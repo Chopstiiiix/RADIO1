@@ -1,0 +1,138 @@
+import { redirect } from "next/navigation";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, display_name, avatar_url")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile) {
+    redirect("/login");
+  }
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      backgroundColor: "var(--bg-base)",
+      fontFamily: "'JetBrains Mono', monospace",
+    }}>
+      {/* Top nav */}
+      <nav style={{
+        maxWidth: "460px",
+        margin: "0 auto",
+        padding: "16px 20px",
+        borderBottom: "2px solid #27272a",
+        backgroundColor: "var(--bg-base)",
+      }}>
+        {/* Top row: brand + user */}
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "12px",
+        }}>
+          <a href={profile.role === "broadcaster" ? "/broadcast" : profile.role === "advertiser" ? "/advertise" : "/listen"}
+            style={{
+              fontSize: "18px", fontWeight: 800, letterSpacing: "-0.05em",
+              color: "#f59e0b", textDecoration: "none", textTransform: "uppercase",
+            }}>
+            Radio1<span style={{ color: "#ffffff" }}>_</span>
+          </a>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{
+              fontSize: "10px",
+              color: "#f59e0b",
+              textTransform: "uppercase",
+              padding: "2px 6px",
+              backgroundColor: "rgba(245, 158, 11, 0.1)",
+              border: "1px solid rgba(245, 158, 11, 0.2)",
+              borderRadius: "2px",
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+            }}>
+              {profile.role}
+            </span>
+            <LogoutButton />
+          </div>
+        </div>
+
+        {/* Nav links row */}
+        <div style={{
+          display: "flex",
+          gap: "6px",
+          overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth: "none",
+        }}>
+          {profile.role === "listener" && (
+            <NavLink href="/listen">Channels</NavLink>
+          )}
+
+          {profile.role === "broadcaster" && (
+            <>
+              <NavLink href="/broadcast">Dashboard</NavLink>
+              <NavLink href="/broadcast/tracks">Tracks</NavLink>
+              <NavLink href="/broadcast/ads">Ads</NavLink>
+              <NavLink href="/broadcast/profile">Profile</NavLink>
+            </>
+          )}
+
+          {profile.role === "advertiser" && (
+            <>
+              <NavLink href="/advertise">Dashboard</NavLink>
+              <NavLink href="/advertise/channels">Channels</NavLink>
+              <NavLink href="/advertise/adverts">My Ads</NavLink>
+              <NavLink href="/advertise/requests">Requests</NavLink>
+            </>
+          )}
+        </div>
+      </nav>
+
+      <main style={{ padding: "24px 20px", maxWidth: "460px", margin: "0 auto" }}>
+        {children}
+      </main>
+    </div>
+  );
+}
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a href={href} style={{
+      fontSize: "13px",
+      color: "var(--text-secondary)",
+      textDecoration: "none",
+      padding: "4px 8px",
+      borderRadius: "4px",
+      transition: "color 0.15s",
+    }}>
+      {children}
+    </a>
+  );
+}
+
+function LogoutButton() {
+  return (
+    <form action="/api/auth/logout" method="POST">
+      <button type="submit" style={{
+        background: "none",
+        border: "1px solid var(--border-subtle)",
+        color: "var(--text-secondary)",
+        padding: "6px 12px",
+        borderRadius: "6px",
+        fontSize: "12px",
+        cursor: "pointer",
+      }}>
+        Sign Out
+      </button>
+    </form>
+  );
+}

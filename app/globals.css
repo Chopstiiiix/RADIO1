@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-base: #202020;
+  --bg-panel: #2B2B2B;
+  --bg-well: #161616;
+  --bg-highlight: #1A2F3D;
+
+  --text-primary: #F0F0F0;
+  --text-secondary: #8C8C8C;
+  --text-tertiary: #5A5A5A;
+  --text-accent: #78B3CE;
+
+  --border-subtle: #383838;
+  --border-strong: #4A4A4A;
+
+  --accent-blue: #78B3CE;
+  --accent-blue-dim: rgba(120, 179, 206, 0.2);
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-well); }
+::-webkit-scrollbar-thumb { background: var(--text-secondary); border-radius: 3px; }
