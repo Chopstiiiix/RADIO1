@@ -45,3 +45,34 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-well); }
 ::-webkit-scrollbar-thumb { background: var(--text-secondary); border-radius: 3px; }
+
+/* Global CTA click animations */
+button,
+a[style*="padding"],
+a[style*="border"],
+.action-btn,
+.broadcast-btn {
+  transition: transform 0.1s ease, filter 0.1s ease, opacity 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:active:not(:disabled),
+a[style*="padding"]:active,
+a[style*="border"]:active,
+.action-btn:active,
+.broadcast-btn:active {
+  transform: scale(0.96) !important;
+  filter: brightness(0.85);
+}
+
+@keyframes cta-press {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 1px solid #f59e0b;
+  outline-offset: 2px;
+}

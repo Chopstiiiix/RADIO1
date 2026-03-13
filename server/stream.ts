@@ -52,6 +52,32 @@ function generateConcatFile(tracks: TrackFile[], outputDir: string): string {
   return concatPath;
 }
 
+export function getChannelTracks(musicDir: string): TrackFile[] {
+  return getTrackFiles(musicDir);
+}
+
+export function startChannelPipelineFromTracks(config: ChannelConfig, tracks: TrackFile[]): TrackFile[] {
+  const { slug, outputDir } = config;
+
+  // Clean old segments
+  if (fs.existsSync(outputDir)) {
+    for (const f of fs.readdirSync(outputDir)) {
+      if (f.endsWith(".ts") || f.endsWith(".m3u8") || f.endsWith(".m4s") || f === "init.mp4") {
+        fs.unlinkSync(path.join(outputDir, f));
+      }
+    }
+  }
+
+  if (tracks.length === 0) {
+    console.log(`⚠️  No tracks for channel ${slug}`);
+    return [];
+  }
+
+  const concatFile = generateConcatFile(tracks, outputDir);
+
+  return launchFfmpeg(slug, outputDir, concatFile, tracks);
+}
+
 export function startChannelPipeline(config: ChannelConfig): TrackFile[] {
   const { slug, musicDir, outputDir } = config;
 
@@ -72,6 +98,10 @@ export function startChannelPipeline(config: ChannelConfig): TrackFile[] {
 
   const concatFile = generateConcatFile(tracks, outputDir);
 
+  return launchFfmpeg(slug, outputDir, concatFile, tracks);
+}
+
+function launchFfmpeg(slug: string, outputDir: string, concatFile: string, tracks: TrackFile[]): TrackFile[] {
   const args = [
     "-re",
     "-f", "concat",

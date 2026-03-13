@@ -50,6 +50,7 @@ function SignupForm() {
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState(initialRole);
   const [channelName, setChannelName] = useState("");
+  const [handle, setHandle] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -75,6 +76,7 @@ function SignupForm() {
           display_name: displayName,
           channel_name: channelName || displayName,
           channel_slug: slug,
+          handle: handle || undefined,
         },
       },
     });
@@ -212,17 +214,46 @@ function SignupForm() {
           </div>
 
           {role === "broadcaster" && (
-            <div>
-              <label style={labelStyle}>Channel Name</label>
-              <input
-                type="text"
-                placeholder="My Radio Channel"
-                value={channelName}
-                onChange={(e) => setChannelName(e.target.value)}
-                required
-                style={inputStyle}
-              />
-            </div>
+            <>
+              <div>
+                <label style={labelStyle}>Channel Name</label>
+                <input
+                  type="text"
+                  placeholder="My Radio Channel"
+                  value={channelName}
+                  onChange={(e) => setChannelName(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Handle</label>
+                <div style={{ position: "relative" }}>
+                  <span style={{
+                    position: "absolute",
+                    left: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "#f59e0b",
+                    fontSize: "13px",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    pointerEvents: "none",
+                  }}>@</span>
+                  <input
+                    type="text"
+                    placeholder="yourhandle"
+                    value={handle}
+                    onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                    required
+                    maxLength={30}
+                    style={{ ...inputStyle, paddingLeft: "28px" }}
+                  />
+                </div>
+                <p style={{ fontSize: "9px", color: "#52525b", marginTop: "4px", letterSpacing: "0.05em" }}>
+                  LETTERS, NUMBERS, UNDERSCORES ONLY
+                </p>
+              </div>
+            </>
           )}
 
           <div>

@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { supabase } from "./supabase";
-import { startChannelPipeline, stopChannelPipeline, streamEvents, type ChannelConfig } from "./stream";
+import { startChannelPipeline, stopChannelPipeline, startChannelPipelineFromTracks, getChannelTracks, streamEvents, type ChannelConfig, type TrackFile } from "./stream";
 import { startChannelScheduler, stopChannelScheduler } from "./scheduler";
 import { syncTracksForChannel } from "./track-sync";
 
@@ -100,4 +100,81 @@ export async function restartChannel(slug: string) {
 
   await stopChannel(slug);
   await startChannel(channel.broadcasterId, slug);
+}
+
+// ──── Queue / Cue management ────
+
+// Per-channel cued track filename (next up)
+const cuedTracks = new Map<string, string>();
+
+export function cueTrack(slug: string, filename: string): boolean {
+  const channel = activeChannels.get(slug);
+  if (!channel) return false;
+
+  // Verify the file exists
+  const allTracks = getChannelTracks(channel.config.musicDir);
+  const found = allTracks.find((t) => t.filename === filename);
+  if (!found) return false;
+
+  cuedTracks.set(slug, filename);
+  console.log(`🎯 [${slug}] Cued next: ${filename}`);
+  return true;
+}
+
+export function getCuedTrack(slug: string): string | null {
+  return cuedTracks.get(slug) || null;
+}
+
+export function clearCuedTrack(slug: string) {
+  cuedTracks.delete(slug);
+}
+
+export async function skipToTrack(slug: string, filename: string): Promise<boolean> {
+  const channel = activeChannels.get(slug);
+  if (!channel) return false;
+
+  const { config, broadcasterId } = channel;
+  const allTracks = getChannelTracks(config.musicDir);
+
+  // Find the target track index
+  const targetIdx = allTracks.findIndex((t) => t.filename === filename);
+  if (targetIdx === -1) return false;
+
+  // Reorder: target track first, then remaining tracks after it, then tracks before it
+  const reordered = [
+    ...allTracks.slice(targetIdx),
+    ...allTracks.slice(0, targetIdx),
+  ];
+
+  console.log(`⏭️  [${slug}] Skipping to: ${filename}`);
+
+  // Stop current pipeline + scheduler
+  stopChannelPipeline(slug);
+  stopChannelScheduler(slug);
+
+  // Clear cue
+  cuedTracks.delete(slug);
+
+  // Brief delay for ffmpeg to exit
+  await new Promise((r) => setTimeout(r, 500));
+
+  // Restart with reordered tracks
+  const tracks = startChannelPipelineFromTracks(config, reordered);
+  if (tracks.length > 0) {
+    await startChannelScheduler(config, tracks, broadcasterId);
+    console.log(`▶️  [${slug}] Now playing: ${filename}`);
+  }
+
+  return tracks.length > 0;
+}
+
+export function getChannelQueue(slug: string): { tracks: { filename: string; duration: number }[]; cued: string | null } | null {
+  const channel = activeChannels.get(slug);
+  if (!channel) return null;
+
+  const allTracks = getChannelTracks(channel.config.musicDir);
+  return {
+    tracks: allTracks.map((t) => ({ filename: t.filename, duration: t.duration })),
+    cued: cuedTracks.get(slug) || null,
+  };
 }

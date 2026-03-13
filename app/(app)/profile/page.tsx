@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import InlineLoader from "@/app/components/InlineLoader";
 import { useRouter } from "next/navigation";
 
-export default function BroadcasterProfile() {
+export default function ProfilePage() {
   const supabase = createClient();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -16,9 +16,6 @@ export default function BroadcasterProfile() {
 
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
-  const [channelName, setChannelName] = useState("");
-  const [genre, setGenre] = useState("");
-  const [handleVal, setHandleVal] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,21 +29,10 @@ export default function BroadcasterProfile() {
         .eq("id", user.id)
         .single();
 
-      const { data: channel } = await supabase
-        .from("broadcaster_profiles")
-        .select("channel_name, genre, handle")
-        .eq("id", user.id)
-        .single();
-
       if (profile) {
         setDisplayName(profile.display_name);
         setBio(profile.bio || "");
         setAvatarUrl(profile.avatar_url || null);
-      }
-      if (channel) {
-        setChannelName(channel.channel_name);
-        setGenre((channel.genre || []).join(", "));
-        setHandleVal(channel.handle || "");
       }
       setLoading(false);
     }
@@ -96,23 +82,14 @@ export default function BroadcasterProfile() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const genreArray = genre.split(",").map((g) => g.trim()).filter(Boolean);
+    const { error } = await supabase.from("profiles").update({
+      display_name: displayName,
+      bio,
+      updated_at: new Date().toISOString(),
+    }).eq("id", user.id);
 
-    const [profileRes, channelRes] = await Promise.all([
-      supabase.from("profiles").update({
-        display_name: displayName,
-        bio,
-        updated_at: new Date().toISOString(),
-      }).eq("id", user.id),
-      supabase.from("broadcaster_profiles").update({
-        channel_name: channelName,
-        genre: genreArray,
-        handle: handleVal || null,
-      }).eq("id", user.id),
-    ]);
-
-    if (profileRes.error || channelRes.error) {
-      setMessage("Error saving: " + (profileRes.error?.message || channelRes.error?.message));
+    if (error) {
+      setMessage("Error saving: " + error.message);
     } else {
       setMessage("Profile updated.");
     }
@@ -249,51 +226,6 @@ export default function BroadcasterProfile() {
         }}
       >
         <Field label="Display Name" value={displayName} onChange={setDisplayName} />
-        <Field label="Channel Name" value={channelName} onChange={setChannelName} />
-        <div>
-          <label style={{
-            display: "block",
-            fontSize: "12px",
-            color: "#52525b",
-            marginBottom: "6px",
-            fontFamily: "var(--font-mono)",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-          }}>
-            Handle
-          </label>
-          <div style={{ position: "relative" }}>
-            <span style={{
-              position: "absolute",
-              left: "12px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "#f59e0b",
-              fontSize: "14px",
-              fontFamily: "var(--font-mono)",
-              pointerEvents: "none",
-            }}>@</span>
-            <input
-              value={handleVal}
-              onChange={(e) => setHandleVal(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-              placeholder="yourhandle"
-              maxLength={30}
-              style={{
-                width: "100%",
-                padding: "12px",
-                paddingLeft: "28px",
-                backgroundColor: "#0a0a0a",
-                border: "1px solid #27272a",
-                borderRadius: "0px",
-                color: "var(--text-primary)",
-                fontSize: "14px",
-                outline: "none",
-                fontFamily: "var(--font-mono)",
-              }}
-            />
-          </div>
-        </div>
-        <Field label="Genres" value={genre} onChange={setGenre} placeholder="hip-hop, r&b, afrobeats" />
 
         <div>
           <label style={{

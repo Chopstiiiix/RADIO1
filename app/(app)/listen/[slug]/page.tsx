@@ -42,6 +42,58 @@ export default function ChannelPage() {
   const [isFavorited, setIsFavorited] = useState(false);
   const heartRef = useRef<LottieRefCurrentProps>(null);
 
+  // Follow state
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [togglingFollow, setTogglingFollow] = useState(false);
+  const [broadcasterId, setBroadcasterId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Check follow status
+  useEffect(() => {
+    async function checkFollow() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setCurrentUserId(user.id);
+
+      const { data: ch } = await supabase
+        .from("broadcaster_profiles")
+        .select("id")
+        .eq("channel_slug", slug)
+        .single();
+      if (!ch) return;
+      setBroadcasterId(ch.id);
+
+      const { data: follow } = await supabase
+        .from("follows")
+        .select("id")
+        .eq("follower_id", user.id)
+        .eq("broadcaster_id", ch.id)
+        .maybeSingle();
+      setIsFollowing(!!follow);
+    }
+    checkFollow();
+  }, [slug, supabase]);
+
+  async function toggleFollow() {
+    if (!currentUserId || !broadcasterId || togglingFollow) return;
+    setTogglingFollow(true);
+
+    if (isFollowing) {
+      await supabase
+        .from("follows")
+        .delete()
+        .eq("follower_id", currentUserId)
+        .eq("broadcaster_id", broadcasterId);
+      setIsFollowing(false);
+    } else {
+      await supabase
+        .from("follows")
+        .insert({ follower_id: currentUserId, broadcaster_id: broadcasterId });
+      setIsFollowing(true);
+    }
+    setTogglingFollow(false);
+  }
+
   useEffect(() => {
     // Check DB for like status
     async function checkLike() {
@@ -365,7 +417,7 @@ export default function ChannelPage() {
           </div>
         </div>
 
-        {/* Channel title + heart */}
+        {/* Channel title + heart + follow */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <h1 className="neon-title" style={{
             fontSize: "30px",
@@ -374,6 +426,11 @@ export default function ChannelPage() {
             textTransform: "uppercase",
             lineHeight: 1,
             display: "inline-block",
+            flex: 1,
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}>
             {channel.channel_name}
           </h1>
@@ -413,6 +470,30 @@ export default function ChannelPage() {
               />
             )}
           </button>
+          {currentUserId && broadcasterId && currentUserId !== broadcasterId && (
+            <button
+              onClick={toggleFollow}
+              disabled={togglingFollow}
+              style={{
+                padding: "6px 14px",
+                backgroundColor: isFollowing ? "transparent" : "#f59e0b",
+                color: isFollowing ? "#f59e0b" : "#0a0a0a",
+                border: "1px solid #f59e0b",
+                borderRadius: "0px",
+                fontSize: "10px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                cursor: togglingFollow ? "not-allowed" : "pointer",
+                fontFamily: "'JetBrains Mono', monospace",
+                flexShrink: 0,
+                opacity: togglingFollow ? 0.6 : 1,
+                transition: "all 0.15s",
+              }}
+            >
+              {isFollowing ? "Following" : "Follow"}
+            </button>
+          )}
         </div>
 
         {/* Channel name */}

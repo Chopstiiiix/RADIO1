@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import EndBroadcastButton from "./EndBroadcastButton";
 
 export default async function BroadcastDashboard() {
   const supabase = await createServerSupabaseClient();
@@ -98,35 +99,95 @@ export default async function BroadcastDashboard() {
       }}>
         {"// QUICK_ACTIONS"}
       </div>
+      <style>{`
+        .action-btn {
+          padding: 12px 16px;
+          background-color: transparent;
+          border: 1px solid #27272a;
+          color: #a1a1aa;
+          font-size: 11px;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          text-decoration: none;
+          text-align: center;
+          display: block;
+        }
+        .action-btn:hover {
+          border-color: #f59e0b;
+          color: #f59e0b;
+        }
+        .action-btn:active {
+          background-color: rgba(245, 158, 11, 0.08);
+        }
+        @keyframes green-glow-pulse {
+          0%, 100% { box-shadow: 0 0 4px rgba(74, 222, 128, 0.3); }
+          50% { box-shadow: 0 0 12px rgba(74, 222, 128, 0.5), 0 0 20px rgba(74, 222, 128, 0.15); }
+        }
+        .now-broadcasting-btn {
+          animation: green-glow-pulse 2s ease-in-out infinite;
+        }
+      `}</style>
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <a href="/broadcast/tracks" style={{
-          padding: "12px 20px",
-          backgroundColor: channel?.is_live ? "transparent" : "#4ADE80",
-          border: channel?.is_live ? "1px solid #4ADE80" : "none",
-          color: channel?.is_live ? "#4ADE80" : "#0a0a0a",
-          fontSize: "11px",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          textDecoration: "none",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "8px",
-        }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" />
-            <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4" />
-            <circle cx="12" cy="12" r="2" fill="currentColor" />
-            <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4" />
-            <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
-          </svg>
-          {channel?.is_live ? "NOW BROADCASTING" : "START BROADCAST"}
-        </a>
-        <ActionButton href="/broadcast/tracks/upload" label="Upload Track" />
-        <ActionButton href="/broadcast/tracks" label="Manage Tracks" />
-        <ActionButton href="/broadcast/ads" label="Review Ads" />
-        <ActionButton href="/broadcast/profile" label="Edit Profile" />
+        {channel?.is_live ? (
+          <div style={{ display: "flex", gap: "8px" }}>
+            <a href="/broadcast/go-live" className="now-broadcasting-btn" style={{
+              flex: 1,
+              padding: "12px 20px",
+              backgroundColor: "transparent",
+              border: "1px solid #4ADE80",
+              color: "#4ADE80",
+              fontSize: "11px",
+              fontWeight: 700,
+              textTransform: "uppercase" as const,
+              letterSpacing: "0.05em",
+              textDecoration: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" />
+                <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4" />
+                <circle cx="12" cy="12" r="2" fill="currentColor" />
+                <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4" />
+                <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
+              </svg>
+              NOW BROADCASTING
+            </a>
+            <EndBroadcastButton />
+          </div>
+        ) : (
+          <a href="/broadcast/go-live" style={{
+            padding: "12px 20px",
+            backgroundColor: "#4ADE80",
+            border: "none",
+            color: "#0a0a0a",
+            fontSize: "11px",
+            fontWeight: 700,
+            textTransform: "uppercase" as const,
+            letterSpacing: "0.05em",
+            textDecoration: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" />
+              <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4" />
+              <circle cx="12" cy="12" r="2" fill="currentColor" />
+              <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4" />
+              <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
+            </svg>
+            START BROADCAST
+          </a>
+        )}
+        <a href="/broadcast/tracks/upload" className="action-btn">Upload Track</a>
+        <a href="/broadcast/tracks" className="action-btn">Manage Tracks</a>
+        <a href="/broadcast/ads" className="action-btn">Review Ads</a>
+        <a href="/broadcast/profile" className="action-btn">Edit Profile</a>
       </div>
     </div>
   );
@@ -155,20 +216,3 @@ function StatCard({ label, value, accent }: { label: string; value: string; acce
   );
 }
 
-function ActionButton({ href, label }: { href: string; label: string }) {
-  return (
-    <a href={href} style={{
-      padding: "12px 16px",
-      backgroundColor: "transparent",
-      border: "1px solid #27272a",
-      color: "#a1a1aa",
-      fontSize: "11px",
-      fontWeight: 500,
-      textTransform: "uppercase",
-      letterSpacing: "0.05em",
-      textDecoration: "none",
-      textAlign: "center",
-      transition: "border-color 0.15s",
-    }}>{label}</a>
-  );
-}

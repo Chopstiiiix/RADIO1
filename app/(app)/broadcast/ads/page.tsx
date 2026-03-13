@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import InlineLoader from "@/app/components/InlineLoader";
 
@@ -9,7 +9,7 @@ interface AdRequest {
   status: string;
   frequency: string;
   requested_at: string;
-  advert: { title: string; description: string | null };
+  advert: { title: string; description: string | null; file_url: string | null; duration_seconds: number | null };
   advertiser: { display_name: string };
 }
 
@@ -17,6 +17,7 @@ export default function AdRequestsPage() {
   const supabase = createClient();
   const [requests, setRequests] = useState<AdRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -26,7 +27,7 @@ export default function AdRequestsPage() {
       .from("ad_requests")
       .select(`
         id, status, frequency, requested_at,
-        advert:adverts(title, description),
+        advert:adverts(title, description, file_url, duration_seconds),
         advertiser:profiles!ad_requests_advertiser_id_fkey(display_name)
       `)
       .eq("broadcaster_id", user.id)
@@ -43,7 +44,15 @@ export default function AdRequestsPage() {
       status,
       responded_at: new Date().toISOString(),
     }).eq("id", id);
+    setReviewingId(null);
     load();
+  }
+
+  function formatDuration(seconds: number | null) {
+    if (!seconds) return "—";
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
   }
 
   return (
@@ -104,80 +113,314 @@ export default function AdRequestsPage() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {requests.map((req) => (
-            <div key={req.id} style={{
-              padding: "16px",
-              backgroundColor: "rgba(24, 24, 27, 0.3)",
-              borderLeft: "2px solid #27272a",
-              borderRadius: "0px",
-              display: "flex",
-              alignItems: "center",
-              gap: "16px",
-            }}>
-              <div style={{ flex: 1 }}>
-                <div style={{
-                  fontWeight: 600,
-                  fontSize: "14px",
-                  textTransform: "uppercase",
-                }}>
-                  {(req.advert as any)?.title ?? "Unknown Ad"}
-                </div>
-                <div style={{ fontSize: "13px" }}>
-                  <span style={{
-                    color: "#52525b",
-                    textTransform: "uppercase",
-                  }}>
-                    From:
-                  </span>{" "}
-                  <span style={{ color: "var(--text-secondary)" }}>
-                    {(req.advertiser as any)?.display_name ?? "Unknown"} — {req.frequency}
-                  </span>
-                </div>
-                {(req.advert as any)?.description && (
-                  <div style={{ color: "var(--text-tertiary)", fontSize: "12px", marginTop: "4px" }}>
-                    {(req.advert as any).description}
-                  </div>
-                )}
-              </div>
+          {requests.map((req) => {
+            const advert = req.advert as any;
+            const advertiser = req.advertiser as any;
+            const isReviewing = reviewingId === req.id;
 
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: "11px", textTransform: "uppercase" }}>
-                {req.status === "pending" ? (
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button onClick={() => respond(req.id, "approved")} style={{
-                      padding: "6px 14px",
-                      backgroundColor: "rgba(74, 222, 128, 0.1)",
-                      border: "1px solid #4ADE80",
-                      color: "#4ADE80",
-                      borderRadius: "0px",
-                      cursor: "pointer",
-                      fontSize: "11px",
+            return (
+              <div key={req.id} style={{
+                backgroundColor: "rgba(24, 24, 27, 0.3)",
+                borderLeft: isReviewing ? "3px solid #f59e0b" : "2px solid #27272a",
+                borderRadius: "0px",
+                overflow: "hidden",
+              }}>
+                {/* Header row */}
+                <div style={{
+                  padding: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "16px",
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{
                       fontWeight: 600,
+                      fontSize: "14px",
                       textTransform: "uppercase",
-                    }}>Approve</button>
-                    <button onClick={() => respond(req.id, "declined")} style={{
-                      padding: "6px 14px",
-                      backgroundColor: "rgba(245, 158, 11, 0.1)",
-                      border: "1px solid #f59e0b",
-                      color: "#f59e0b",
-                      borderRadius: "0px",
-                      cursor: "pointer",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                    }}>Decline</button>
+                    }}>
+                      {advert?.title ?? "Unknown Ad"}
+                    </div>
+                    <div style={{ fontSize: "13px" }}>
+                      <span style={{
+                        color: "#52525b",
+                        textTransform: "uppercase",
+                      }}>
+                        From:
+                      </span>{" "}
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        {advertiser?.display_name ?? "Unknown"} — {req.frequency}
+                      </span>
+                    </div>
                   </div>
-                ) : (
-                  <span style={{
-                    color: req.status === "approved" ? "#4ADE80" : "#E24A4A",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}>{req.status}</span>
+
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: "11px", textTransform: "uppercase" }}>
+                    {req.status === "pending" ? (
+                      <button
+                        onClick={() => setReviewingId(isReviewing ? null : req.id)}
+                        style={{
+                          padding: "6px 14px",
+                          backgroundColor: isReviewing ? "rgba(245, 158, 11, 0.15)" : "rgba(245, 158, 11, 0.1)",
+                          border: "1px solid #f59e0b",
+                          color: "#f59e0b",
+                          borderRadius: "0px",
+                          cursor: "pointer",
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        {isReviewing ? "Close" : "Review"}
+                      </button>
+                    ) : (
+                      <span style={{
+                        color: req.status === "approved" ? "#4ADE80" : "#E24A4A",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                      }}>{req.status}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Review panel */}
+                {isReviewing && (
+                  <ReviewPanel
+                    req={req}
+                    onApprove={() => respond(req.id, "approved")}
+                    onDecline={() => respond(req.id, "declined")}
+                    formatDuration={formatDuration}
+                  />
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
+
+function ReviewPanel({ req, onApprove, onDecline, formatDuration }: {
+  req: AdRequest;
+  onApprove: () => void;
+  onDecline: () => void;
+  formatDuration: (s: number | null) => string;
+}) {
+  const advert = req.advert as any;
+  const advertiser = req.advertiser as any;
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  function togglePlay() {
+    if (!audioRef.current) return;
+    if (playing) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setPlaying(!playing);
+  }
+
+  function handleTimeUpdate() {
+    if (!audioRef.current) return;
+    const ct = audioRef.current.currentTime;
+    const dur = audioRef.current.duration || 1;
+    setCurrentTime(ct);
+    setProgress((ct / dur) * 100);
+  }
+
+  function handleSeek(e: React.MouseEvent<HTMLDivElement>) {
+    if (!audioRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    audioRef.current.currentTime = pct * (audioRef.current.duration || 0);
+  }
+
+  return (
+    <div style={{
+      padding: "0 16px 16px",
+      borderTop: "1px solid #1a1a1e",
+    }}>
+      {/* Ad details */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "12px",
+        marginBottom: "16px",
+        paddingTop: "16px",
+      }}>
+        <div>
+          <div style={detailLabel}>Advertiser</div>
+          <div style={detailValue}>{advertiser?.display_name ?? "Unknown"}</div>
+        </div>
+        <div>
+          <div style={detailLabel}>Frequency</div>
+          <div style={detailValue}>{req.frequency}</div>
+        </div>
+        <div>
+          <div style={detailLabel}>Duration</div>
+          <div style={detailValue}>{formatDuration(advert?.duration_seconds)}</div>
+        </div>
+        <div>
+          <div style={detailLabel}>Requested</div>
+          <div style={detailValue}>{new Date(req.requested_at).toLocaleDateString()}</div>
+        </div>
+      </div>
+
+      {advert?.description && (
+        <div style={{ marginBottom: "16px" }}>
+          <div style={detailLabel}>Description</div>
+          <div style={{
+            ...detailValue,
+            lineHeight: "1.5",
+          }}>{advert.description}</div>
+        </div>
+      )}
+
+      {/* Audio player */}
+      {advert?.file_url ? (
+        <div style={{
+          backgroundColor: "rgba(10, 10, 10, 0.6)",
+          border: "1px solid #27272a",
+          padding: "12px 16px",
+          marginBottom: "16px",
+        }}>
+          <audio
+            ref={audioRef}
+            src={advert.file_url}
+            onTimeUpdate={handleTimeUpdate}
+            onEnded={() => { setPlaying(false); setProgress(0); setCurrentTime(0); }}
+            preload="metadata"
+          />
+
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {/* Play/Pause button */}
+            <button onClick={togglePlay} style={{
+              width: "36px",
+              height: "36px",
+              backgroundColor: "#f59e0b",
+              border: "none",
+              borderRadius: "0px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}>
+              {playing ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#0a0a0a" stroke="none">
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#0a0a0a" stroke="none">
+                  <polygon points="6,4 20,12 6,20" />
+                </svg>
+              )}
+            </button>
+
+            {/* Progress bar */}
+            <div style={{ flex: 1 }}>
+              <div
+                onClick={handleSeek}
+                style={{
+                  height: "4px",
+                  backgroundColor: "#27272a",
+                  cursor: "pointer",
+                  position: "relative",
+                }}
+              >
+                <div style={{
+                  height: "100%",
+                  width: `${progress}%`,
+                  backgroundColor: "#f59e0b",
+                  transition: "width 0.1s linear",
+                }} />
+              </div>
+            </div>
+
+            {/* Time */}
+            <div style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "11px",
+              color: "#71717a",
+              minWidth: "40px",
+              textAlign: "right",
+            }}>
+              {formatDuration(currentTime)}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          padding: "20px",
+          textAlign: "center",
+          backgroundColor: "rgba(10, 10, 10, 0.4)",
+          border: "1px solid #27272a",
+          marginBottom: "16px",
+        }}>
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "11px",
+            color: "#52525b",
+            textTransform: "uppercase",
+          }}>
+            No audio file available
+          </span>
+        </div>
+      )}
+
+      {/* Approve / Decline buttons */}
+      <div style={{ display: "flex", gap: "8px" }}>
+        <button onClick={onApprove} style={{
+          flex: 1,
+          padding: "12px",
+          backgroundColor: "rgba(74, 222, 128, 0.1)",
+          border: "1px solid #4ADE80",
+          color: "#4ADE80",
+          borderRadius: "0px",
+          cursor: "pointer",
+          fontSize: "11px",
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+          fontFamily: "var(--font-mono)",
+        }}>
+          Approve
+        </button>
+        <button onClick={onDecline} style={{
+          flex: 1,
+          padding: "12px",
+          backgroundColor: "rgba(226, 74, 74, 0.1)",
+          border: "1px solid #E24A4A",
+          color: "#E24A4A",
+          borderRadius: "0px",
+          cursor: "pointer",
+          fontSize: "11px",
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+          fontFamily: "var(--font-mono)",
+        }}>
+          Decline
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const detailLabel: React.CSSProperties = {
+  fontSize: "10px",
+  color: "#52525b",
+  textTransform: "uppercase",
+  letterSpacing: "0.1em",
+  fontFamily: "var(--font-mono)",
+  marginBottom: "2px",
+};
+
+const detailValue: React.CSSProperties = {
+  fontSize: "13px",
+  color: "var(--text-secondary)",
+};

@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No channel configured" }, { status: 400 });
   }
 
-  const { action } = await req.json();
+  const body = await req.json();
+  const { action, filename } = body;
 
   if (action === "start") {
     if (channel.is_live) {
@@ -78,5 +79,45 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ error: "Invalid action — use 'start' or 'stop'" }, { status: 400 });
+  if (action === "skip") {
+    if (!filename) {
+      return NextResponse.json({ error: "filename required" }, { status: 400 });
+    }
+    try {
+      const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/skip`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return NextResponse.json({ error: data.error }, { status: res.status });
+      }
+      return NextResponse.json({ ok: true, message: data.message });
+    } catch {
+      return NextResponse.json({ error: "Broadcast server unavailable" }, { status: 503 });
+    }
+  }
+
+  if (action === "cue") {
+    if (!filename) {
+      return NextResponse.json({ error: "filename required" }, { status: 400 });
+    }
+    try {
+      const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/cue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return NextResponse.json({ error: data.error }, { status: res.status });
+      }
+      return NextResponse.json({ ok: true, message: data.message });
+    } catch {
+      return NextResponse.json({ error: "Broadcast server unavailable" }, { status: 503 });
+    }
+  }
+
+  return NextResponse.json({ error: "Invalid action — use 'start', 'stop', 'skip', or 'cue'" }, { status: 400 });
 }

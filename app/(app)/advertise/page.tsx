@@ -58,9 +58,9 @@ export default async function AdvertiseDashboard() {
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "32px" }}>
-        <StatCard label="My Adverts" value={String(adCount ?? 0)} accent />
-        <StatCard label="Pending Requests" value={String(pendingCount ?? 0)} />
-        <StatCard label="Approved Placements" value={String(approvedCount ?? 0)} />
+        <StatCard label="My Adverts" value={String(adCount ?? 0)} accent href="/advertise/adverts" />
+        <StatCard label="Pending Requests" value={String(pendingCount ?? 0)} href="/advertise/requests" />
+        <StatCard label="Approved Placements" value={String(approvedCount ?? 0)} href="/advertise/requests" />
       </div>
 
       {/* // QUICK_ACTIONS */}
@@ -76,13 +76,15 @@ export default async function AdvertiseDashboard() {
   );
 }
 
-function StatCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
+function StatCard({ label, value, accent, href }: { label: string; value: string; accent?: boolean; href?: string }) {
+  const content = (
     <div style={{
       padding: "20px",
       backgroundColor: "rgba(24, 24, 27, 0.3)",
       borderLeft: accent ? "3px solid #f59e0b" : "3px solid #27272a",
       borderRadius: "0px",
+      cursor: href ? "pointer" : "default",
+      transition: "background-color 0.15s",
     }}>
       <div style={{
         fontFamily: "monospace",
@@ -95,6 +97,11 @@ function StatCard({ label, value, accent }: { label: string; value: string; acce
       <div style={{ fontSize: "22px", fontWeight: 700 }}>{value}</div>
     </div>
   );
+
+  if (href) {
+    return <a href={href} className="action-btn" style={{ textDecoration: "none", color: "inherit", display: "block", padding: 0, border: "none" }}>{content}</a>;
+  }
+  return content;
 }
 
 function ActionButton({ href, label }: { href: string; label: string }) {

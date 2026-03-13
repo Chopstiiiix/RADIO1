@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import { startStreamServer } from "./stream";
 import { startMetadataServer } from "./metadata-server";
-import { startChannel, stopChannel, getActiveChannels } from "./channel-manager";
+import { startChannel, stopChannel, getActiveChannels, skipToTrack, cueTrack, getCuedTrack, getChannelQueue } from "./channel-manager";
 import { supabase } from "./supabase";
 
 const STREAM_PORT = parseInt(process.env.STREAM_PORT || "8000");
@@ -56,6 +56,51 @@ async function main() {
     const { slug } = req.params;
     await stopChannel(slug);
     res.json({ ok: true, message: `Channel ${slug} is now offline` });
+  });
+
+  // Skip to a specific track (play immediately)
+  api.post("/api/channels/:slug/skip", async (req, res) => {
+    const { slug } = req.params;
+    const { filename } = req.body;
+
+    if (!filename) {
+      return res.status(400).json({ error: "filename required" });
+    }
+
+    const success = await skipToTrack(slug, filename);
+    if (success) {
+      res.json({ ok: true, message: `Now playing: ${filename}` });
+    } else {
+      res.status(400).json({ error: "Track not found or channel not active" });
+    }
+  });
+
+  // Cue a track as next up
+  api.post("/api/channels/:slug/cue", (req, res) => {
+    const { slug } = req.params;
+    const { filename } = req.body;
+
+    if (!filename) {
+      return res.status(400).json({ error: "filename required" });
+    }
+
+    const success = cueTrack(slug, filename);
+    if (success) {
+      res.json({ ok: true, message: `Cued: ${filename}` });
+    } else {
+      res.status(400).json({ error: "Track not found or channel not active" });
+    }
+  });
+
+  // Get channel queue info
+  api.get("/api/channels/:slug/queue", (req, res) => {
+    const { slug } = req.params;
+    const queue = getChannelQueue(slug);
+    if (queue) {
+      res.json(queue);
+    } else {
+      res.status(404).json({ error: "Channel not active" });
+    }
   });
 
   // List active channels

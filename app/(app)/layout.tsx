@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import NotificationButton from "@/app/components/NotificationButton";
+import AvatarMenu from "@/app/components/AvatarMenu";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient();
@@ -19,6 +20,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!profile) {
     redirect("/login");
   }
+
+  const profileHref =
+    profile.role === "broadcaster" ? "/broadcast/profile" :
+    profile.role === "advertiser" ? "/advertise/profile" :
+    "/profile";
 
   return (
     <div style={{
@@ -63,7 +69,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               {profile.role}
             </span>
             {profile.role !== "listener" && <NotificationButton role={profile.role} />}
-            <LogoutButton />
+            <AvatarMenu
+              avatarUrl={profile.avatar_url || null}
+              displayName={profile.display_name}
+              role={profile.role}
+              profileHref={profileHref}
+            />
           </div>
         </div>
 
@@ -76,7 +87,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           scrollbarWidth: "none",
         }}>
           {profile.role === "listener" && (
-            <NavLink href="/listen">Channels</NavLink>
+            <>
+              <NavLink href="/listen">Channels</NavLink>
+              <NavLink href="/search">Search</NavLink>
+            </>
           )}
 
           {profile.role === "broadcaster" && (
@@ -85,8 +99,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <NavLink href="/broadcast/tracks">Tracks</NavLink>
               <NavLink href="/broadcast/ads">Ads</NavLink>
               <NavLink href="/listen">Listen</NavLink>
+              <NavLink href="/search">Search</NavLink>
               <NavLink href="/broadcast/go-live">Live</NavLink>
-              <NavLink href="/broadcast/profile">Profile</NavLink>
             </>
           )}
 
@@ -97,6 +111,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <NavLink href="/advertise/adverts">My Ads</NavLink>
               <NavLink href="/advertise/requests">Requests</NavLink>
               <NavLink href="/listen">Listen</NavLink>
+              <NavLink href="/search">Search</NavLink>
             </>
           )}
         </div>
@@ -122,23 +137,5 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
     }}>
       {children}
     </a>
-  );
-}
-
-function LogoutButton() {
-  return (
-    <form action="/api/auth/logout" method="POST">
-      <button type="submit" style={{
-        background: "none",
-        border: "1px solid var(--border-subtle)",
-        color: "var(--text-secondary)",
-        padding: "6px 12px",
-        borderRadius: "6px",
-        fontSize: "12px",
-        cursor: "pointer",
-      }}>
-        Sign Out
-      </button>
-    </form>
   );
 }
