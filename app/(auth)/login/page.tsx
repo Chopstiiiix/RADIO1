@@ -1,16 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PasswordInput from "@/app/components/PasswordInput";
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirectTo");
   const supabase = createClient();
 
   async function handleLogin(e: React.FormEvent) {
@@ -26,9 +36,13 @@ export default function LoginPage() {
       return;
     }
 
-    // Get role to redirect
+    // Redirect to intended page or role-based default
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      if (redirectTo) {
+        router.push(redirectTo);
+        return;
+      }
       const { data: profile } = await supabase
         .from("profiles")
         .select("role")
@@ -179,19 +193,19 @@ export default function LoginPage() {
         {/* Role CTAs */}
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           <RoleCTA
-            href="/signup?role=listener"
+            href={`/signup?role=listener${redirectTo ? `&redirectTo=${encodeURIComponent(redirectTo)}` : ""}`}
             role="listener"
             title="Listener"
             description="Browse channels and enjoy live radio"
           />
           <RoleCTA
-            href="/signup?role=broadcaster"
+            href={`/signup?role=broadcaster${redirectTo ? `&redirectTo=${encodeURIComponent(redirectTo)}` : ""}`}
             role="broadcaster"
             title="Broadcaster"
             description="Create your own channel and go live"
           />
           <RoleCTA
-            href="/signup?role=advertiser"
+            href={`/signup?role=advertiser${redirectTo ? `&redirectTo=${encodeURIComponent(redirectTo)}` : ""}`}
             role="advertiser"
             title="Advertiser"
             description="Place ads on popular channels"

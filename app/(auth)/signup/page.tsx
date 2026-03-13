@@ -44,6 +44,7 @@ export default function SignupPage() {
 function SignupForm() {
   const searchParams = useSearchParams();
   const initialRole = searchParams.get("role") || "listener";
+  const redirectTo = searchParams.get("redirectTo");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -93,9 +94,15 @@ function SignupForm() {
       return;
     }
 
-    if (role === "broadcaster") router.push("/broadcast");
-    else if (role === "advertiser") router.push("/advertise");
-    else router.push("/listen");
+    if (redirectTo) {
+      router.push(redirectTo);
+    } else if (role === "broadcaster") {
+      router.push("/broadcast");
+    } else if (role === "advertiser") {
+      router.push("/advertise");
+    } else {
+      router.push("/listen");
+    }
   }
 
   return (
@@ -313,7 +320,7 @@ function SignupForm() {
             fontFamily: "'JetBrains Mono', monospace",
           }}>
             Already have an account?{" "}
-            <a href="/login" style={{ color: "#f59e0b", textDecoration: "none" }}>Sign in</a>
+            <a href={`/login${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ""}`} style={{ color: "#f59e0b", textDecoration: "none" }}>Sign in</a>
           </p>
         </form>
       </div>

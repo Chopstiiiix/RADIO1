@@ -48,6 +48,9 @@ export default function ChannelPage() {
   const [broadcasterId, setBroadcasterId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+  // Share state
+  const [showShareToast, setShowShareToast] = useState(false);
+
   // Check follow status
   useEffect(() => {
     async function checkFollow() {
@@ -879,14 +882,29 @@ export default function ChannelPage() {
             </button>
           </div>
 
-          {/* Right: Share / back to channels */}
+          {/* Right: Share channel link */}
           <button
-            onClick={() => router.push("/listen")}
+            onClick={async () => {
+              const shareUrl = `${window.location.origin}/listen/${slug}`;
+              const shareData = {
+                title: `${channel.channel_name} on Radio1`,
+                text: `Listen to ${channel.channel_name} on Radio1`,
+                url: shareUrl,
+              };
+              if (navigator.share && navigator.canShare?.(shareData)) {
+                try { await navigator.share(shareData); } catch { /* user cancelled */ }
+              } else {
+                await navigator.clipboard.writeText(shareUrl);
+                setShowShareToast(true);
+                setTimeout(() => setShowShareToast(false), 2000);
+              }
+            }}
             style={{
               background: "none", border: "none", padding: "12px",
               cursor: "pointer", color: "#71717a",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "color 0.2s",
+              position: "relative",
             }}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -896,6 +914,21 @@ export default function ChannelPage() {
               <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
               <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
             </svg>
+            {showShareToast && (
+              <span style={{
+                position: "absolute",
+                bottom: "100%",
+                right: 0,
+                backgroundColor: "#f59e0b",
+                color: "#0a0a0a",
+                fontSize: "10px",
+                fontWeight: 700,
+                padding: "4px 8px",
+                whiteSpace: "nowrap",
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+              }}>Link copied</span>
+            )}
           </button>
         </div>
 

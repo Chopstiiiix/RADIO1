@@ -39,10 +39,11 @@ export async function updateSession(request: NextRequest) {
   // Public routes
   const isPublicRoute = pathname === "/login" || pathname === "/signup" || pathname.startsWith("/callback");
 
-  // Not logged in + trying to access protected route → login
+  // Not logged in + trying to access protected route → login with redirect
   if (!user && !isPublicRoute && pathname !== "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    url.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(url);
   }
 

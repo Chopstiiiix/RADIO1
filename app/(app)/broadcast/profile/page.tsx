@@ -15,11 +15,30 @@ export default function BroadcasterProfile() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
+  const [originalDisplayName, setOriginalDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [channelName, setChannelName] = useState("");
   const [genre, setGenre] = useState("");
   const [handleVal, setHandleVal] = useState("");
+  const [originalHandle, setOriginalHandle] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [nameChangedAt, setNameChangedAt] = useState<string | null>(null);
+  const [handleChangedAt, setHandleChangedAt] = useState<string | null>(null);
+
+  const COOLDOWN_DAYS = 30;
+
+  function getCooldownRemaining(changedAt: string | null): number {
+    if (!changedAt) return 0;
+    const changed = new Date(changedAt).getTime();
+    const now = Date.now();
+    const diff = COOLDOWN_DAYS * 86400000 - (now - changed);
+    return diff > 0 ? Math.ceil(diff / 86400000) : 0;
+  }
+
+  const nameCooldown = getCooldownRemaining(nameChangedAt);
+  const handleCooldown = getCooldownRemaining(handleChangedAt);
+  const nameChanged = displayName !== originalDisplayName;
+  const handleChanged = handleVal !== originalHandle;
 
   useEffect(() => {
     async function load() {
@@ -28,25 +47,29 @@ export default function BroadcasterProfile() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("display_name, bio, avatar_url")
+        .select("display_name, bio, avatar_url, display_name_changed_at")
         .eq("id", user.id)
         .single();
 
       const { data: channel } = await supabase
         .from("broadcaster_profiles")
-        .select("channel_name, genre, handle")
+        .select("channel_name, genre, handle, handle_changed_at")
         .eq("id", user.id)
         .single();
 
       if (profile) {
         setDisplayName(profile.display_name);
+        setOriginalDisplayName(profile.display_name);
         setBio(profile.bio || "");
         setAvatarUrl(profile.avatar_url || null);
+        setNameChangedAt(profile.display_name_changed_at || null);
       }
       if (channel) {
         setChannelName(channel.channel_name);
         setGenre((channel.genre || []).join(", "));
         setHandleVal(channel.handle || "");
+        setOriginalHandle(channel.handle || "");
+        setHandleChangedAt(channel.handle_changed_at || null);
       }
       setLoading(false);
     }
@@ -93,28 +116,58 @@ export default function BroadcasterProfile() {
     setSaving(true);
     setMessage("");
 
+    if (nameChanged && nameCooldown > 0) {
+      setMessage(`Error: Display name can only be changed every ${COOLDOWN_DAYS} days. ${nameCooldown} days remaining.`);
+      setSaving(false);
+      return;
+    }
+    if (handleChanged && handleCooldown > 0) {
+      setMessage(`Error: Handle can only be changed every ${COOLDOWN_DAYS} days. ${handleCooldown} days remaining.`);
+      setSaving(false);
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const genreArray = genre.split(",").map((g) => g.trim()).filter(Boolean);
+    const now = new Date().toISOString();
+
+    const profileUpdate: Record<string, unknown> = {
+      display_name: displayName,
+      bio,
+      updated_at: now,
+    };
+    if (nameChanged) {
+      profileUpdate.display_name_changed_at = now;
+    }
+
+    const channelUpdate: Record<string, unknown> = {
+      channel_name: channelName,
+      genre: genreArray,
+      handle: handleVal || null,
+    };
+    if (handleChanged) {
+      channelUpdate.handle_changed_at = now;
+    }
 
     const [profileRes, channelRes] = await Promise.all([
-      supabase.from("profiles").update({
-        display_name: displayName,
-        bio,
-        updated_at: new Date().toISOString(),
-      }).eq("id", user.id),
-      supabase.from("broadcaster_profiles").update({
-        channel_name: channelName,
-        genre: genreArray,
-        handle: handleVal || null,
-      }).eq("id", user.id),
+      supabase.from("profiles").update(profileUpdate).eq("id", user.id),
+      supabase.from("broadcaster_profiles").update(channelUpdate).eq("id", user.id),
     ]);
 
     if (profileRes.error || channelRes.error) {
       setMessage("Error saving: " + (profileRes.error?.message || channelRes.error?.message));
     } else {
       setMessage("Profile updated.");
+      if (nameChanged) {
+        setOriginalDisplayName(displayName);
+        setNameChangedAt(now);
+      }
+      if (handleChanged) {
+        setOriginalHandle(handleVal);
+        setHandleChangedAt(now);
+      }
     }
     setSaving(false);
   }
@@ -248,7 +301,17 @@ export default function BroadcasterProfile() {
           borderRadius: "0px",
         }}
       >
-        <Field label="Display Name" value={displayName} onChange={setDisplayName} />
+        <div>
+          <Field label="Display Name" value={displayName} onChange={setDisplayName} disabled={nameCooldown > 0} />
+          {nameCooldown > 0 && (
+            <p style={{
+              fontSize: "10px", color: "#f59e0b", marginTop: "4px",
+              fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.05em",
+            }}>
+              Locked for {nameCooldown} more day{nameCooldown !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
         <Field label="Channel Name" value={channelName} onChange={setChannelName} />
         <div>
           <label style={{
@@ -268,7 +331,7 @@ export default function BroadcasterProfile() {
               left: "12px",
               top: "50%",
               transform: "translateY(-50%)",
-              color: "#f59e0b",
+              color: handleCooldown > 0 ? "#52525b" : "#f59e0b",
               fontSize: "14px",
               fontFamily: "var(--font-mono)",
               pointerEvents: "none",
@@ -278,20 +341,31 @@ export default function BroadcasterProfile() {
               onChange={(e) => setHandleVal(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
               placeholder="yourhandle"
               maxLength={30}
+              disabled={handleCooldown > 0}
               style={{
                 width: "100%",
                 padding: "12px",
                 paddingLeft: "28px",
                 backgroundColor: "#0a0a0a",
-                border: "1px solid #27272a",
+                border: `1px solid ${handleCooldown > 0 ? "#3f3f46" : "#27272a"}`,
                 borderRadius: "0px",
-                color: "var(--text-primary)",
+                color: handleCooldown > 0 ? "#52525b" : "var(--text-primary)",
                 fontSize: "14px",
                 outline: "none",
                 fontFamily: "var(--font-mono)",
+                cursor: handleCooldown > 0 ? "not-allowed" : undefined,
+                opacity: handleCooldown > 0 ? 0.6 : 1,
               }}
             />
           </div>
+          {handleCooldown > 0 && (
+            <p style={{
+              fontSize: "10px", color: "#f59e0b", marginTop: "4px",
+              fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.05em",
+            }}>
+              Locked for {handleCooldown} more day{handleCooldown !== 1 ? "s" : ""}
+            </p>
+          )}
         </div>
         <Field label="Genres" value={genre} onChange={setGenre} placeholder="hip-hop, r&b, afrobeats" />
 
@@ -357,8 +431,8 @@ export default function BroadcasterProfile() {
   );
 }
 
-function Field({ label, value, onChange, placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string;
+function Field({ label, value, onChange, placeholder, disabled }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean;
 }) {
   return (
     <div>
@@ -377,16 +451,19 @@ function Field({ label, value, onChange, placeholder }: {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        disabled={disabled}
         style={{
           width: "100%",
           padding: "12px",
           backgroundColor: "#0a0a0a",
-          border: "1px solid #27272a",
+          border: `1px solid ${disabled ? "#3f3f46" : "#27272a"}`,
           borderRadius: "0px",
-          color: "var(--text-primary)",
+          color: disabled ? "#52525b" : "var(--text-primary)",
           fontSize: "14px",
           outline: "none",
           fontFamily: "var(--font-mono)",
+          cursor: disabled ? "not-allowed" : undefined,
+          opacity: disabled ? 0.6 : 1,
         }}
       />
     </div>

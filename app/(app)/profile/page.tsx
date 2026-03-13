@@ -15,8 +15,23 @@ export default function ProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
+  const [originalDisplayName, setOriginalDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [nameChangedAt, setNameChangedAt] = useState<string | null>(null);
+
+  const COOLDOWN_DAYS = 30;
+
+  function getCooldownRemaining(changedAt: string | null): number {
+    if (!changedAt) return 0;
+    const changed = new Date(changedAt).getTime();
+    const now = Date.now();
+    const diff = COOLDOWN_DAYS * 86400000 - (now - changed);
+    return diff > 0 ? Math.ceil(diff / 86400000) : 0;
+  }
+
+  const nameCooldown = getCooldownRemaining(nameChangedAt);
+  const nameChanged = displayName !== originalDisplayName;
 
   useEffect(() => {
     async function load() {
@@ -25,14 +40,16 @@ export default function ProfilePage() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("display_name, bio, avatar_url")
+        .select("display_name, bio, avatar_url, display_name_changed_at")
         .eq("id", user.id)
         .single();
 
       if (profile) {
         setDisplayName(profile.display_name);
+        setOriginalDisplayName(profile.display_name);
         setBio(profile.bio || "");
         setAvatarUrl(profile.avatar_url || null);
+        setNameChangedAt(profile.display_name_changed_at || null);
       }
       setLoading(false);
     }
@@ -79,19 +96,34 @@ export default function ProfilePage() {
     setSaving(true);
     setMessage("");
 
+    if (nameChanged && nameCooldown > 0) {
+      setMessage(`Error: Display name can only be changed every ${COOLDOWN_DAYS} days. ${nameCooldown} days remaining.`);
+      setSaving(false);
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { error } = await supabase.from("profiles").update({
+    const updateData: Record<string, unknown> = {
       display_name: displayName,
       bio,
       updated_at: new Date().toISOString(),
-    }).eq("id", user.id);
+    };
+    if (nameChanged) {
+      updateData.display_name_changed_at = new Date().toISOString();
+    }
+
+    const { error } = await supabase.from("profiles").update(updateData).eq("id", user.id);
 
     if (error) {
       setMessage("Error saving: " + error.message);
     } else {
       setMessage("Profile updated.");
+      if (nameChanged) {
+        setOriginalDisplayName(displayName);
+        setNameChangedAt(new Date().toISOString());
+      }
     }
     setSaving(false);
   }
@@ -225,7 +257,21 @@ export default function ProfilePage() {
           borderRadius: "0px",
         }}
       >
-        <Field label="Display Name" value={displayName} onChange={setDisplayName} />
+        <div>
+          <Field label="Display Name" value={displayName} onChange={setDisplayName} disabled={nameCooldown > 0} />
+          {nameCooldown > 0 && (
+            <p style={{
+              fontSize: "10px",
+              color: "#f59e0b",
+              marginTop: "4px",
+              fontFamily: "var(--font-mono)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}>
+              Locked for {nameCooldown} more day{nameCooldown !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
 
         <div>
           <label style={{
@@ -289,8 +335,8 @@ export default function ProfilePage() {
   );
 }
 
-function Field({ label, value, onChange, placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string;
+function Field({ label, value, onChange, placeholder, disabled }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean;
 }) {
   return (
     <div>
@@ -309,16 +355,19 @@ function Field({ label, value, onChange, placeholder }: {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        disabled={disabled}
         style={{
           width: "100%",
           padding: "12px",
           backgroundColor: "#0a0a0a",
-          border: "1px solid #27272a",
+          border: `1px solid ${disabled ? "#3f3f46" : "#27272a"}`,
           borderRadius: "0px",
-          color: "var(--text-primary)",
+          color: disabled ? "#52525b" : "var(--text-primary)",
           fontSize: "14px",
           outline: "none",
           fontFamily: "var(--font-mono)",
+          cursor: disabled ? "not-allowed" : undefined,
+          opacity: disabled ? 0.6 : 1,
         }}
       />
     </div>
