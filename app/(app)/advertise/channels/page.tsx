@@ -173,7 +173,7 @@ export default function BrowseChannelsPage() {
         textTransform: "uppercase",
         letterSpacing: "-0.05em",
       }}>
-        Browse Channels
+        Browse Channels<span style={{ color: "#f59e0b" }}>_</span>
       </h1>
 
       {/* Ad selector */}

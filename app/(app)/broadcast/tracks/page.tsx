@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import TrashButton from "@/app/components/TrashButton";
+import InlineLoader from "@/app/components/InlineLoader";
 
 interface Track {
   id: string;
@@ -202,7 +204,7 @@ export default function TracksPage() {
               display: "inline-block",
             }} />
           </div>
-          <h1 style={{ fontSize: "24px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "-0.05em" }}>Tracks</h1>
+          <h1 style={{ fontSize: "24px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "-0.05em" }}>Tracks<span style={{ color: "#f59e0b" }}>_</span></h1>
         </div>
         <a href="/broadcast/tracks/upload" style={{
           padding: "10px 20px",
@@ -309,7 +311,7 @@ export default function TracksPage() {
       )}
 
       {loading ? (
-        <p style={{ color: "#52525b", textTransform: "uppercase", letterSpacing: "0.1em", fontSize: "12px" }}>Loading...</p>
+        <InlineLoader />
       ) : tracks.length === 0 ? (
         <div style={{
           padding: "60px 20px",
@@ -458,14 +460,7 @@ export default function TracksPage() {
                 </button>
 
                 {/* Delete */}
-                <button onClick={(e) => { e.stopPropagation(); deleteTrack(track.id); }} style={{
-                  background: "none",
-                  border: "none",
-                  color: "#52525b",
-                  cursor: "pointer",
-                  fontSize: "16px",
-                  padding: "4px",
-                }}>{"\u00D7"}</button>
+                <TrashButton onClick={() => deleteTrack(track.id)} />
               </div>
             );
           })}

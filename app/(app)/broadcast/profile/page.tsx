@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import InlineLoader from "@/app/components/InlineLoader";
 import { useRouter } from "next/navigation";
 
 export default function BroadcasterProfile() {
@@ -76,17 +77,7 @@ export default function BroadcasterProfile() {
     setSaving(false);
   }
 
-  if (loading) return (
-    <p style={{
-      color: "#52525b",
-      fontFamily: "var(--font-mono)",
-      textTransform: "uppercase",
-      letterSpacing: "0.1em",
-      fontSize: "12px",
-    }}>
-      Loading...
-    </p>
-  );
+  if (loading) return <InlineLoader />;
 
   return (
     <div style={{ maxWidth: "500px" }}>
@@ -123,7 +114,7 @@ export default function BroadcasterProfile() {
         letterSpacing: "-0.05em",
         color: "var(--text-primary)",
       }}>
-        Edit Profile
+        Edit Profile<span style={{ color: "#f59e0b" }}>_</span>
       </h1>
 
       <form

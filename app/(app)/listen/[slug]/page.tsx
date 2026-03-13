@@ -8,6 +8,7 @@ import { useStream } from "@/app/hooks/useStream";
 import Lottie from "lottie-react";
 import type { LottieRefCurrentProps } from "lottie-react";
 import heartAnimation from "@/public/heart.json";
+import InlineLoader from "@/app/components/InlineLoader";
 
 interface ChannelInfo {
   channel_name: string;
@@ -217,10 +218,9 @@ export default function ChannelPage() {
     return (
       <div style={{
         height: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-        backgroundColor: "var(--bg-base)", fontFamily: "var(--font-mono)",
-        color: "var(--text-tertiary)", fontSize: "12px",
+        backgroundColor: "var(--bg-base)",
       }}>
-        LOCATING SIGNAL...
+        <InlineLoader />
       </div>
     );
   }

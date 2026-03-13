@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import InlineLoader from "@/app/components/InlineLoader";
 
 export default function GoLivePage() {
   const supabase = createClient();
@@ -91,11 +92,7 @@ export default function GoLivePage() {
   }
 
   if (loading) {
-    return (
-      <div style={{ color: "#52525b", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.1em", padding: "40px 0" }}>
-        Loading...
-      </div>
-    );
+    return <InlineLoader />;
   }
 
   return (
@@ -135,7 +132,7 @@ export default function GoLivePage() {
         textTransform: "uppercase",
         marginBottom: "8px",
       }}>
-        Go Live
+        Go Live<span style={{ color: "#f59e0b" }}>_</span>
       </h1>
       <p style={{
         color: "#52525b",

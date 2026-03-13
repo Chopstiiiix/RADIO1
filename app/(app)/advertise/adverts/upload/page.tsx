@@ -99,7 +99,7 @@ export default function UploadAdvertPage() {
         textTransform: "uppercase",
         letterSpacing: "-0.05em",
       }}>
-        Upload Advert
+        Upload Advert<span style={{ color: "#f59e0b" }}>_</span>
       </h1>
 
       <form onSubmit={handleUpload} style={{

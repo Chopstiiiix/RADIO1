@@ -32,6 +32,13 @@ export default function NotificationButton({ role }: { role: string }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  // Load notification count on mount and poll every 30s
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [role]);
+
   async function loadNotifications() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();

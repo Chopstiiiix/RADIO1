@@ -62,7 +62,7 @@ export default async function BroadcastDashboard() {
           textTransform: "uppercase",
           color: "#f5f5f5",
         }}>
-          {channel?.channel_name ?? "Your Channel"}
+          {channel?.channel_name ?? "Your Channel"}<span style={{ color: "#f59e0b" }}>_</span>
         </h1>
         <p style={{
           color: "#52525b",

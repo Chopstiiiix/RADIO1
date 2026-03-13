@@ -119,7 +119,7 @@ export default function UploadTrackPage() {
         textTransform: "uppercase",
         letterSpacing: "-0.05em",
       }}>
-        Upload Track
+        Upload Track<span style={{ color: "#f59e0b" }}>_</span>
       </h1>
 
       <form onSubmit={handleUpload} style={{

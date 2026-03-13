@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import InlineLoader from "@/app/components/InlineLoader";
 
 interface AdRequest {
   id: string;
@@ -78,18 +79,11 @@ export default function AdRequestsPage() {
         textTransform: "uppercase",
         letterSpacing: "-0.05em",
       }}>
-        Ad Requests
+        Ad Requests<span style={{ color: "#f59e0b" }}>_</span>
       </h1>
 
       {loading ? (
-        <p style={{
-          color: "#52525b",
-          textTransform: "uppercase",
-          fontFamily: "var(--font-mono)",
-          fontSize: "12px",
-        }}>
-          Loading...
-        </p>
+        <InlineLoader />
       ) : requests.length === 0 ? (
         <div style={{
           padding: "60px 20px",

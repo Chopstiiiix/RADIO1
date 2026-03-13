@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import TrashButton from "@/app/components/TrashButton";
+import InlineLoader from "@/app/components/InlineLoader";
 
 interface Advert {
   id: string;
@@ -10,6 +12,7 @@ interface Advert {
   duration_seconds: number | null;
   is_active: boolean;
   uploaded_at: string;
+  approval_status: "approved" | "pending" | "declined" | "none";
 }
 
 export default function MyAdvertsPage() {
@@ -27,7 +30,27 @@ export default function MyAdvertsPage() {
       .eq("advertiser_id", user.id)
       .order("uploaded_at", { ascending: false });
 
-    setAdverts(data || []);
+    // Fetch ad request statuses for each advert
+    const { data: requests } = await supabase
+      .from("ad_requests")
+      .select("advert_id, status")
+      .eq("advertiser_id", user.id);
+
+    const statusMap: Record<string, string> = {};
+    if (requests) {
+      for (const r of requests) {
+        // Priority: approved > pending > declined
+        const current = statusMap[r.advert_id];
+        if (!current || r.status === "approved" || (r.status === "pending" && current !== "approved")) {
+          statusMap[r.advert_id] = r.status;
+        }
+      }
+    }
+
+    setAdverts((data || []).map((ad: any) => ({
+      ...ad,
+      approval_status: (statusMap[ad.id] as any) || "none",
+    })));
     setLoading(false);
   }
 
@@ -64,7 +87,7 @@ export default function MyAdvertsPage() {
         }} />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-        <h1 style={{ fontSize: "24px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "-0.05em" }}>My Adverts</h1>
+        <h1 style={{ fontSize: "24px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "-0.05em" }}>My Adverts<span style={{ color: "#f59e0b" }}>_</span></h1>
         <a href="/advertise/adverts/upload" style={{
           padding: "10px 20px",
           backgroundColor: "#f59e0b",
@@ -79,7 +102,7 @@ export default function MyAdvertsPage() {
       </div>
 
       {loading ? (
-        <p style={{ color: "#52525b", textTransform: "uppercase", fontFamily: "var(--font-mono)", fontSize: "11px", letterSpacing: "0.05em" }}>Loading...</p>
+        <InlineLoader />
       ) : adverts.length === 0 ? (
         <div style={{
           padding: "60px 20px",
@@ -117,23 +140,29 @@ export default function MyAdvertsPage() {
               <button onClick={() => toggleActive(ad.id, ad.is_active)} style={{
                 background: "none",
                 border: "1px solid var(--border-subtle)",
-                color: ad.is_active ? "#4ADE80" : "var(--text-tertiary)",
+                color: ad.is_active && ad.approval_status === "approved"
+                  ? "#4ADE80"
+                  : ad.approval_status === "declined"
+                    ? "#E24A4A"
+                    : ad.is_active
+                      ? "#f59e0b"
+                      : "var(--text-tertiary)",
                 padding: "4px 10px",
                 borderRadius: "0px",
                 fontSize: "11px",
                 cursor: "pointer",
                 fontFamily: "var(--font-mono)",
               }}>
-                {ad.is_active ? "ACTIVE" : "INACTIVE"}
+                {ad.is_active && ad.approval_status === "approved"
+                  ? "ACTIVE"
+                  : ad.approval_status === "declined"
+                    ? "DECLINED"
+                    : ad.is_active
+                      ? "READY"
+                      : "INACTIVE"}
               </button>
 
-              <button onClick={() => deleteAdvert(ad.id)} style={{
-                background: "none",
-                border: "none",
-                color: "#52525b",
-                cursor: "pointer",
-                fontSize: "16px",
-              }}>x</button>
+              <TrashButton onClick={() => deleteAdvert(ad.id)} />
             </div>
           ))}
         </div>

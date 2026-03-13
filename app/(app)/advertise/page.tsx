@@ -51,7 +51,7 @@ export default async function AdvertiseDashboard() {
         }} />
       </div>
       <h1 style={{ fontSize: "28px", fontWeight: 700, letterSpacing: "-0.05em", marginBottom: "8px", textTransform: "uppercase" }}>
-        Advertiser Dashboard
+        Advertiser Dashboard<span style={{ color: "#f59e0b" }}>_</span>
       </h1>
       <p style={{ color: "#52525b", fontSize: "12px", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "32px" }}>
         Welcome back, {profile?.display_name}
