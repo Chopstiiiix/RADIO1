@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import PasswordInput from "@/app/components/PasswordInput";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -49,60 +50,89 @@ export default function LoginPage() {
       justifyContent: "center",
       backgroundColor: "var(--bg-base)",
       padding: "20px",
+      fontFamily: "'JetBrains Mono', monospace",
     }}>
+      <style>{`
+        @keyframes pulse-opacity {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+        .cursor-blink {
+          animation: pulse-opacity 1s step-end infinite;
+        }
+      `}</style>
       <div style={{ width: "100%", maxWidth: "400px" }}>
         {/* Logo */}
         <h1 style={{
-          fontSize: "40px",
-          fontWeight: 700,
-          letterSpacing: "-1.5px",
-          marginBottom: "8px",
+          fontSize: "36px",
+          fontWeight: 800,
+          letterSpacing: "-0.05em",
+          marginBottom: "4px",
           textAlign: "center",
-        }}>Radio1</h1>
+          textTransform: "uppercase",
+          fontFamily: "'JetBrains Mono', monospace",
+        }}>
+          Radio1<span style={{ color: "#f59e0b" }}>_</span>
+        </h1>
         <p style={{
-          color: "var(--text-secondary)",
+          color: "#52525b",
           textAlign: "center",
-          marginBottom: "40px",
-          fontSize: "14px",
+          marginBottom: "32px",
+          fontSize: "10px",
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          fontFamily: "'JetBrains Mono', monospace",
         }}>AI-Powered Multi-Channel Radio</p>
 
+        {/* Terminal prompt */}
+        <div style={{
+          fontSize: "12px",
+          color: "#f59e0b",
+          letterSpacing: "0.05em",
+          marginBottom: "16px",
+          fontFamily: "'JetBrains Mono', monospace",
+        }}>
+          {">"} auth --sign-in
+          <span className="cursor-blink" style={{
+            width: "8px",
+            height: "12px",
+            backgroundColor: "#f59e0b",
+            display: "inline-block",
+          }} />
+        </div>
+
         {/* Login Form */}
-        <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{
-              padding: "14px 16px",
-              backgroundColor: "var(--bg-well)",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "8px",
-              color: "var(--text-primary)",
-              fontSize: "14px",
-              outline: "none",
-            }}
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{
-              padding: "14px 16px",
-              backgroundColor: "var(--bg-well)",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "8px",
-              color: "var(--text-primary)",
-              fontSize: "14px",
-              outline: "none",
-            }}
-          />
+        <form onSubmit={handleLogin} style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px",
+          borderLeft: "3px solid #f59e0b",
+          paddingLeft: "16px",
+        }}>
+          <div>
+            <label style={labelStyle}>Email</label>
+            <input
+              type="email"
+              placeholder="you@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Password</label>
+            <PasswordInput
+              value={password}
+              onChange={setPassword}
+              placeholder="Enter password"
+              required
+              style={inputStyle}
+            />
+          </div>
 
           {error && (
-            <p style={{ color: "#E24A4A", fontSize: "13px" }}>{error}</p>
+            <p style={{ color: "#E24A4A", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em" }}>{error}</p>
           )}
 
           <button
@@ -110,17 +140,21 @@ export default function LoginPage() {
             disabled={loading}
             style={{
               padding: "14px",
-              backgroundColor: "var(--accent-blue)",
-              color: "var(--bg-well)",
+              backgroundColor: "#f59e0b",
+              color: "#0a0a0a",
               border: "none",
-              borderRadius: "8px",
-              fontSize: "14px",
-              fontWeight: 600,
+              borderRadius: "0px",
+              fontSize: "11px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
               cursor: loading ? "not-allowed" : "pointer",
               opacity: loading ? 0.6 : 1,
+              fontFamily: "'JetBrains Mono', monospace",
+              marginTop: "4px",
             }}
           >
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Authenticating..." : "Sign In"}
           </button>
         </form>
 
@@ -131,28 +165,34 @@ export default function LoginPage() {
           gap: "12px",
           margin: "32px 0",
         }}>
-          <div style={{ flex: 1, height: "1px", backgroundColor: "var(--border-subtle)" }} />
-          <span style={{ color: "var(--text-tertiary)", fontSize: "12px", fontFamily: "var(--font-mono)" }}>OR JOIN AS</span>
-          <div style={{ flex: 1, height: "1px", backgroundColor: "var(--border-subtle)" }} />
+          <div style={{ flex: 1, height: "1px", backgroundColor: "#27272a" }} />
+          <span style={{
+            color: "#52525b",
+            fontSize: "10px",
+            fontFamily: "'JetBrains Mono', monospace",
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+          }}>// SELECT_ROLE</span>
+          <div style={{ flex: 1, height: "1px", backgroundColor: "#27272a" }} />
         </div>
 
         {/* Role CTAs */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           <RoleCTA
             href="/signup?role=listener"
-            icon="🎧"
+            role="listener"
             title="Listener"
             description="Browse channels and enjoy live radio"
           />
           <RoleCTA
             href="/signup?role=broadcaster"
-            icon="🎙️"
+            role="broadcaster"
             title="Broadcaster"
             description="Create your own channel and go live"
           />
           <RoleCTA
             href="/signup?role=advertiser"
-            icon="📢"
+            role="advertiser"
             title="Advertiser"
             description="Place ads on popular channels"
           />
@@ -162,9 +202,54 @@ export default function LoginPage() {
   );
 }
 
-function RoleCTA({ href, icon, title, description }: {
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: "10px",
+  color: "#52525b",
+  marginBottom: "6px",
+  fontFamily: "'JetBrains Mono', monospace",
+  textTransform: "uppercase",
+  letterSpacing: "0.1em",
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "12px",
+  backgroundColor: "rgba(24, 24, 27, 0.5)",
+  border: "1px solid #27272a",
+  borderRadius: "0px",
+  color: "var(--text-primary)",
+  fontSize: "13px",
+  outline: "none",
+  fontFamily: "'JetBrains Mono', monospace",
+  boxSizing: "border-box",
+};
+
+function RoleIcon({ role, color }: { role: string; color: string }) {
+  if (role === "listener") return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+    </svg>
+  );
+  if (role === "broadcaster") return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" y1="19" x2="12" y2="22" />
+    </svg>
+  );
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6z" />
+      <path d="m22 10-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10" />
+    </svg>
+  );
+}
+
+function RoleCTA({ href, role, title, description }: {
   href: string;
-  icon: string;
+  role: string;
   title: string;
   description: string;
 }) {
@@ -175,21 +260,39 @@ function RoleCTA({ href, icon, title, description }: {
         display: "flex",
         alignItems: "center",
         gap: "14px",
-        padding: "16px",
-        backgroundColor: "var(--bg-panel)",
-        border: "1px solid var(--border-subtle)",
-        borderRadius: "10px",
+        padding: "14px 16px",
+        backgroundColor: "transparent",
+        border: "1px solid #27272a",
+        borderRadius: "0px",
         textDecoration: "none",
         color: "inherit",
         transition: "border-color 0.15s",
+        fontFamily: "'JetBrains Mono', monospace",
       }}
-      onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent-blue)")}
-      onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
+      onMouseOver={(e) => (e.currentTarget.style.borderColor = "#f59e0b")}
+      onMouseOut={(e) => (e.currentTarget.style.borderColor = "#27272a")}
     >
-      <span style={{ fontSize: "24px" }}>{icon}</span>
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "32px",
+        height: "32px",
+        flexShrink: 0,
+      }}>
+        <RoleIcon role={role} color="#a1a1aa" />
+      </div>
       <div>
-        <div style={{ fontWeight: 600, fontSize: "15px" }}>{title}</div>
-        <div style={{ color: "var(--text-secondary)", fontSize: "13px" }}>{description}</div>
+        <div style={{
+          fontWeight: 700,
+          fontSize: "12px",
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+        }}>{title}</div>
+        <div style={{
+          color: "#52525b",
+          fontSize: "11px",
+        }}>{description}</div>
       </div>
     </a>
   );

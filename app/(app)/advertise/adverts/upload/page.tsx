@@ -5,11 +5,13 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Lottie from "lottie-react";
 import loadingAnimation from "@/public/loadingV3.json";
+import checkmarkAnimation from "@/public/checkmark.json";
 
 export default function UploadAdvertPage() {
   const supabase = createClient();
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -61,7 +63,9 @@ export default function UploadAdvertPage() {
       return;
     }
 
-    router.push("/advertise/adverts");
+    setUploading(false);
+    setSuccess(true);
+    setTimeout(() => router.push("/advertise/adverts"), 2000);
   }
 
   return (
@@ -195,6 +199,37 @@ export default function UploadAdvertPage() {
             fontFamily: "'JetBrains Mono', monospace",
           }}>
             DO NOT CLOSE THIS PAGE
+          </div>
+        </div>
+      )}
+
+      {/* Success checkmark overlay */}
+      {success && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "rgba(10, 10, 10, 0.92)",
+          zIndex: 100,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "20px",
+        }}>
+          <Lottie
+            animationData={checkmarkAnimation}
+            loop={false}
+            style={{ width: 120, height: 120 }}
+          />
+          <div style={{
+            fontSize: "13px",
+            fontWeight: 600,
+            color: "#f59e0b",
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+            fontFamily: "'JetBrains Mono', monospace",
+          }}>
+            UPLOAD COMPLETE
           </div>
         </div>
       )}

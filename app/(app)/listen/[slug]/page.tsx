@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Visualizer from "@/app/components/Visualizer";
 import { useStream } from "@/app/hooks/useStream";
+import Lottie from "lottie-react";
+import type { LottieRefCurrentProps } from "lottie-react";
+import heartAnimation from "@/public/heart.json";
 
 interface ChannelInfo {
   channel_name: string;
@@ -22,6 +25,7 @@ export default function ChannelPage() {
   const supabase = createClient();
 
   const [channel, setChannel] = useState<ChannelInfo | null>(null);
+  const [allSlugs, setAllSlugs] = useState<string[]>([]);
   const [metadata, setMetadata] = useState({
     track: null as { title: string; artist: string } | null,
     upcoming: [] as { title: string; artist: string; duration?: number }[],
@@ -33,7 +37,68 @@ export default function ChannelPage() {
 
   const stream = useStream(metadata.trackStartOffset, metadata.duration, slug);
 
-  // Load channel info
+  // Favorite state
+  const [isFavorited, setIsFavorited] = useState(false);
+  const heartRef = useRef<LottieRefCurrentProps>(null);
+
+  useEffect(() => {
+    // Check DB for like status
+    async function checkLike() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from("channel_likes")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("channel_slug", slug)
+          .maybeSingle();
+        setIsFavorited(!!data);
+      } else {
+        // Fallback to localStorage for unauthenticated
+        try {
+          const favs: string[] = JSON.parse(localStorage.getItem("radio1_favorites") || "[]");
+          setIsFavorited(favs.includes(slug));
+        } catch { /* ignore */ }
+      }
+    }
+    checkLike();
+  }, [slug]);
+
+  const [heartAnimating, setHeartAnimating] = useState(false);
+
+  // Set initial frame based on favorite state
+  useEffect(() => {
+    if (heartRef.current) {
+      heartRef.current.goToAndStop(0, true);
+    }
+  }, []);
+
+  async function toggleFavorite() {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (isFavorited) {
+      setIsFavorited(false);
+      if (user) {
+        await supabase.from("channel_likes").delete()
+          .eq("user_id", user.id).eq("channel_slug", slug);
+      }
+    } else {
+      setIsFavorited(true);
+      // Play the fill animation briefly
+      setHeartAnimating(true);
+      if (heartRef.current) {
+        heartRef.current.goToAndPlay(0, true);
+      }
+      setTimeout(() => setHeartAnimating(false), 350);
+      if (user) {
+        await supabase.from("channel_likes").upsert({
+          user_id: user.id, channel_slug: slug,
+        }, { onConflict: "user_id,channel_slug" });
+      }
+    }
+  }
+
+  // Load channel info + all channel slugs for prev/next navigation
   useEffect(() => {
     async function loadChannel() {
       const { data } = await supabase
@@ -43,8 +108,21 @@ export default function ChannelPage() {
         .single();
       setChannel(data as any);
     }
+    async function loadAllSlugs() {
+      const { data } = await supabase
+        .from("broadcaster_profiles")
+        .select("channel_slug")
+        .order("channel_name", { ascending: true });
+      if (data) setAllSlugs(data.map((c) => c.channel_slug));
+    }
     loadChannel();
+    loadAllSlugs();
   }, [slug, supabase]);
+
+  const currentIndex = allSlugs.indexOf(slug);
+  const prevSlug = currentIndex > 0 ? allSlugs[currentIndex - 1] : allSlugs[allSlugs.length - 1];
+  const nextSlug = currentIndex < allSlugs.length - 1 ? allSlugs[currentIndex + 1] : allSlugs[0];
+  const canNavigate = allSlugs.length > 1;
 
   // Connect to per-channel metadata SSE
   useEffect(() => {
@@ -127,6 +205,13 @@ export default function ChannelPage() {
   const progress = metadata.duration > 0 ? Math.min((stream.elapsed / metadata.duration) * 100, 100) : 0;
   const profile = channel?.profile as any;
   const effectiveVolume = stream.isMuted ? 0 : stream.volume;
+
+  // Ruler scaling: ensure ~20px per second so sub-second ticks stay visible
+  const rulerPxPerSec = 20;
+  const rulerContainerW = typeof window !== "undefined" ? Math.min(window.innerWidth, 460) : 460;
+  const rulerWidthPct = Math.max(200, ((metadata.duration || 1) * rulerPxPerSec / rulerContainerW) * 100);
+  // Playhead at center: translate so 0% progress = start at center
+  const rulerTranslateOrigin = (50 / rulerWidthPct) * 100; // equivalent of 50% container in ruler %
 
   if (!channel) {
     return (
@@ -280,17 +365,55 @@ export default function ChannelPage() {
           </div>
         </div>
 
-        {/* Channel title */}
-        <h1 className="neon-title" style={{
-          fontSize: "30px",
-          fontWeight: 800,
-          letterSpacing: "-0.05em",
-          textTransform: "uppercase",
-          lineHeight: 1,
-          display: "inline-block",
-        }}>
-          {channel.channel_name}
-        </h1>
+        {/* Channel title + heart */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <h1 className="neon-title" style={{
+            fontSize: "30px",
+            fontWeight: 800,
+            letterSpacing: "-0.05em",
+            textTransform: "uppercase",
+            lineHeight: 1,
+            display: "inline-block",
+          }}>
+            {channel.channel_name}
+          </h1>
+          <button
+            onClick={toggleFavorite}
+            aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "4px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            {heartAnimating ? (
+              <Lottie
+                lottieRef={heartRef}
+                animationData={heartAnimation}
+                autoplay={false}
+                loop={false}
+                style={{ width: 28, height: 28 }}
+              />
+            ) : isFavorited ? (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#f59e0b" stroke="none">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+            ) : (
+              <Lottie
+                lottieRef={heartRef}
+                animationData={heartAnimation}
+                autoplay={false}
+                loop={false}
+                style={{ width: 28, height: 28 }}
+              />
+            )}
+          </button>
+        </div>
 
         {/* Channel name */}
         <div style={{
@@ -438,32 +561,111 @@ export default function ChannelPage() {
             </span>
           </div>
 
-          {/* Timeline ruler */}
+          {/* Sliding timeline with fixed center playhead */}
           <div style={{
             width: "100%",
-            height: "30px",
+            height: "44px",
             position: "relative",
-            backgroundImage:
-              "repeating-linear-gradient(to right, transparent, transparent 19px, #27272a 19px, #27272a 20px), " +
-              "repeating-linear-gradient(to right, transparent, transparent 99px, #52525b 99px, #52525b 100px)",
-            backgroundPosition: "0 bottom",
-            backgroundSize: "100% 6px, 100% 12px",
-            backgroundRepeat: "no-repeat",
+            overflow: "hidden",
           }}>
-            {/* Playhead */}
+            {/* Sliding ruler — moves right-to-left as time progresses */}
             <div style={{
               position: "absolute",
-              top: "-4px",
-              left: `${progress}%`,
+              top: 0,
+              left: 0,
+              width: `${rulerWidthPct}%`,
+              height: "100%",
+              transform: `translateX(calc(${rulerTranslateOrigin}% - ${progress}%))`,
+              transition: "transform 1s linear",
+            }}>
+              {/* Generate tick marks: minutes with second numbers, sub-ticks between seconds */}
+              {(() => {
+                const dur = metadata.duration || 1;
+                const totalWidth = rulerWidthPct;
+                const ticks: React.ReactNode[] = [];
+
+                // 4 sub-ticks between each second (every 250ms)
+                const step = 0.25;
+                const totalSteps = Math.ceil(dur / step);
+
+                for (let i = 0; i <= totalSteps; i++) {
+                  const t = i * step;
+                  if (t > dur) break;
+
+                  const posPercent = (t / dur) * totalWidth;
+                  const isWholeSecond = Math.abs(t - Math.round(t)) < 0.01;
+                  const sec = Math.round(t);
+                  const isMinute = isWholeSecond && sec % 60 === 0;
+
+                  let height: number;
+                  let color: string;
+                  let showLabel = false;
+                  let labelText = "";
+
+                  if (isMinute) {
+                    height = 18;
+                    color = "#f59e0b";
+                    showLabel = true;
+                    const m = Math.floor(sec / 60);
+                    labelText = `${m}:00`;
+                  } else if (isWholeSecond) {
+                    height = 10;
+                    color = "#52525b";
+                    showLabel = true;
+                    const s = sec % 60;
+                    labelText = String(s);
+                  } else {
+                    // Sub-second tick (250ms intervals)
+                    height = 6;
+                    color = "#52525b";
+                  }
+
+                  ticks.push(
+                    <div key={t} style={{
+                      position: "absolute",
+                      left: `${posPercent}%`,
+                      bottom: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      transform: "translateX(-50%)",
+                    }}>
+                      {showLabel && (
+                        <span style={{
+                          fontSize: isMinute ? "10px" : "7px",
+                          color: isMinute ? "#f59e0b" : "#3f3f46",
+                          marginBottom: isMinute ? "2px" : "1px",
+                          whiteSpace: "nowrap",
+                          fontFamily: "var(--font-mono)",
+                          fontWeight: isMinute ? 700 : 500,
+                        }}>{labelText}</span>
+                      )}
+                      <div style={{
+                        width: isWholeSecond ? "1px" : "1px",
+                        height: `${height}px`,
+                        backgroundColor: color,
+                        opacity: isWholeSecond ? 1 : 0.8,
+                      }} />
+                    </div>
+                  );
+                }
+                return ticks;
+              })()}
+            </div>
+
+            {/* Fixed center playhead */}
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: "50%",
               width: "2px",
-              height: "calc(100% + 4px)",
+              height: "100%",
               backgroundColor: "#f59e0b",
               transform: "translateX(-50%)",
               zIndex: 20,
-              transition: "left 1s linear",
-              boxShadow: "0 0 6px rgba(245, 158, 11, 0.8)",
+              boxShadow: "0 0 8px rgba(245, 158, 11, 0.8)",
             }}>
-              {/* Playhead arrow */}
+              {/* Playhead triangle */}
               <div style={{
                 position: "absolute",
                 top: 0,
@@ -476,21 +678,28 @@ export default function ChannelPage() {
                 borderTop: "6px solid #f59e0b",
               }} />
             </div>
-          </div>
 
-          {/* Ruler numbers */}
-          <div style={{
-            width: "100%",
-            display: "flex",
-            justifyContent: "space-between",
-            padding: "0 10px",
-            fontSize: "10px",
-            color: "#52525b",
-            marginTop: "4px",
-          }}>
-            {[0, 1, 2, 3, 4].map((n) => (
-              <span key={n}>{n}</span>
-            ))}
+            {/* Fade edges */}
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "40px",
+              height: "100%",
+              background: "linear-gradient(to right, #2B2B2B, transparent)",
+              zIndex: 10,
+              pointerEvents: "none",
+            }} />
+            <div style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              width: "40px",
+              height: "100%",
+              background: "linear-gradient(to left, #2B2B2B, transparent)",
+              zIndex: 10,
+              pointerEvents: "none",
+            }} />
           </div>
         </div>
 
@@ -527,14 +736,14 @@ export default function ChannelPage() {
 
           {/* Center: Transport */}
           <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-            {/* Previous */}
+            {/* Previous Channel */}
             <button
-              onClick={stream.skipPrev}
-              disabled={metadata.ended}
+              onClick={() => canNavigate && router.push(`/listen/${prevSlug}`)}
+              disabled={!canNavigate}
               style={{
                 background: "none", border: "none", padding: "12px",
-                cursor: metadata.ended ? "default" : "pointer",
-                color: metadata.ended ? "#3f3f46" : "#71717a",
+                cursor: canNavigate ? "pointer" : "default",
+                color: canNavigate ? "#71717a" : "#3f3f46",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 transition: "color 0.2s",
               }}
@@ -570,14 +779,14 @@ export default function ChannelPage() {
               )}
             </button>
 
-            {/* Next */}
+            {/* Next Channel */}
             <button
-              onClick={stream.skipNext}
-              disabled={metadata.ended}
+              onClick={() => canNavigate && router.push(`/listen/${nextSlug}`)}
+              disabled={!canNavigate}
               style={{
                 background: "none", border: "none", padding: "12px",
-                cursor: metadata.ended ? "default" : "pointer",
-                color: metadata.ended ? "#3f3f46" : "#71717a",
+                cursor: canNavigate ? "pointer" : "default",
+                color: canNavigate ? "#71717a" : "#3f3f46",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 transition: "color 0.2s",
               }}

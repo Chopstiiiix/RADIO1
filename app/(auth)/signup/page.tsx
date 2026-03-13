@@ -3,12 +3,35 @@
 import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import PasswordInput from "@/app/components/PasswordInput";
 
 const ROLES = [
-  { value: "listener", label: "Listener", icon: "🎧" },
-  { value: "broadcaster", label: "Broadcaster", icon: "🎙️" },
-  { value: "advertiser", label: "Advertiser", icon: "📢" },
+  { value: "listener", full: "Listener" },
+  { value: "broadcaster", full: "Broadcaster" },
+  { value: "advertiser", full: "Advertiser" },
 ] as const;
+
+function RoleIcon({ value, color }: { value: string; color: string }) {
+  if (value === "listener") return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+    </svg>
+  );
+  if (value === "broadcaster") return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" y1="19" x2="12" y2="22" />
+    </svg>
+  );
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6z" />
+      <path d="m22 10-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10" />
+    </svg>
+  );
+}
 
 export default function SignupPage() {
   return (
@@ -43,8 +66,6 @@ function SignupForm() {
 
     const slug = slugify(channelName || displayName);
 
-    // Sign up — pass role + profile info as user metadata
-    // The database trigger handle_new_user() creates profiles automatically
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -70,7 +91,6 @@ function SignupForm() {
       return;
     }
 
-    // Redirect based on role
     if (role === "broadcaster") router.push("/broadcast");
     else if (role === "advertiser") router.push("/advertise");
     else router.push("/listen");
@@ -85,122 +105,152 @@ function SignupForm() {
       justifyContent: "center",
       backgroundColor: "var(--bg-base)",
       padding: "20px",
+      fontFamily: "'JetBrains Mono', monospace",
     }}>
+      <style>{`
+        @keyframes pulse-opacity {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+        .cursor-blink {
+          animation: pulse-opacity 1s step-end infinite;
+        }
+      `}</style>
       <div style={{ width: "100%", maxWidth: "400px" }}>
         <h1 style={{
-          fontSize: "32px",
-          fontWeight: 700,
-          letterSpacing: "-1px",
-          marginBottom: "8px",
+          fontSize: "36px",
+          fontWeight: 800,
+          letterSpacing: "-0.05em",
+          marginBottom: "4px",
           textAlign: "center",
-        }}>Join Radio1</h1>
+          textTransform: "uppercase",
+          fontFamily: "'JetBrains Mono', monospace",
+        }}>
+          Radio1<span style={{ color: "#f59e0b" }}>_</span>
+        </h1>
         <p style={{
-          color: "var(--text-secondary)",
+          color: "#52525b",
           textAlign: "center",
           marginBottom: "32px",
-          fontSize: "14px",
+          fontSize: "10px",
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          fontFamily: "'JetBrains Mono', monospace",
         }}>Create your account</p>
 
-        <form onSubmit={handleSignup} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        {/* Terminal prompt */}
+        <div style={{
+          fontSize: "12px",
+          color: "#f59e0b",
+          letterSpacing: "0.05em",
+          marginBottom: "16px",
+          fontFamily: "'JetBrains Mono', monospace",
+        }}>
+          {">"} auth --register
+          <span className="cursor-blink" style={{
+            width: "8px",
+            height: "12px",
+            backgroundColor: "#f59e0b",
+            display: "inline-block",
+          }} />
+        </div>
+
+        <form onSubmit={handleSignup} style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px",
+          borderLeft: "3px solid #f59e0b",
+          paddingLeft: "16px",
+        }}>
           {/* Role selector */}
-          <div style={{ display: "flex", gap: "8px" }}>
-            {ROLES.map((r) => (
-              <button
-                key={r.value}
-                type="button"
-                onClick={() => setRole(r.value)}
-                style={{
-                  flex: 1,
-                  padding: "12px 8px",
-                  backgroundColor: role === r.value ? "var(--bg-highlight)" : "var(--bg-well)",
-                  border: `1px solid ${role === r.value ? "var(--accent-blue)" : "var(--border-subtle)"}`,
-                  borderRadius: "8px",
-                  color: role === r.value ? "var(--accent-blue)" : "var(--text-secondary)",
-                  cursor: "pointer",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  textAlign: "center",
-                }}
-              >
-                <div style={{ fontSize: "20px", marginBottom: "4px" }}>{r.icon}</div>
-                {r.label}
-              </button>
-            ))}
+          <div>
+            <label style={labelStyle}>Role</label>
+            <div style={{ display: "flex", gap: "8px" }}>
+              {ROLES.map((r) => (
+                <button
+                  key={r.value}
+                  type="button"
+                  onClick={() => setRole(r.value)}
+                  style={{
+                    flex: 1,
+                    padding: "12px 8px",
+                    backgroundColor: role === r.value ? "rgba(245, 158, 11, 0.1)" : "rgba(24, 24, 27, 0.5)",
+                    border: `1px solid ${role === r.value ? "#f59e0b" : "#27272a"}`,
+                    borderRadius: "0px",
+                    color: role === r.value ? "#f59e0b" : "#52525b",
+                    cursor: "pointer",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    textAlign: "center",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    transition: "all 0.15s",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <RoleIcon value={r.value} color={role === r.value ? "#f59e0b" : "#52525b"} />
+                  {r.full}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <input
-            type="text"
-            placeholder="Display Name"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            required
-            style={{
-              padding: "14px 16px",
-              backgroundColor: "var(--bg-well)",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "8px",
-              color: "var(--text-primary)",
-              fontSize: "14px",
-              outline: "none",
-            }}
-          />
-
-          {role === "broadcaster" && (
+          <div>
+            <label style={labelStyle}>Display Name</label>
             <input
               type="text"
-              placeholder="Channel Name"
-              value={channelName}
-              onChange={(e) => setChannelName(e.target.value)}
+              placeholder="Your name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
               required
-              style={{
-                padding: "14px 16px",
-                backgroundColor: "var(--bg-well)",
-                border: "1px solid var(--border-subtle)",
-                borderRadius: "8px",
-                color: "var(--text-primary)",
-                fontSize: "14px",
-                outline: "none",
-              }}
+              style={inputStyle}
             />
+          </div>
+
+          {role === "broadcaster" && (
+            <div>
+              <label style={labelStyle}>Channel Name</label>
+              <input
+                type="text"
+                placeholder="My Radio Channel"
+                value={channelName}
+                onChange={(e) => setChannelName(e.target.value)}
+                required
+                style={inputStyle}
+              />
+            </div>
           )}
 
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{
-              padding: "14px 16px",
-              backgroundColor: "var(--bg-well)",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "8px",
-              color: "var(--text-primary)",
-              fontSize: "14px",
-              outline: "none",
-            }}
-          />
+          <div>
+            <label style={labelStyle}>Email</label>
+            <input
+              type="email"
+              placeholder="you@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              style={inputStyle}
+            />
+          </div>
 
-          <input
-            type="password"
-            placeholder="Password (min 6 characters)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            style={{
-              padding: "14px 16px",
-              backgroundColor: "var(--bg-well)",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "8px",
-              color: "var(--text-primary)",
-              fontSize: "14px",
-              outline: "none",
-            }}
-          />
+          <div>
+            <label style={labelStyle}>Password</label>
+            <PasswordInput
+              value={password}
+              onChange={setPassword}
+              placeholder="Min 6 characters"
+              required
+              minLength={6}
+              style={inputStyle}
+            />
+          </div>
 
           {error && (
-            <p style={{ color: "#E24A4A", fontSize: "13px" }}>{error}</p>
+            <p style={{ color: "#E24A4A", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em" }}>{error}</p>
           )}
 
           <button
@@ -208,25 +258,57 @@ function SignupForm() {
             disabled={loading}
             style={{
               padding: "14px",
-              backgroundColor: "var(--accent-blue)",
-              color: "var(--bg-well)",
+              backgroundColor: "#f59e0b",
+              color: "#0a0a0a",
               border: "none",
-              borderRadius: "8px",
-              fontSize: "14px",
-              fontWeight: 600,
+              borderRadius: "0px",
+              fontSize: "11px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
               cursor: loading ? "not-allowed" : "pointer",
               opacity: loading ? 0.6 : 1,
+              fontFamily: "'JetBrains Mono', monospace",
+              marginTop: "4px",
             }}
           >
             {loading ? "Creating account..." : "Create Account"}
           </button>
 
-          <p style={{ textAlign: "center", fontSize: "13px", color: "var(--text-secondary)" }}>
+          <p style={{
+            textAlign: "center",
+            fontSize: "11px",
+            color: "#52525b",
+            fontFamily: "'JetBrains Mono', monospace",
+          }}>
             Already have an account?{" "}
-            <a href="/login" style={{ color: "var(--accent-blue)", textDecoration: "none" }}>Sign in</a>
+            <a href="/login" style={{ color: "#f59e0b", textDecoration: "none" }}>Sign in</a>
           </p>
         </form>
       </div>
     </div>
   );
 }
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: "10px",
+  color: "#52525b",
+  marginBottom: "6px",
+  fontFamily: "'JetBrains Mono', monospace",
+  textTransform: "uppercase",
+  letterSpacing: "0.1em",
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "12px",
+  backgroundColor: "rgba(24, 24, 27, 0.5)",
+  border: "1px solid #27272a",
+  borderRadius: "0px",
+  color: "var(--text-primary)",
+  fontSize: "13px",
+  outline: "none",
+  fontFamily: "'JetBrains Mono', monospace",
+  boxSizing: "border-box",
+};

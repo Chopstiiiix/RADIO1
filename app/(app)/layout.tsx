@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import NotificationButton from "@/app/components/NotificationButton";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient();
@@ -61,6 +62,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             }}>
               {profile.role}
             </span>
+            {profile.role !== "listener" && <NotificationButton role={profile.role} />}
             <LogoutButton />
           </div>
         </div>
@@ -82,6 +84,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <NavLink href="/broadcast">Dashboard</NavLink>
               <NavLink href="/broadcast/tracks">Tracks</NavLink>
               <NavLink href="/broadcast/ads">Ads</NavLink>
+              <NavLink href="/listen">Listen</NavLink>
+              <NavLink href="/broadcast/go-live">Go Live</NavLink>
               <NavLink href="/broadcast/profile">Profile</NavLink>
             </>
           )}
@@ -92,6 +96,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <NavLink href="/advertise/channels">Channels</NavLink>
               <NavLink href="/advertise/adverts">My Ads</NavLink>
               <NavLink href="/advertise/requests">Requests</NavLink>
+              <NavLink href="/listen">Listen</NavLink>
             </>
           )}
         </div>
@@ -113,6 +118,7 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
       padding: "4px 8px",
       borderRadius: "4px",
       transition: "color 0.15s",
+      whiteSpace: "nowrap",
     }}>
       {children}
     </a>

@@ -1,0 +1,82 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+const BROADCAST_API = process.env.BROADCAST_API_URL || "http://localhost:8002";
+
+export async function POST(req: NextRequest) {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Verify broadcaster role
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "broadcaster") {
+    return NextResponse.json({ error: "Not a broadcaster" }, { status: 403 });
+  }
+
+  // Get channel slug
+  const { data: channel } = await supabase
+    .from("broadcaster_profiles")
+    .select("channel_slug, is_live")
+    .eq("id", user.id)
+    .single();
+
+  if (!channel?.channel_slug) {
+    return NextResponse.json({ error: "No channel configured" }, { status: 400 });
+  }
+
+  const { action } = await req.json();
+
+  if (action === "start") {
+    if (channel.is_live) {
+      return NextResponse.json({ ok: true, message: "Already broadcasting" });
+    }
+
+    try {
+      const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ broadcaster_id: user.id }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return NextResponse.json({ error: data.error || "Failed to start broadcast" }, { status: res.status });
+      }
+
+      return NextResponse.json({ ok: true, message: data.message, slug: channel.channel_slug });
+    } catch {
+      return NextResponse.json(
+        { error: "Broadcast server unavailable — ensure the server is running" },
+        { status: 503 }
+      );
+    }
+  }
+
+  if (action === "stop") {
+    try {
+      const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/stop`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await res.json();
+      return NextResponse.json({ ok: true, message: data.message });
+    } catch {
+      return NextResponse.json(
+        { error: "Broadcast server unavailable" },
+        { status: 503 }
+      );
+    }
+  }
+
+  return NextResponse.json({ error: "Invalid action — use 'start' or 'stop'" }, { status: 400 });
+}

@@ -46,7 +46,7 @@ export default function TracksPage() {
         .select("channel_slug, is_live")
         .eq("id", user.id)
         .single();
-      if (ch?.is_live) setChannelSlug(ch.channel_slug);
+      if (ch?.channel_slug && ch.is_live) setChannelSlug(ch.channel_slug);
     }
   }
 
@@ -65,11 +65,6 @@ export default function TracksPage() {
           setNowPlayingTitle(data.track.title);
           const titles = new Set<string>();
           titles.add(data.track.title.toLowerCase());
-          if (data.upcoming) {
-            for (const u of data.upcoming) {
-              titles.add(u.title.toLowerCase());
-            }
-          }
           setBroadcastingTitles(titles);
         } else {
           setNowPlayingTitle(null);
@@ -138,11 +133,39 @@ export default function TracksPage() {
 
     if (error) {
       setBroadcastMessage(error.message);
-    } else {
-      setBroadcastMessage(`${selectedTracks.size} track${selectedTracks.size > 1 ? "s" : ""} queued for broadcast!`);
-      setSelectedTracks(new Set());
-      loadTracks();
+      setBroadcasting(false);
+      return;
     }
+
+    // Start the broadcast immediately
+    try {
+      const res = await fetch("/api/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start" }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setBroadcastMessage(data.error || "Failed to start broadcast");
+        setBroadcasting(false);
+        return;
+      }
+
+      setBroadcastMessage(`${selectedTracks.size} track${selectedTracks.size > 1 ? "s" : ""} broadcasting live!`);
+      setSelectedTracks(new Set());
+
+      // Set channel slug so SSE connects for live indicators
+      if (data.slug) {
+        setChannelSlug(data.slug);
+      }
+
+      loadTracks();
+    } catch {
+      setBroadcastMessage("Broadcast server unavailable — tracks queued but not live");
+    }
+
     setBroadcasting(false);
   }
 
@@ -200,7 +223,7 @@ export default function TracksPage() {
           {broadcastMessage && (
             <p style={{
               fontSize: "11px",
-              color: broadcastMessage.includes("queued") ? "#4ADE80" : "#E24A4A",
+              color: (broadcastMessage.includes("queued") || broadcastMessage.includes("broadcasting")) ? "#4ADE80" : "#E24A4A",
               marginBottom: "12px",
               fontFamily: "var(--font-mono)",
               letterSpacing: "0.05em",
@@ -336,31 +359,17 @@ export default function TracksPage() {
               >
                 {/* Checkbox / On-Air indicator */}
                 {isBroadcasting ? (
-                  <div style={{
+                  <div className="cursor-blink" style={{
                     width: "18px",
                     height: "18px",
+                    border: "2px solid #f59e0b",
+                    backgroundColor: isNowPlaying ? "#f59e0b" : "rgba(245, 158, 11, 0.15)",
+                    boxShadow: "0 0 8px rgba(245, 158, 11, 0.4)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     flexShrink: 0,
-                  }}>
-                    {isNowPlaying ? (
-                      <span className="cursor-blink" style={{
-                        width: "8px",
-                        height: "8px",
-                        backgroundColor: "#f59e0b",
-                        borderRadius: "50%",
-                        boxShadow: "0 0 8px rgba(245, 158, 11, 0.6)",
-                      }} />
-                    ) : (
-                      <span style={{
-                        width: "6px",
-                        height: "6px",
-                        backgroundColor: "#52525b",
-                        borderRadius: "50%",
-                      }} />
-                    )}
-                  </div>
+                  }} />
                 ) : !track.is_active ? null : (
                   <div style={{
                     width: "18px",
@@ -434,18 +443,18 @@ export default function TracksPage() {
                   </div>
                 ) : null}
 
-                {/* Active toggle */}
+                {/* Status toggle */}
                 <button onClick={(e) => { e.stopPropagation(); toggleActive(track.id, track.is_active); }} style={{
                   background: "none",
                   border: "1px solid var(--border-subtle)",
-                  color: track.is_active ? "#4ADE80" : "var(--text-tertiary)",
+                  color: isBroadcasting ? "#4ADE80" : track.is_active ? "#f59e0b" : "var(--text-tertiary)",
                   padding: "4px 10px",
                   borderRadius: "0px",
                   fontSize: "11px",
                   cursor: "pointer",
                   fontFamily: "var(--font-mono)",
                 }}>
-                  {track.is_active ? "ACTIVE" : "INACTIVE"}
+                  {isBroadcasting ? "ACTIVE" : track.is_active ? "READY" : "INACTIVE"}
                 </button>
 
                 {/* Delete */}

@@ -22,6 +22,18 @@ export default async function ListenPage() {
     .order("is_live", { ascending: false })
     .order("monthly_listeners", { ascending: false });
 
+  // Get like counts per channel
+  const { data: likeCounts } = await supabase
+    .from("channel_likes")
+    .select("channel_slug");
+
+  const likeMap: Record<string, number> = {};
+  if (likeCounts) {
+    for (const row of likeCounts) {
+      likeMap[row.channel_slug] = (likeMap[row.channel_slug] || 0) + 1;
+    }
+  }
+
   const allChannels = (channels || []) as unknown as Channel[];
 
   return (
@@ -178,7 +190,7 @@ export default async function ListenPage() {
           </div>
         ) : (
           allChannels.map((ch, index) => (
-            <ChannelCard key={ch.id} channel={ch} index={index} />
+            <ChannelCard key={ch.id} channel={ch} index={index} likes={likeMap[ch.channel_slug] || 0} />
           ))
         )}
       </div>
@@ -228,7 +240,7 @@ export default async function ListenPage() {
   );
 }
 
-function ChannelCard({ channel, index }: { channel: any; index: number }) {
+function ChannelCard({ channel, index, likes }: { channel: any; index: number; likes: number }) {
   const isLive = channel.is_live;
   const profile = channel.profile as any;
   const chNum = String(index + 1).padStart(2, "0");
@@ -369,6 +381,21 @@ function ChannelCard({ channel, index }: { channel: any; index: number }) {
             {isLive ? "Connected" : "Standby"}
           </span>
 
+          {/* Likes count */}
+          <span style={{
+            fontSize: "10px",
+            letterSpacing: "0.05em",
+            color: isLive ? "rgba(245, 158, 11, 0.7)" : "#52525b",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+          }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill={likes > 0 ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+            {likes.toLocaleString()}
+          </span>
+
           {/* Listener count */}
           <span style={{
             fontSize: "10px",
@@ -376,7 +403,7 @@ function ChannelCard({ channel, index }: { channel: any; index: number }) {
             color: isLive ? "rgba(245, 158, 11, 0.7)" : "#52525b",
             display: "flex",
             alignItems: "center",
-            gap: "5px",
+            gap: "4px",
           }}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
