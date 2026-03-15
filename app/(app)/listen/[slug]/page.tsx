@@ -298,16 +298,6 @@ export default function ChannelPage() {
     }}>
 
       <style>{`
-        .scanlines {
-          background: linear-gradient(
-            to bottom,
-            rgba(255, 255, 255, 0),
-            rgba(255, 255, 255, 0) 50%,
-            rgba(0, 0, 0, 0.2) 50%,
-            rgba(0, 0, 0, 0.2)
-          );
-          background-size: 100% 4px;
-        }
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
@@ -340,16 +330,6 @@ export default function ChannelPage() {
           color: var(--accent-blue) !important;
         }
       `}</style>
-
-      {/* Scanline overlay */}
-      <div className="scanlines" style={{
-        position: "fixed",
-        inset: 0,
-        pointerEvents: "none",
-        zIndex: 50,
-        mixBlendMode: "overlay",
-        opacity: 0.5,
-      }} />
 
       {/* ── Header ── */}
       <header style={{
