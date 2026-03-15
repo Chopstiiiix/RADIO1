@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { action, filename } = body;
+  const { action, filename, track_ids } = body;
 
   if (action === "start") {
     if (channel.is_live) {
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broadcaster_id: user.id }),
+        body: JSON.stringify({ broadcaster_id: user.id, track_ids }),
       });
 
       const data = await res.json();

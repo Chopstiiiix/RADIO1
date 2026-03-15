@@ -25,7 +25,7 @@ async function main() {
   // Go live — start a channel
   api.post("/api/channels/:slug/start", async (req, res) => {
     const { slug } = req.params;
-    const { broadcaster_id } = req.body;
+    const { broadcaster_id, track_ids } = req.body;
 
     if (!broadcaster_id) {
       return res.status(400).json({ error: "broadcaster_id required" });
@@ -43,11 +43,11 @@ async function main() {
       return res.status(404).json({ error: "Channel not found" });
     }
 
-    const success = await startChannel(broadcaster_id, slug);
+    const success = await startChannel(broadcaster_id, slug, track_ids);
     if (success) {
       res.json({ ok: true, message: `Channel ${slug} is now live` });
     } else {
-      res.status(400).json({ error: "No tracks available — upload tracks first" });
+      res.status(400).json({ error: "No tracks available — select tracks to broadcast" });
     }
   });
 

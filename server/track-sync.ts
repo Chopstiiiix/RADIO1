@@ -9,17 +9,23 @@ import { supabase } from "./supabase";
 export async function syncTracksForChannel(
   broadcasterId: string,
   slug: string,
-  musicDir: string
+  musicDir: string,
+  trackIds?: string[]
 ): Promise<void> {
-  console.log(`🔄 [${slug}] Syncing tracks from Supabase...`);
+  console.log(`🔄 [${slug}] Syncing tracks from Supabase...${trackIds ? ` (${trackIds.length} selected)` : ""}`);
 
-  // Get active tracks from database
-  const { data: tracks, error } = await supabase
+  // Get tracks from database — filter by selected IDs if provided
+  let query = supabase
     .from("tracks")
     .select("id, title, primary_artist, file_url")
     .eq("broadcaster_id", broadcasterId)
-    .eq("is_active", true)
-    .order("uploaded_at", { ascending: true });
+    .eq("is_active", true);
+
+  if (trackIds && trackIds.length > 0) {
+    query = query.in("id", trackIds);
+  }
+
+  const { data: tracks, error } = await query.order("uploaded_at", { ascending: true });
 
   if (error) {
     console.error(`[${slug}] Error fetching tracks:`, error.message);

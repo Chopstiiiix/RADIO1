@@ -43,6 +43,7 @@ export default function GoLivePage() {
   // Music library
   const [tracks, setTracks] = useState<Track[]>([]);
   const [tracksLoading, setTracksLoading] = useState(false);
+  const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
 
   // Ads
   const [approvedAds, setApprovedAds] = useState<ApprovedAd[]>([]);
@@ -118,9 +119,8 @@ export default function GoLivePage() {
     return () => clearInterval(interval);
   }, [isLive, supabase]);
 
-  // Load tracks when music panel opens
+  // Load tracks on mount (needed for selection before going live)
   useEffect(() => {
-    if (activePanel !== "music") return;
     async function loadTracks() {
       setTracksLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -133,11 +133,14 @@ export default function GoLivePage() {
         .eq("is_active", true)
         .order("title");
 
-      setTracks((data as Track[]) || []);
+      const loadedTracks = (data as Track[]) || [];
+      setTracks(loadedTracks);
+      // Select all by default
+      setSelectedTrackIds(new Set(loadedTracks.map((t) => t.id)));
       setTracksLoading(false);
     }
     loadTracks();
-  }, [activePanel, supabase]);
+  }, [supabase]);
 
   // Load approved ads when ads panel opens
   useEffect(() => {
@@ -316,15 +319,41 @@ export default function GoLivePage() {
     setSkipping(false);
   }
 
+  function toggleTrackSelection(trackId: string) {
+    setSelectedTrackIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(trackId)) next.delete(trackId);
+      else next.add(trackId);
+      return next;
+    });
+  }
+
+  function selectAllTracks() {
+    setSelectedTrackIds(new Set(tracks.map((t) => t.id)));
+  }
+
+  function deselectAllTracks() {
+    setSelectedTrackIds(new Set());
+  }
+
   async function toggleBroadcast() {
     setToggling(true);
     setMessage("");
+
+    if (!isLive && selectedTrackIds.size === 0) {
+      setMessage("Select at least one track to broadcast");
+      setToggling(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: isLive ? "stop" : "start" }),
+        body: JSON.stringify({
+          action: isLive ? "stop" : "start",
+          ...(isLive ? {} : { track_ids: Array.from(selectedTrackIds) }),
+        }),
       });
 
       const data = await res.json();
@@ -589,14 +618,140 @@ export default function GoLivePage() {
           textTransform: "uppercase",
           letterSpacing: "0.1em",
         }}>
-          {trackCount} active track{trackCount !== 1 ? "s" : ""} ready
+          {isLive
+            ? `${trackCount} active track${trackCount !== 1 ? "s" : ""} ready`
+            : `${selectedTrackIds.size} of ${tracks.length} track${tracks.length !== 1 ? "s" : ""} selected`
+          }
         </div>
       </div>
+
+      {/* ──── TRACK SELECTION (before going live) ──── */}
+      {!isLive && (
+        <div style={{
+          backgroundColor: "rgba(24, 24, 27, 0.3)",
+          borderLeft: "3px solid #f59e0b",
+          overflow: "hidden",
+          marginBottom: "16px",
+        }}>
+          <div style={{
+            padding: "12px 16px",
+            borderBottom: "1px solid #1a1a1e",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}>
+            <span style={{
+              fontSize: "10px",
+              color: "#f59e0b",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              fontFamily: "var(--font-mono)",
+            }}>
+              SELECT TRACKS TO BROADCAST
+            </span>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                onClick={selectAllTracks}
+                style={{
+                  fontSize: "9px", color: "#71717a", background: "none", border: "none",
+                  cursor: "pointer", textTransform: "uppercase", fontFamily: "var(--font-mono)",
+                  letterSpacing: "0.05em",
+                }}
+              >All</button>
+              <button
+                onClick={deselectAllTracks}
+                style={{
+                  fontSize: "9px", color: "#71717a", background: "none", border: "none",
+                  cursor: "pointer", textTransform: "uppercase", fontFamily: "var(--font-mono)",
+                  letterSpacing: "0.05em",
+                }}
+              >None</button>
+              <a href="/broadcast/tracks/upload" style={{
+                fontSize: "9px", color: "#71717a", textDecoration: "none",
+                textTransform: "uppercase", fontFamily: "var(--font-mono)", letterSpacing: "0.05em",
+              }}>+ Upload</a>
+            </div>
+          </div>
+
+          {tracksLoading ? (
+            <div style={{ padding: "20px" }}><InlineLoader /></div>
+          ) : tracks.length === 0 ? (
+            <div style={{ padding: "32px 16px", textAlign: "center" }}>
+              <p style={{
+                color: "#52525b", fontSize: "11px", textTransform: "uppercase",
+                fontFamily: "var(--font-mono)", marginBottom: "8px",
+              }}>No active tracks</p>
+              <a href="/broadcast/tracks/upload" style={{
+                color: "#f59e0b", fontSize: "11px", textDecoration: "none",
+                textTransform: "uppercase", fontFamily: "var(--font-mono)",
+              }}>Upload tracks to get started</a>
+            </div>
+          ) : (
+            <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+              {tracks.map((track) => {
+                const isSelected = selectedTrackIds.has(track.id);
+                return (
+                  <div
+                    key={track.id}
+                    onClick={() => toggleTrackSelection(track.id)}
+                    style={{
+                      padding: "10px 16px",
+                      borderBottom: "1px solid rgba(39, 39, 42, 0.5)",
+                      backgroundColor: isSelected ? "rgba(245, 158, 11, 0.06)" : "transparent",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      transition: "background-color 0.1s",
+                    }}
+                  >
+                    {/* Checkbox */}
+                    <div style={{
+                      width: "18px",
+                      height: "18px",
+                      border: isSelected ? "2px solid #f59e0b" : "2px solid #3f3f46",
+                      backgroundColor: isSelected ? "#f59e0b" : "transparent",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      transition: "all 0.1s",
+                    }}>
+                      {isSelected && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
+
+                    {/* Track info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: isSelected ? "var(--text-primary)" : "#71717a",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}>
+                        {track.title}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "#52525b" }}>
+                        {track.primary_artist} · {formatDuration(track.duration_seconds)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Go Live / Stop button */}
       <button
         onClick={toggleBroadcast}
-        disabled={toggling || (!isLive && trackCount === 0)}
+        disabled={toggling || (!isLive && selectedTrackIds.size === 0)}
         style={{
           width: "100%",
           padding: "16px",
@@ -607,8 +762,8 @@ export default function GoLivePage() {
           fontWeight: 700,
           textTransform: "uppercase",
           letterSpacing: "0.1em",
-          cursor: toggling || (!isLive && trackCount === 0) ? "not-allowed" : "pointer",
-          opacity: toggling ? 0.6 : 1,
+          cursor: toggling || (!isLive && selectedTrackIds.size === 0) ? "not-allowed" : "pointer",
+          opacity: toggling || (!isLive && selectedTrackIds.size === 0) ? 0.6 : 1,
           fontFamily: "'JetBrains Mono', monospace",
           display: "flex",
           alignItems: "center",
@@ -633,12 +788,12 @@ export default function GoLivePage() {
               <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4" />
               <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
             </svg>
-            {toggling ? "STARTING..." : "GO LIVE"}
+            {toggling ? "STARTING..." : `GO LIVE (${selectedTrackIds.size} TRACK${selectedTrackIds.size !== 1 ? "S" : ""})`}
           </>
         )}
       </button>
 
-      {!isLive && trackCount === 0 && (
+      {!isLive && tracks.length === 0 && (
         <p style={{
           fontSize: "11px",
           color: "#52525b",

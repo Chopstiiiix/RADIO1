@@ -19,7 +19,7 @@ export function getActiveChannels() {
   return activeChannels;
 }
 
-export async function startChannel(broadcasterId: string, slug: string): Promise<boolean> {
+export async function startChannel(broadcasterId: string, slug: string, trackIds?: string[]): Promise<boolean> {
   if (activeChannels.has(slug)) {
     console.log(`Channel ${slug} already active`);
     return true;
@@ -30,8 +30,17 @@ export async function startChannel(broadcasterId: string, slug: string): Promise
   fs.mkdirSync(musicDir, { recursive: true });
   fs.mkdirSync(outputDir, { recursive: true });
 
-  // Sync tracks from Supabase Storage to local music dir
-  await syncTracksForChannel(broadcasterId, slug, musicDir);
+  // Clear old files so only selected tracks play
+  if (fs.existsSync(musicDir)) {
+    for (const f of fs.readdirSync(musicDir)) {
+      if (/\.(mp3|flac|wav|m4a|ogg)$/i.test(f)) {
+        fs.unlinkSync(path.join(musicDir, f));
+      }
+    }
+  }
+
+  // Sync selected tracks from Supabase Storage to local music dir
+  await syncTracksForChannel(broadcasterId, slug, musicDir, trackIds);
 
   const config: ChannelConfig = { slug, musicDir, outputDir };
 
