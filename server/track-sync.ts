@@ -39,6 +39,26 @@ export async function syncTracksForChannel(
 
   fs.mkdirSync(musicDir, { recursive: true });
 
+  // Build expected filenames for the selected tracks
+  const expectedFiles = new Set<string>();
+  for (const track of tracks) {
+    if (track.file_url.startsWith("local://")) continue;
+    const ext = path.extname(new URL(track.file_url).pathname) || ".mp3";
+    const safeName = `${track.primary_artist} - ${track.title}`
+      .replace(/[^a-zA-Z0-9\s\-_.]/g, "")
+      .trim();
+    expectedFiles.add(`${safeName}${ext}`);
+  }
+
+  // Remove old tracks not in this selection so only selected tracks broadcast
+  if (trackIds && trackIds.length > 0) {
+    for (const f of fs.readdirSync(musicDir)) {
+      if (/\.(mp3|flac|wav|m4a|ogg)$/i.test(f) && !expectedFiles.has(f)) {
+        fs.unlinkSync(path.join(musicDir, f));
+      }
+    }
+  }
+
   // Get existing local files
   const existingFiles = new Set(
     fs.existsSync(musicDir) ? fs.readdirSync(musicDir) : []

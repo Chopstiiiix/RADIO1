@@ -13,6 +13,7 @@ import path from "path";
 import fs from "fs";
 import { startChannelPipeline, startChannelPipelineFromTracks, stopChannelPipeline, getChannelTracks, streamEvents, type TrackFile } from "./stream";
 import { supabase } from "./supabase";
+import { syncTracksForChannel } from "./track-sync";
 import type { Response } from "express";
 
 const PORT = 5000;
@@ -36,18 +37,15 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
   fs.mkdirSync(outputDir, { recursive: true });
   fs.mkdirSync(musicDir, { recursive: true });
 
-  let tracks: TrackFile[];
-  if (trackIds && trackIds.length > 0) {
-    const allTracks = getChannelTracks(musicDir);
-    tracks = trackIds
-      .map(id => allTracks.find(t => t.filename === id))
-      .filter((t): t is TrackFile => !!t);
+  // Sync tracks from Supabase Storage to local disk before starting
+  await syncTracksForChannel(broadcasterId, slug, musicDir, trackIds);
 
-    if (tracks.length === 0) return false;
-    tracks = startChannelPipelineFromTracks({ slug, musicDir, outputDir }, tracks);
-  } else {
-    tracks = startChannelPipeline({ slug, musicDir, outputDir });
-  }
+  let tracks: TrackFile[];
+  const allTracks = getChannelTracks(musicDir);
+  if (allTracks.length === 0) return false;
+
+  // Use all synced tracks (they're already filtered by trackIds in syncTracksForChannel)
+  tracks = startChannelPipelineFromTracks({ slug, musicDir, outputDir }, allTracks);
 
   if (tracks.length === 0) return false;
 
