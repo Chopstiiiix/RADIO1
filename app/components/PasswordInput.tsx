@@ -1,9 +1,19 @@
 "use client";
 
 import { useState, useRef } from "react";
-import Lottie from "lottie-react";
+import dynamic from "next/dynamic";
 import type { LottieRefCurrentProps } from "lottie-react";
 import visibilityAnimation from "@/public/visibility.json";
+
+const Lottie = dynamic(() => import("lottie-react"), {
+  ssr: false,
+  loading: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#71717a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
+});
 
 export default function PasswordInput({
   value,
@@ -28,11 +38,9 @@ export default function PasswordInput({
     setVisible(next);
     if (lottieRef.current) {
       if (next) {
-        // Play forward: eye open → closed (show → hide)
         lottieRef.current.setDirection(1);
         lottieRef.current.play();
       } else {
-        // Play reverse: eye closed → open (hide → show)
         lottieRef.current.setDirection(-1);
         lottieRef.current.play();
       }
