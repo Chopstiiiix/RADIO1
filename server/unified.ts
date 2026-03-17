@@ -1,29 +1,25 @@
 /**
- * Unified Radio1 server for single-port deployment (Railway, Render, etc.)
+ * Radio1 backend server — runs on port 5000
  *
- * Consolidates all services behind one PORT:
- *   /stream/:slug/*   → HLS segments
- *   /metadata/*        → SSE + REST metadata
- *   /api/channels/*    → Channel management REST API
- *   Everything else    → Next.js standalone (proxied)
+ * Next.js rewrites proxy these paths from the public port:
+ *   /stream/:slug/*    → HLS segments
+ *   /metadata/*         → SSE + REST metadata
+ *   /api/channels/*     → Channel management REST API
  */
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
-import { spawn } from "child_process";
-import { createProxyMiddleware } from "http-proxy-middleware";
 import { startChannelPipeline, startChannelPipelineFromTracks, stopChannelPipeline, getChannelTracks, streamEvents, type TrackFile } from "./stream";
 import { supabase } from "./supabase";
 import type { Response } from "express";
 
-const PORT = parseInt(process.env.PORT || "3000");
-const NEXTJS_INTERNAL_PORT = 3001;
+const PORT = 5000;
 const BASE_OUTPUT_DIR = path.join(process.cwd(), "stream-output");
 const BASE_MUSIC_DIR = path.join(process.cwd(), "music");
 
-// ── Channel Manager (inlined from channel-manager.ts to avoid circular deps) ──
+// ── Channel Manager ──
 
 interface ChannelState {
   broadcasterId: string;
@@ -33,8 +29,6 @@ interface ChannelState {
 }
 
 const activeChannels = new Map<string, ChannelState>();
-
-function getActiveChannels() { return activeChannels; }
 
 async function startChannel(broadcasterId: string, slug: string, trackIds?: string[]): Promise<boolean> {
   const musicDir = path.join(BASE_MUSIC_DIR, slug);
@@ -177,7 +171,7 @@ function getChannelQueue(slug: string) {
   };
 }
 
-// ── Metadata SSE (inlined) ──
+// ── Metadata SSE ──
 
 interface NowPlayingState {
   track: { title: string; artist: string; album?: string } | null;
@@ -195,7 +189,6 @@ function getDefaultState(): NowPlayingState {
   return { track: null, upcoming: [], duration: 0, startedAt: 0, trackStartOffset: 0, ended: false };
 }
 
-// Re-export for use by channel manager above
 function updateNowPlaying(slug: string, state: Partial<NowPlayingState>) {
   const current = channelStates.get(slug) || getDefaultState();
   if (state.track) state.startedAt = Date.now();
@@ -237,7 +230,7 @@ streamEvents.on("ended", async (slug: string) => {
 
 // ── Express App ──
 async function main() {
-  console.log("🎙️  Radio1 Unified Server Starting...\n");
+  console.log("🎙️  Radio1 Backend Server Starting...\n");
 
   const app = express();
   app.use(cors());
@@ -347,40 +340,11 @@ async function main() {
     res.json(channels);
   });
 
-  // ── Proxy everything else to Next.js ──
-  app.use(
-    createProxyMiddleware({
-      target: `http://127.0.0.1:${NEXTJS_INTERNAL_PORT}`,
-      changeOrigin: true,
-      ws: true,
-    })
-  );
-
-  // Start Next.js standalone
-  const nextJs = spawn("node", ["server.js"], {
-    env: {
-      ...process.env,
-      PORT: String(NEXTJS_INTERNAL_PORT),
-      HOSTNAME: "127.0.0.1",
-    },
-    stdio: "inherit",
-  });
-
-  nextJs.on("error", (err) => console.error("Next.js error:", err));
-  nextJs.on("exit", (code) => {
-    console.error(`Next.js exited with code ${code}`);
-    process.exit(1);
-  });
-
-  // Give Next.js a moment to boot
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`\n🔥 Radio1 unified server live on port ${PORT}`);
+    console.log(`\n🔥 Radio1 backend live on port ${PORT}`);
     console.log(`   📡 Stream:   /stream/{slug}/stream.m3u8`);
     console.log(`   📊 Metadata: /metadata/channels/{slug}/now-playing`);
-    console.log(`   🔧 API:      /api/channels/*`);
-    console.log(`   🌐 Next.js:  proxied from :${NEXTJS_INTERNAL_PORT}\n`);
+    console.log(`   🔧 API:      /api/channels/*\n`);
   });
 }
 
