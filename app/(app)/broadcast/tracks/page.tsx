@@ -67,6 +67,11 @@ export default function TracksPage() {
           setNowPlayingTitle(data.track.title);
           const titles = new Set<string>();
           titles.add(data.track.title.toLowerCase());
+          if (data.upcoming) {
+            for (const u of data.upcoming) {
+              titles.add(u.title.toLowerCase());
+            }
+          }
           setBroadcastingTitles(titles);
         } else {
           setNowPlayingTitle(null);
@@ -107,7 +112,7 @@ export default function TracksPage() {
 
   function toggleSelectAll() {
     const selectableTracks = tracks.filter((t) =>
-      t.is_active && !broadcastingTitles.has(t.title.toLowerCase())
+      t.is_active && !isTrackBroadcasting(t)
     );
     const allSelected = selectableTracks.length > 0 && selectableTracks.every((t) => selectedTracks.has(t.id));
     if (allSelected) {
@@ -171,8 +176,14 @@ export default function TracksPage() {
     setBroadcasting(false);
   }
 
+  function isTrackBroadcasting(t: Track) {
+    const key = `${t.primary_artist} - ${t.title}`.toLowerCase();
+    return broadcastingTitles.has(key) ||
+      Array.from(broadcastingTitles).some(bt => bt.includes(t.title.toLowerCase()));
+  }
+
   const selectableCount = tracks.filter((t) =>
-    t.is_active && !broadcastingTitles.has(t.title.toLowerCase())
+    t.is_active && !isTrackBroadcasting(t)
   ).length;
 
   return (
@@ -330,8 +341,8 @@ export default function TracksPage() {
           {tracks.map((track) => {
             const isSelected = selectedTracks.has(track.id);
             const isNowPlaying = nowPlayingTitle !== null &&
-              track.title.toLowerCase() === nowPlayingTitle.toLowerCase();
-            const isBroadcasting = broadcastingTitles.has(track.title.toLowerCase());
+              nowPlayingTitle.toLowerCase().includes(track.title.toLowerCase());
+            const isBroadcasting = isTrackBroadcasting(track);
             const isSelectable = track.is_active && !isBroadcasting;
 
             return (
@@ -361,12 +372,12 @@ export default function TracksPage() {
               >
                 {/* Checkbox / On-Air indicator */}
                 {isBroadcasting ? (
-                  <div className="cursor-blink" style={{
+                  <div className="broadcast-glow" style={{
                     width: "18px",
                     height: "18px",
-                    border: "2px solid #f59e0b",
-                    backgroundColor: isNowPlaying ? "#f59e0b" : "rgba(245, 158, 11, 0.15)",
-                    boxShadow: "0 0 8px rgba(245, 158, 11, 0.4)",
+                    border: "2px solid #4ADE80",
+                    backgroundColor: "#4ADE80",
+                    boxShadow: "0 0 8px rgba(74, 222, 128, 0.4)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -456,7 +467,7 @@ export default function TracksPage() {
                   cursor: "pointer",
                   fontFamily: "var(--font-mono)",
                 }}>
-                  {isBroadcasting ? "ACTIVE" : track.is_active ? "READY" : "INACTIVE"}
+                  {isBroadcasting ? "LIVE" : track.is_active ? "READY" : "INACTIVE"}
                 </button>
 
                 {/* Delete */}
