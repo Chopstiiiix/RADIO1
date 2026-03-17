@@ -6,12 +6,12 @@ import Hls from "hls.js";
 function getStreamUrl(slug?: string) {
   if (typeof window === "undefined") {
     return slug
-      ? `http://localhost:8000/${slug}/stream.m3u8`
-      : "http://localhost:8000/stream.m3u8";
+      ? `/stream/${slug}/stream.m3u8`
+      : "/stream/default/stream.m3u8";
   }
   return slug
-    ? `http://${window.location.hostname}:8000/${slug}/stream.m3u8`
-    : `http://${window.location.hostname}:8000/stream.m3u8`;
+    ? `${window.location.origin}/stream/${slug}/stream.m3u8`
+    : `${window.location.origin}/stream/default/stream.m3u8`;
 }
 
 export function useStream(trackStartOffset: number, trackDuration: number, slug?: string) {

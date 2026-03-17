@@ -5,8 +5,8 @@ import type { TrackInfo } from "../components/NowPlaying";
 import type { UpcomingTrack } from "../components/Schedule";
 
 function getMetadataUrl() {
-  if (typeof window === "undefined") return "http://localhost:8001/now-playing";
-  return `http://${window.location.hostname}:8001/now-playing`;
+  if (typeof window === "undefined") return "/metadata/channels/default/now-playing";
+  return `${window.location.origin}/metadata/channels/default/now-playing`;
 }
 
 interface MetadataState {

@@ -170,8 +170,8 @@ export default function GoLivePage() {
   // SSE for now playing when live
   useEffect(() => {
     if (!isLive || !channelSlug) return;
-    const host = typeof window !== "undefined" ? window.location.hostname : "localhost";
-    const es = new EventSource(`http://${host}:8001/channels/${channelSlug}/now-playing`);
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const es = new EventSource(`${origin}/metadata/channels/${channelSlug}/now-playing`);
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);

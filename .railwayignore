@@ -1,0 +1,11 @@
+node_modules
+.next
+.env
+.env.*
+.env.local
+.git
+*.md
+.DS_Store
+stream-output
+music
+radio1.tar

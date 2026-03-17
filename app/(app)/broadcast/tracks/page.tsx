@@ -57,8 +57,8 @@ export default function TracksPage() {
   // SSE: track currently broadcasting
   useEffect(() => {
     if (!channelSlug) return;
-    const host = typeof window !== "undefined" ? window.location.hostname : "localhost";
-    const url = `http://${host}:8001/channels/${channelSlug}/now-playing`;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const url = `${origin}/metadata/channels/${channelSlug}/now-playing`;
     const es = new EventSource(url);
     es.onmessage = (event) => {
       try {

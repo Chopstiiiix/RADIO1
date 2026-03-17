@@ -182,8 +182,8 @@ export default function ChannelPage() {
 
   // Connect to per-channel metadata SSE
   useEffect(() => {
-    const host = typeof window !== "undefined" ? window.location.hostname : "localhost";
-    const url = `http://${host}:8001/channels/${slug}/now-playing`;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const url = `${origin}/metadata/channels/${slug}/now-playing`;
     let eventSource: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
