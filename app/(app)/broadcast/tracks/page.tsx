@@ -66,10 +66,10 @@ export default function TracksPage() {
         if (data.track && !data.ended) {
           setNowPlayingTitle(data.track.title);
           const titles = new Set<string>();
-          titles.add(data.track.title.toLowerCase());
+          titles.add(data.track.title.replace(/[^a-zA-Z0-9\s\-_.]/g, "").trim().toLowerCase());
           if (data.upcoming) {
             for (const u of data.upcoming) {
-              titles.add(u.title.toLowerCase());
+              titles.add(u.title.replace(/[^a-zA-Z0-9\s\-_.]/g, "").trim().toLowerCase());
             }
           }
           setBroadcastingTitles(titles);
@@ -176,10 +176,16 @@ export default function TracksPage() {
     setBroadcasting(false);
   }
 
+  // Strip special chars to match the filename sanitization in track-sync.ts
+  function normalize(s: string) {
+    return s.replace(/[^a-zA-Z0-9\s\-_.]/g, "").trim().toLowerCase();
+  }
+
   function isTrackBroadcasting(t: Track) {
-    const key = `${t.primary_artist} - ${t.title}`.toLowerCase();
+    const key = normalize(`${t.primary_artist} - ${t.title}`);
+    const titleNorm = normalize(t.title);
     return broadcastingTitles.has(key) ||
-      Array.from(broadcastingTitles).some(bt => bt.includes(t.title.toLowerCase()));
+      Array.from(broadcastingTitles).some(bt => bt.includes(titleNorm) || normalize(bt).includes(titleNorm));
   }
 
   const selectableCount = tracks.filter((t) =>
@@ -341,7 +347,7 @@ export default function TracksPage() {
           {tracks.map((track) => {
             const isSelected = selectedTracks.has(track.id);
             const isNowPlaying = nowPlayingTitle !== null &&
-              nowPlayingTitle.toLowerCase().includes(track.title.toLowerCase());
+              normalize(nowPlayingTitle).includes(normalize(track.title));
             const isBroadcasting = isTrackBroadcasting(track);
             const isSelectable = track.is_active && !isBroadcasting;
 
