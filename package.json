@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "concurrently \"next dev\" \"tsx server/unified.ts\"",
     "build": "next build",
-    "start": "concurrently \"next start -p ${PORT:-3000}\" \"tsx server/unified.ts\""
+    "start": "concurrently \"node .next/standalone/server.js\" \"tsx server/unified.ts\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.500.0",
