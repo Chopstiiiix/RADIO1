@@ -112,7 +112,7 @@ export default function ChannelPage() {
       } else {
         // Fallback to localStorage for unauthenticated
         try {
-          const favs: string[] = JSON.parse(localStorage.getItem("radio1_favorites") || "[]");
+          const favs: string[] = JSON.parse(localStorage.getItem("caster_favorites") || "[]");
           setIsFavorited(favs.includes(slug));
         } catch { /* ignore */ }
       }
@@ -867,8 +867,8 @@ export default function ChannelPage() {
             onClick={async () => {
               const shareUrl = `${window.location.origin}/listen/${slug}`;
               const shareData = {
-                title: `${channel.channel_name} on Radio1`,
-                text: `Listen to ${channel.channel_name} on Radio1`,
+                title: `${channel.channel_name} on Caster`,
+                text: `Listen to ${channel.channel_name} on Caster`,
                 url: shareUrl,
               };
               if (navigator.share && navigator.canShare?.(shareData)) {

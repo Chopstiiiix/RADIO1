@@ -1,5 +1,5 @@
 /**
- * Radio1 backend server — runs on port 5000
+ * Caster backend server — runs on port 5000
  *
  * Next.js rewrites proxy these paths from the public port:
  *   /stream/:slug/*    → HLS segments
@@ -54,8 +54,8 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
   await supabase.from("broadcaster_profiles").update({ is_live: true }).eq("channel_slug", slug);
 
   updateNowPlaying(slug, {
-    track: { title: tracks[0].filename.replace(/\.[^.]+$/, ""), artist: "Radio1" },
-    upcoming: tracks.slice(1, 4).map(t => ({ title: t.filename.replace(/\.[^.]+$/, ""), artist: "Radio1" })),
+    track: { title: tracks[0].filename.replace(/\.[^.]+$/, ""), artist: "Caster" },
+    upcoming: tracks.slice(1, 4).map(t => ({ title: t.filename.replace(/\.[^.]+$/, ""), artist: "Caster" })),
     duration: tracks[0].duration,
     trackStartOffset: 0,
     ended: false,
@@ -103,7 +103,7 @@ function startTrackTimer(slug: string) {
     const upcoming = [];
     for (let i = 1; i <= 3; i++) {
       const idx = (current.currentIndex + i) % current.tracks.length;
-      upcoming.push({ title: current.tracks[idx].filename.replace(/\.[^.]+$/, ""), artist: "Radio1" });
+      upcoming.push({ title: current.tracks[idx].filename.replace(/\.[^.]+$/, ""), artist: "Caster" });
     }
 
     let cumulativeOffset = 0;
@@ -112,7 +112,7 @@ function startTrackTimer(slug: string) {
     }
 
     updateNowPlaying(slug, {
-      track: { title: next.filename.replace(/\.[^.]+$/, ""), artist: "Radio1" },
+      track: { title: next.filename.replace(/\.[^.]+$/, ""), artist: "Caster" },
       upcoming,
       duration: next.duration,
       trackStartOffset: cumulativeOffset,
@@ -137,11 +137,11 @@ async function skipToTrack(slug: string, filename: string): Promise<boolean> {
   const upcoming = [];
   for (let i = 1; i <= 3; i++) {
     const ui = (idx + i) % ch.tracks.length;
-    upcoming.push({ title: ch.tracks[ui].filename.replace(/\.[^.]+$/, ""), artist: "Radio1" });
+    upcoming.push({ title: ch.tracks[ui].filename.replace(/\.[^.]+$/, ""), artist: "Caster" });
   }
 
   updateNowPlaying(slug, {
-    track: { title: track.filename.replace(/\.[^.]+$/, ""), artist: "Radio1" },
+    track: { title: track.filename.replace(/\.[^.]+$/, ""), artist: "Caster" },
     upcoming,
     duration: track.duration,
     trackStartOffset: cumulativeOffset,
@@ -228,7 +228,7 @@ streamEvents.on("ended", async (slug: string) => {
 
 // ── Express App ──
 async function main() {
-  console.log("🎙️  Radio1 Backend Server Starting...\n");
+  console.log("🎙️  Caster Backend Server Starting...\n");
 
   const app = express();
   app.use(cors());
@@ -339,7 +339,7 @@ async function main() {
   });
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`\n🔥 Radio1 backend live on port ${PORT}`);
+    console.log(`\n🔥 Caster backend live on port ${PORT}`);
     console.log(`   📡 Stream:   /stream/{slug}/stream.m3u8`);
     console.log(`   📊 Metadata: /metadata/channels/{slug}/now-playing`);
     console.log(`   🔧 API:      /api/channels/*\n`);

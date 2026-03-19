@@ -30,7 +30,7 @@ export default function Loading() {
         letterSpacing: "-0.05em",
         textTransform: "uppercase",
       }}>
-        Radio1<span style={{ color: "#f59e0b" }}>_</span>
+        Caster<span style={{ color: "#f59e0b" }}>_</span>
       </h1>
 
       <div style={{

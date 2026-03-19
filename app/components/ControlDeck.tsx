@@ -102,10 +102,10 @@ export default function ControlDeck({
 
   const handleShare = useCallback(async () => {
     const url = window.location.href;
-    const text = "Listening live on Radio1";
+    const text = "Listening live on Caster";
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Radio1", text, url });
+        await navigator.share({ title: "Caster", text, url });
       } catch { /* cancelled */ }
     } else {
       await navigator.clipboard.writeText(url);

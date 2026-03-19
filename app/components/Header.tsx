@@ -50,7 +50,7 @@ export default function Header({ isLive, channelName }: { isLive: boolean; chann
           color: "var(--text-primary)",
         }}
       >
-        {channelName ?? "Radio1"}
+        {channelName ?? "Caster"}
       </h1>
 
       <style>{`

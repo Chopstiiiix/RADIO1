@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Radio1 — 24/7 AI-Powered Radio",
+  title: "Caster — 24/7 AI-Powered Radio",
   description: "Live internet radio powered by AI DJ technology",
 };
 

@@ -86,7 +86,7 @@ function LoginForm() {
           textTransform: "uppercase",
           fontFamily: "'JetBrains Mono', monospace",
         }}>
-          Radio1<span style={{ color: "#f59e0b" }}>_</span>
+          Caster<span style={{ color: "#f59e0b" }}>_</span>
         </h1>
         <p style={{
           color: "#52525b",

@@ -52,7 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               fontSize: "18px", fontWeight: 800, letterSpacing: "-0.05em",
               color: "#f59e0b", textDecoration: "none", textTransform: "uppercase",
             }}>
-            Radio1<span style={{ color: "#ffffff" }}>_</span>
+            Caster<span style={{ color: "#ffffff" }}>_</span>
           </a>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{

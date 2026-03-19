@@ -11,7 +11,7 @@ const METADATA_PORT = parseInt(process.env.METADATA_PORT || "8001");
 const API_PORT = 8002;
 
 async function main() {
-  console.log("🎙️  Radio1 Server Starting...\n");
+  console.log("🎙️  Caster Server Starting...\n");
 
   // Start the HTTP servers
   startStreamServer(STREAM_PORT);
@@ -116,7 +116,7 @@ async function main() {
     console.log(`🔧 Channel API: http://0.0.0.0:${API_PORT}`);
   });
 
-  console.log("\n🔥 Radio1 multi-channel server is live. All systems go.");
+  console.log("\n🔥 Caster multi-channel server is live. All systems go.");
 }
 
 main().catch(console.error);

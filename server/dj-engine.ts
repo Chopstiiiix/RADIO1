@@ -15,7 +15,7 @@ export async function generateDJScript(context: DJContext): Promise<string> {
     return "";
   }
 
-  const prompt = `You are an AI radio DJ for Radio1, a 24/7 internet radio station.
+  const prompt = `You are an AI radio DJ for Caster, a 24/7 internet radio station.
 Generate a short, natural DJ segment (2-3 sentences max) to transition between songs.
 
 Current track: "${context.currentTrack.title}" by ${context.currentTrack.artist}

@@ -21,7 +21,7 @@ export default function GlobalError({
         gap: "16px",
       }}>
         <h1 style={{ fontSize: "36px", fontWeight: 800, letterSpacing: "-0.05em", textTransform: "uppercase" }}>
-          Radio1<span style={{ color: "#f59e0b" }}>_</span>
+          Caster<span style={{ color: "#f59e0b" }}>_</span>
         </h1>
         <p style={{ fontSize: "12px", color: "#71717a", textTransform: "uppercase", letterSpacing: "0.1em" }}>
           {">"} error: something went wrong
