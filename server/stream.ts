@@ -107,6 +107,9 @@ function launchFfmpeg(slug: string, outputDir: string, concatFile: string, track
     "-f", "concat",
     "-safe", "0",
     "-i", concatFile,
+    // Normalize audio: force stereo, 44.1kHz, 16-bit — fixes channel noise
+    // from WAV files with unknown channel layouts or mismatched bit depths
+    "-af", "aformat=channel_layouts=stereo:sample_rates=44100:sample_fmts=s16",
     "-c:a", "flac",
     "-f", "hls",
     "-hls_time", "4",
