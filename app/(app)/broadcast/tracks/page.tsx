@@ -209,6 +209,20 @@ export default function TracksPage() {
         .broadcast-glow {
           animation: broadcast-pulse 1.5s ease-in-out infinite;
         }
+        @keyframes orange-blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.25; }
+        }
+        .broadcasting-block {
+          animation: orange-blink 1.2s ease-in-out infinite;
+        }
+        @keyframes active-pulse {
+          0%, 100% { color: #4ADE80; border-color: rgba(74, 222, 128, 0.3); }
+          50% { color: #86efac; border-color: rgba(74, 222, 128, 0.5); }
+        }
+        .active-status {
+          animation: active-pulse 2s ease-in-out infinite;
+        }
       `}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
         <div>
@@ -378,15 +392,10 @@ export default function TracksPage() {
               >
                 {/* Checkbox / On-Air indicator */}
                 {isBroadcasting ? (
-                  <div className="broadcast-glow" style={{
-                    width: "18px",
-                    height: "18px",
-                    border: "2px solid #4ADE80",
-                    backgroundColor: "#4ADE80",
-                    boxShadow: "0 0 8px rgba(74, 222, 128, 0.4)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
+                  <div className="broadcasting-block" style={{
+                    width: "14px",
+                    height: "14px",
+                    backgroundColor: "#f59e0b",
                     flexShrink: 0,
                   }} />
                 ) : !track.is_active ? null : (
@@ -463,17 +472,21 @@ export default function TracksPage() {
                 ) : null}
 
                 {/* Status toggle */}
-                <button onClick={(e) => { e.stopPropagation(); toggleActive(track.id, track.is_active); }} style={{
-                  background: "none",
-                  border: "1px solid var(--border-subtle)",
-                  color: isBroadcasting ? "#4ADE80" : track.is_active ? "#f59e0b" : "var(--text-tertiary)",
-                  padding: "4px 10px",
-                  borderRadius: "0px",
-                  fontSize: "11px",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-mono)",
-                }}>
-                  {isBroadcasting ? "LIVE" : track.is_active ? "READY" : "INACTIVE"}
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleActive(track.id, track.is_active); }}
+                  className={isBroadcasting ? "active-status" : ""}
+                  style={{
+                    background: "none",
+                    border: "1px solid var(--border-subtle)",
+                    color: isBroadcasting ? "#4ADE80" : track.is_active ? "#f59e0b" : "var(--text-tertiary)",
+                    padding: "4px 10px",
+                    borderRadius: "0px",
+                    fontSize: "11px",
+                    cursor: isBroadcasting ? "default" : "pointer",
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  {isBroadcasting ? "ACTIVE" : track.is_active ? "READY" : "INACTIVE"}
                 </button>
 
                 {/* Delete */}
