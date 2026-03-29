@@ -54,7 +54,30 @@ export default function TracksPage() {
 
   useEffect(() => { loadTracks(); }, []);
 
-  // SSE: track currently broadcasting
+  // Fetch the full broadcast queue to know which tracks are in rotation
+  useEffect(() => {
+    if (!channelSlug || !isChannelLive) return;
+    async function fetchQueue() {
+      try {
+        const res = await fetch(`/api/channels/${channelSlug}/queue`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.queue && Array.isArray(data.queue)) {
+            const titles = new Set<string>();
+            for (const filename of data.queue) {
+              // Strip extension and normalize to match track titles
+              const name = filename.replace(/\.[^.]+$/, "");
+              titles.add(normalize(name));
+            }
+            setBroadcastingTitles(titles);
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    fetchQueue();
+  }, [channelSlug, isChannelLive]);
+
+  // SSE: track currently playing
   useEffect(() => {
     if (!channelSlug) return;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -65,14 +88,7 @@ export default function TracksPage() {
         const data = JSON.parse(event.data);
         if (data.track && !data.ended) {
           setNowPlayingTitle(data.track.title);
-          const titles = new Set<string>();
-          titles.add(data.track.title.replace(/[^a-zA-Z0-9\s\-_.]/g, "").trim().toLowerCase());
-          if (data.upcoming) {
-            for (const u of data.upcoming) {
-              titles.add(u.title.replace(/[^a-zA-Z0-9\s\-_.]/g, "").trim().toLowerCase());
-            }
-          }
-          setBroadcastingTitles(titles);
+          if (!isChannelLive) setIsChannelLive(true);
         } else if (data.ended) {
           setNowPlayingTitle(null);
           setBroadcastingTitles(new Set());
@@ -184,12 +200,11 @@ export default function TracksPage() {
   }
 
   function isTrackBroadcasting(t: Track) {
-    // When channel is live, all active tracks are in the broadcast rotation
-    if (isChannelLive && t.is_active) return true;
+    if (broadcastingTitles.size === 0) return false;
     const key = normalize(`${t.primary_artist} - ${t.title}`);
     const titleNorm = normalize(t.title);
     return broadcastingTitles.has(key) ||
-      Array.from(broadcastingTitles).some(bt => bt.includes(titleNorm) || normalize(bt).includes(titleNorm));
+      Array.from(broadcastingTitles).some(bt => bt.includes(titleNorm) || titleNorm.includes(bt));
   }
 
   const selectableCount = tracks.filter((t) =>
