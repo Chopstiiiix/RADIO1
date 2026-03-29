@@ -166,7 +166,7 @@ export default function TracksPage() {
       const res = await fetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "start" }),
+        body: JSON.stringify({ action: "start", track_ids: Array.from(selectedTracks) }),
       });
 
       const data = await res.json();
@@ -411,11 +411,12 @@ export default function TracksPage() {
               >
                 {/* Checkbox / On-Air indicator */}
                 {isBroadcasting ? (
-                  <div className="broadcasting-block" style={{
+                  <div style={{
                     width: "14px",
                     height: "14px",
                     backgroundColor: "#f59e0b",
                     flexShrink: 0,
+                    animation: "orange-blink 1.2s ease-in-out infinite",
                   }} />
                 ) : !track.is_active ? null : (
                   <div style={{
@@ -492,8 +493,7 @@ export default function TracksPage() {
 
                 {/* Status toggle */}
                 <button
-                  onClick={(e) => { e.stopPropagation(); toggleActive(track.id, track.is_active); }}
-                  className={isBroadcasting ? "active-status" : ""}
+                  onClick={(e) => { e.stopPropagation(); if (!isBroadcasting) toggleActive(track.id, track.is_active); }}
                   style={{
                     background: "none",
                     border: "1px solid var(--border-subtle)",
@@ -503,6 +503,7 @@ export default function TracksPage() {
                     fontSize: "11px",
                     cursor: isBroadcasting ? "default" : "pointer",
                     fontFamily: "var(--font-mono)",
+                    animation: isBroadcasting ? "active-pulse 2s ease-in-out infinite" : "none",
                   }}
                 >
                   {isBroadcasting ? "ACTIVE" : track.is_active ? "READY" : "INACTIVE"}
