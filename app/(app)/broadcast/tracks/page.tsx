@@ -27,6 +27,7 @@ export default function TracksPage() {
   const [nowPlayingTitle, setNowPlayingTitle] = useState<string | null>(null);
   const [broadcastingTitles, setBroadcastingTitles] = useState<Set<string>>(new Set());
   const [channelSlug, setChannelSlug] = useState<string | null>(null);
+  const [isChannelLive, setIsChannelLive] = useState(false);
 
   async function loadTracks() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -41,15 +42,14 @@ export default function TracksPage() {
     setTracks(data || []);
     setLoading(false);
 
-    // Get channel slug for SSE connection
-    if (!channelSlug) {
-      const { data: ch } = await supabase
-        .from("broadcaster_profiles")
-        .select("channel_slug, is_live")
-        .eq("id", user.id)
-        .single();
-      if (ch?.channel_slug && ch.is_live) setChannelSlug(ch.channel_slug);
-    }
+    // Always fetch channel slug and live status
+    const { data: ch } = await supabase
+      .from("broadcaster_profiles")
+      .select("channel_slug, is_live")
+      .eq("id", user.id)
+      .single();
+    if (ch?.channel_slug) setChannelSlug(ch.channel_slug);
+    if (ch?.is_live) setIsChannelLive(true);
   }
 
   useEffect(() => { loadTracks(); }, []);
@@ -73,9 +73,10 @@ export default function TracksPage() {
             }
           }
           setBroadcastingTitles(titles);
-        } else {
+        } else if (data.ended) {
           setNowPlayingTitle(null);
           setBroadcastingTitles(new Set());
+          setIsChannelLive(false);
         }
       } catch { /* ignore */ }
     };
@@ -162,6 +163,7 @@ export default function TracksPage() {
 
       setBroadcastMessage(`${selectedTracks.size} track${selectedTracks.size > 1 ? "s" : ""} broadcasting live!`);
       setSelectedTracks(new Set());
+      setIsChannelLive(true);
 
       // Set channel slug so SSE connects for live indicators
       if (data.slug) {
@@ -182,6 +184,8 @@ export default function TracksPage() {
   }
 
   function isTrackBroadcasting(t: Track) {
+    // When channel is live, all active tracks are in the broadcast rotation
+    if (isChannelLive && t.is_active) return true;
     const key = normalize(`${t.primary_artist} - ${t.title}`);
     const titleNorm = normalize(t.title);
     return broadcastingTitles.has(key) ||
