@@ -33,6 +33,7 @@ export default function GoLivePage() {
   const [trackCount, setTrackCount] = useState(0);
   const [nowPlaying, setNowPlaying] = useState<string | null>(null);
   const [nowPlayingArtist, setNowPlayingArtist] = useState<string | null>(null);
+  const [nowPlayingType, setNowPlayingType] = useState<string>("track");
   const [trackDuration, setTrackDuration] = useState(0);
   const [trackElapsed, setTrackElapsed] = useState(0);
   const trackStartTimeRef = useRef<number>(0);
@@ -55,6 +56,11 @@ export default function GoLivePage() {
 
   // Live listener count
   const [liveListeners, setLiveListeners] = useState(0);
+
+  // AI Host
+  const [aiHostEnabled, setAiHostEnabled] = useState(false);
+  const [aiHostAvailable, setAiHostAvailable] = useState(false);
+  const [subscribedAgents, setSubscribedAgents] = useState<{ name: string; role: string }[]>([]);
 
   // Volume controls
   const [musicVolume, setMusicVolume] = useState(80);
@@ -142,6 +148,40 @@ export default function GoLivePage() {
     loadTracks();
   }, [supabase]);
 
+  // Load AI host config
+  useEffect(() => {
+    async function loadAiHostConfig() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Check if broadcaster has AI host config
+      const { data: config } = await supabase
+        .from("broadcaster_agent_configs")
+        .select("ai_host_enabled")
+        .eq("broadcaster_id", user.id)
+        .single();
+
+      // Check subscriptions
+      const { data: subs } = await supabase
+        .from("agent_subscriptions")
+        .select("role, agent:ai_agents(name)")
+        .eq("broadcaster_id", user.id)
+        .eq("status", "active");
+
+      if (subs && subs.length > 0) {
+        setAiHostAvailable(true);
+        setSubscribedAgents(subs.map((s: any) => ({
+          name: (s.agent as any)?.name ?? "Unknown",
+          role: s.role,
+        })));
+        if (config) {
+          setAiHostEnabled(config.ai_host_enabled);
+        }
+      }
+    }
+    loadAiHostConfig();
+  }, [supabase]);
+
   // Load approved ads when ads panel opens
   useEffect(() => {
     if (activePanel !== "ads") return;
@@ -178,6 +218,7 @@ export default function GoLivePage() {
         if (data.track && !data.ended) {
           setNowPlaying(data.track.title);
           setNowPlayingArtist(data.track.artist || null);
+          setNowPlayingType(data.type || "track");
           setTrackDuration(data.duration || 0);
           // Reset elapsed timer when track changes
           trackStartTimeRef.current = Date.now();
@@ -185,6 +226,7 @@ export default function GoLivePage() {
         } else {
           setNowPlaying(null);
           setNowPlayingArtist(null);
+          setNowPlayingType("track");
           setTrackDuration(0);
           setTrackElapsed(0);
         }
@@ -336,6 +378,16 @@ export default function GoLivePage() {
     setSelectedTrackIds(new Set());
   }
 
+  async function toggleAiHost() {
+    const newVal = !aiHostEnabled;
+    setAiHostEnabled(newVal);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase
+      .from("broadcaster_agent_configs")
+      .upsert({ broadcaster_id: user.id, ai_host_enabled: newVal, updated_at: new Date().toISOString() }, { onConflict: "broadcaster_id" });
+  }
+
   async function toggleBroadcast() {
     setToggling(true);
     setMessage("");
@@ -352,7 +404,7 @@ export default function GoLivePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: isLive ? "stop" : "start",
-          ...(isLive ? {} : { track_ids: Array.from(selectedTrackIds) }),
+          ...(isLive ? {} : { track_ids: Array.from(selectedTrackIds), use_ai_host: aiHostEnabled }),
         }),
       });
 
@@ -554,10 +606,34 @@ export default function GoLivePage() {
 
         {isLive && nowPlaying && (
           <div style={{ marginBottom: "12px", textAlign: "left", padding: "0 4px" }}>
+            {/* Host segment indicator */}
+            {nowPlayingType === "host_segment" && (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                marginBottom: "6px",
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#78B3CE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                </svg>
+                <span style={{
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: "#78B3CE",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  fontFamily: "var(--font-mono)",
+                }}>
+                  AI HOST TALKING
+                </span>
+              </div>
+            )}
             {/* Track title + artist */}
             <div style={{
               fontSize: "12px",
-              color: "#fbbf24",
+              color: nowPlayingType === "host_segment" ? "#78B3CE" : "#fbbf24",
               textTransform: "uppercase",
               letterSpacing: "0.05em",
               marginBottom: "4px",
@@ -566,7 +642,7 @@ export default function GoLivePage() {
               overflow: "hidden",
               textOverflow: "ellipsis",
             }}>
-              {nowPlaying}
+              {nowPlayingType === "host_segment" ? "DJ Segment" : nowPlaying}
             </div>
             {nowPlayingArtist && (
               <div style={{
@@ -624,6 +700,139 @@ export default function GoLivePage() {
           }
         </div>
       </div>
+
+      {/* ──── AI HOST TOGGLE ──── */}
+      {!isLive && (
+        <div style={{
+          backgroundColor: aiHostEnabled ? "rgba(120, 179, 206, 0.06)" : "rgba(24, 24, 27, 0.3)",
+          borderLeft: aiHostEnabled ? "3px solid #78B3CE" : "2px solid #27272a",
+          padding: "16px",
+          marginBottom: "16px",
+        }}>
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: aiHostAvailable ? "12px" : 0,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={aiHostEnabled ? "#78B3CE" : "#52525b"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+                <line x1="8" y1="23" x2="16" y2="23" />
+              </svg>
+              <div>
+                <div style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: aiHostEnabled ? "#78B3CE" : "#a1a1aa",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  fontFamily: "var(--font-mono)",
+                }}>
+                  AI RADIO HOST
+                </div>
+                <div style={{ fontSize: "10px", color: "#52525b", marginTop: "2px" }}>
+                  {aiHostAvailable
+                    ? "AI hosts introduce tracks and chat between songs"
+                    : "Subscribe to AI hosts in the marketplace"
+                  }
+                </div>
+              </div>
+            </div>
+
+            {aiHostAvailable ? (
+              <button
+                onClick={toggleAiHost}
+                style={{
+                  width: "44px",
+                  height: "24px",
+                  borderRadius: "12px",
+                  backgroundColor: aiHostEnabled ? "#78B3CE" : "#27272a",
+                  border: aiHostEnabled ? "1px solid #78B3CE" : "1px solid #3f3f46",
+                  cursor: "pointer",
+                  position: "relative",
+                  transition: "all 0.2s",
+                  flexShrink: 0,
+                }}
+              >
+                <div style={{
+                  width: "18px",
+                  height: "18px",
+                  borderRadius: "50%",
+                  backgroundColor: aiHostEnabled ? "#fff" : "#52525b",
+                  position: "absolute",
+                  top: "2px",
+                  left: aiHostEnabled ? "22px" : "2px",
+                  transition: "left 0.2s",
+                }} />
+              </button>
+            ) : (
+              <a href="/broadcast/agents" style={{
+                fontSize: "10px",
+                color: "#f59e0b",
+                textDecoration: "none",
+                textTransform: "uppercase",
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.05em",
+                padding: "6px 10px",
+                border: "1px solid #f59e0b",
+              }}>
+                Browse Agents
+              </a>
+            )}
+          </div>
+
+          {/* Show subscribed agents summary */}
+          {aiHostAvailable && aiHostEnabled && subscribedAgents.length > 0 && (
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {subscribedAgents.map((agent, i) => (
+                <div key={i} style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "4px 10px",
+                  backgroundColor: "rgba(120, 179, 206, 0.08)",
+                  border: "1px solid rgba(120, 179, 206, 0.2)",
+                }}>
+                  <span style={{
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    color: "#78B3CE",
+                    fontFamily: "var(--font-mono)",
+                  }}>
+                    {agent.name}
+                  </span>
+                  <span style={{
+                    fontSize: "8px",
+                    fontWeight: 700,
+                    color: agent.role === "primary" ? "#4ADE80" : "#f59e0b",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    fontFamily: "var(--font-mono)",
+                  }}>
+                    {agent.role}
+                  </span>
+                </div>
+              ))}
+              <a href="/broadcast/agents" style={{
+                fontSize: "9px",
+                color: "#52525b",
+                textDecoration: "none",
+                textTransform: "uppercase",
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.05em",
+                display: "flex",
+                alignItems: "center",
+                padding: "4px 8px",
+              }}>
+                Manage
+              </a>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ──── TRACK SELECTION (before going live) ──── */}
       {!isLive && (
@@ -788,7 +997,7 @@ export default function GoLivePage() {
               <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4" />
               <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
             </svg>
-            {toggling ? "STARTING..." : `GO LIVE (${selectedTrackIds.size} TRACK${selectedTrackIds.size !== 1 ? "S" : ""})`}
+            {toggling ? "STARTING..." : `GO LIVE (${selectedTrackIds.size} TRACK${selectedTrackIds.size !== 1 ? "S" : ""}${aiHostEnabled ? " + AI HOST" : ""})`}
           </>
         )}
       </button>

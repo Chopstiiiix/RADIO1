@@ -13,6 +13,7 @@ interface NowPlayingState {
   startedAt: number;
   trackStartOffset: number;
   ended: boolean;
+  type?: "track" | "host_segment" | "advert";
 }
 
 // Per-channel state

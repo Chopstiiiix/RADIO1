@@ -11,6 +11,7 @@ interface Track {
   file: string;
   duration: number;
   startOffset: number;
+  type: "track" | "host_segment" | "advert";
 }
 
 interface ChannelSchedulerState {
@@ -49,18 +50,24 @@ function parseTrackFromFile(tf: TrackFile, startOffset: number): Track {
   const name = tf.filename.replace(/\.(mp3|flac|wav|m4a|ogg)$/i, "");
   const base = { file: tf.filename, duration: tf.duration, startOffset };
 
+  // Detect host segments (files from _host_segments directory)
+  const isHostSegment = tf.path.includes("_host_segments");
+  if (isHostSegment) {
+    return { ...base, artist: "AI Host", title: "DJ Segment", type: "host_segment" };
+  }
+
   // Try DB metadata first
   const dbMatch = dbMetadataCache.get(name.toUpperCase());
   if (dbMatch) {
-    return { ...base, artist: dbMatch.artist, title: dbMatch.title };
+    return { ...base, artist: dbMatch.artist, title: dbMatch.title, type: "track" };
   }
 
   // Fallback: parse "Artist - Title" from filename
   const parts = name.split(" - ");
   if (parts.length >= 2) {
-    return { ...base, artist: parts[0].trim(), title: parts.slice(1).join(" - ").trim() };
+    return { ...base, artist: parts[0].trim(), title: parts.slice(1).join(" - ").trim(), type: "track" };
   }
-  return { ...base, artist: "Unknown Artist", title: name.trim() };
+  return { ...base, artist: "Unknown Artist", title: name.trim(), type: "track" };
 }
 
 function getTotalEncodedTime(outputDir: string): number {
@@ -93,12 +100,16 @@ function broadcastTrack(slug: string, playlist: Track[], index: number) {
   }
 
   const current = playlist[index];
+  // Filter upcoming to only show actual tracks (not host segments)
   const upcoming: { title: string; artist: string }[] = [];
   for (let i = index + 1; i < playlist.length && upcoming.length < 3; i++) {
-    upcoming.push({ title: playlist[i].title, artist: playlist[i].artist });
+    if (playlist[i].type !== "host_segment") {
+      upcoming.push({ title: playlist[i].title, artist: playlist[i].artist });
+    }
   }
 
-  console.log(`🎶 [${slug}] Now playing: ${current.title} — ${current.artist} (${Math.round(current.duration)}s)`);
+  const typeEmoji = current.type === "host_segment" ? "🎙️" : "🎶";
+  console.log(`${typeEmoji} [${slug}] Now playing: ${current.title} — ${current.artist} (${Math.round(current.duration)}s)`);
 
   updateChannelNowPlaying(slug, {
     track: { title: current.title, artist: current.artist },
@@ -106,6 +117,7 @@ function broadcastTrack(slug: string, playlist: Track[], index: number) {
     duration: Math.round(current.duration),
     trackStartOffset: current.startOffset,
     ended: false,
+    type: current.type,
   });
 }
 

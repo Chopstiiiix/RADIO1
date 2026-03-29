@@ -34,6 +34,7 @@ export default function ChannelPage() {
     trackStartOffset: 0,
     ended: false,
     isLive: false,
+    type: "track" as "track" | "host_segment" | "advert",
   });
 
   const stream = useStream(metadata.trackStartOffset, metadata.duration, slug);
@@ -199,6 +200,7 @@ export default function ChannelPage() {
             trackStartOffset: data.trackStartOffset ?? 0,
             ended: data.ended ?? false,
             isLive: !data.ended,
+            type: data.type ?? "track",
           });
         } catch { /* ignore */ }
       };
@@ -524,27 +526,27 @@ export default function ChannelPage() {
             marginBottom: "8px",
             letterSpacing: "0.1em",
           }}>
-            {metadata.track ? "NOW_PLAYING" : "AWAITING_SIGNAL"}
+            {metadata.type === "host_segment" ? "AI_HOST" : metadata.track ? "NOW_PLAYING" : "AWAITING_SIGNAL"}
           </div>
           <h2 className={metadata.track ? "glow-text" : ""} style={{
             fontSize: "20px",
             fontWeight: 700,
             letterSpacing: "-0.02em",
-            color: metadata.track ? "#fbbf24" : "#a1a1aa",
+            color: metadata.type === "host_segment" ? "#78B3CE" : metadata.track ? "#fbbf24" : "#a1a1aa",
             textTransform: "uppercase",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
           }}>
-            {metadata.track?.title.replace(/\s+/g, "_") || "—"}
+            {metadata.type === "host_segment" ? "DJ_SEGMENT" : metadata.track?.title.replace(/\s+/g, "_") || "—"}
           </h2>
           <h3 style={{
             fontSize: "13px",
             fontWeight: 500,
-            color: metadata.track ? "#d4d4d8" : "#71717a",
+            color: metadata.type === "host_segment" ? "#78B3CE" : metadata.track ? "#d4d4d8" : "#71717a",
             marginTop: "4px",
           }}>
-            HOST: {metadata.track?.artist || profile?.display_name || "Unknown"}
+            {metadata.type === "host_segment" ? "AI Radio Host" : `HOST: ${metadata.track?.artist || profile?.display_name || "Unknown"}`}
           </h3>
         </div>
 

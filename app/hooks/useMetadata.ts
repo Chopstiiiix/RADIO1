@@ -16,6 +16,7 @@ interface MetadataState {
   duration: number;
   trackStartOffset: number;
   ended: boolean;
+  type: "track" | "host_segment" | "advert";
 }
 
 export function useMetadata(): MetadataState {
@@ -26,6 +27,7 @@ export function useMetadata(): MetadataState {
     duration: 0,
     trackStartOffset: 0,
     ended: false,
+    type: "track",
   });
 
   useEffect(() => {
@@ -47,6 +49,7 @@ export function useMetadata(): MetadataState {
             duration: data.duration ?? prev.duration,
             trackStartOffset: data.trackStartOffset ?? prev.trackStartOffset,
             ended: data.ended ?? false,
+            type: data.type ?? "track",
           }));
         } catch {
           // ignore

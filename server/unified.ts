@@ -31,7 +31,7 @@ interface ChannelState {
 
 const activeChannels = new Map<string, ChannelState>();
 
-async function startChannel(broadcasterId: string, slug: string, trackIds?: string[]): Promise<boolean> {
+async function startChannel(broadcasterId: string, slug: string, trackIds?: string[], useAiHost?: boolean): Promise<boolean> {
   const musicDir = path.join(BASE_MUSIC_DIR, slug);
   const outputDir = path.join(BASE_OUTPUT_DIR, slug);
   fs.mkdirSync(outputDir, { recursive: true });
@@ -178,6 +178,7 @@ interface NowPlayingState {
   startedAt: number;
   trackStartOffset: number;
   ended: boolean;
+  type?: "track" | "host_segment" | "advert";
 }
 
 const channelStates = new Map<string, NowPlayingState>();
@@ -285,7 +286,7 @@ async function main() {
 
   app.post("/api/channels/:slug/start", async (req, res) => {
     const { slug } = req.params;
-    const { broadcaster_id, track_ids } = req.body;
+    const { broadcaster_id, track_ids, use_ai_host } = req.body;
     if (!broadcaster_id) return res.status(400).json({ error: "broadcaster_id required" });
 
     const { data: channel } = await supabase
@@ -296,7 +297,7 @@ async function main() {
       .single();
 
     if (!channel) return res.status(404).json({ error: "Channel not found" });
-    const success = await startChannel(broadcaster_id, slug, track_ids);
+    const success = await startChannel(broadcaster_id, slug, track_ids, use_ai_host);
     if (success) res.json({ ok: true, message: `Channel ${slug} is now live` });
     else res.status(400).json({ error: "No tracks available — select tracks to broadcast" });
   });
