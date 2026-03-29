@@ -54,6 +54,9 @@ export default function GoLivePage() {
   const [cuedFilename, setCuedFilename] = useState<string | null>(null);
   const [skipping, setSkipping] = useState(false);
 
+  // Live queue filenames (tracks currently in broadcast rotation)
+  const [liveQueueFilenames, setLiveQueueFilenames] = useState<Set<string>>(new Set());
+
   // Live listener count
   const [liveListeners, setLiveListeners] = useState(0);
 
@@ -206,6 +209,23 @@ export default function GoLivePage() {
     }
     loadAds();
   }, [activePanel, supabase]);
+
+  // Fetch broadcast queue to know which tracks are live in rotation
+  useEffect(() => {
+    if (!isLive || !channelSlug) { setLiveQueueFilenames(new Set()); return; }
+    async function fetchQueue() {
+      try {
+        const res = await fetch(`/api/channels/${channelSlug}/queue`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.queue && Array.isArray(data.queue)) {
+            setLiveQueueFilenames(new Set(data.queue as string[]));
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    fetchQueue();
+  }, [isLive, channelSlug]);
 
   // SSE for now playing when live
   useEffect(() => {
@@ -517,6 +537,10 @@ export default function GoLivePage() {
           border-color: #f59e0b;
           color: #f59e0b;
           background: rgba(245, 158, 11, 0.08);
+        }
+        @keyframes live-dot-blink {
+          0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(74, 222, 128, 0.8); }
+          50% { opacity: 0.3; box-shadow: 0 0 2px rgba(74, 222, 128, 0.3); }
         }
       `}</style>
 
@@ -1314,6 +1338,7 @@ export default function GoLivePage() {
                     const isCurrentlyPlaying = nowPlaying?.toLowerCase() === track.title.toLowerCase();
                     const serverFilename = getServerFilename(track);
                     const isCued = cuedFilename === serverFilename;
+                    const isInLiveQueue = liveQueueFilenames.has(serverFilename);
 
                     return (
                       <div key={track.id} style={{
@@ -1323,6 +1348,8 @@ export default function GoLivePage() {
                           ? "rgba(245, 158, 11, 0.06)"
                           : isCued
                           ? "rgba(74, 222, 128, 0.04)"
+                          : isInLiveQueue
+                          ? "rgba(74, 222, 128, 0.02)"
                           : "transparent",
                       }}>
                         <div style={{
@@ -1339,11 +1366,16 @@ export default function GoLivePage() {
                               ? "#f59e0b"
                               : isCued
                               ? "#4ADE80"
+                              : isInLiveQueue
+                              ? "#4ADE80"
                               : "#3f3f46",
                             boxShadow: isCurrentlyPlaying
                               ? "0 0 6px rgba(245, 158, 11, 0.8)"
                               : isCued
                               ? "0 0 6px rgba(74, 222, 128, 0.6)"
+                              : "none",
+                            animation: isInLiveQueue && !isCurrentlyPlaying && !isCued
+                              ? "live-dot-blink 1.5s ease-in-out infinite"
                               : "none",
                             flexShrink: 0,
                           }} />
@@ -1368,6 +1400,18 @@ export default function GoLivePage() {
                                   letterSpacing: "0.05em",
                                 }}>
                                   CUED
+                                </span>
+                              )}
+                              {isInLiveQueue && !isCurrentlyPlaying && !isCued && (
+                                <span style={{
+                                  fontSize: "9px",
+                                  color: "#4ADE80",
+                                  marginLeft: "6px",
+                                  fontFamily: "var(--font-mono)",
+                                  letterSpacing: "0.05em",
+                                  opacity: 0.7,
+                                }}>
+                                  LIVE
                                 </span>
                               )}
                             </div>
