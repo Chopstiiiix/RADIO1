@@ -16,6 +16,9 @@ import { supabase } from "./supabase";
 import { syncTracksForChannel } from "./track-sync";
 import type { Response } from "express";
 
+// Suppress auto-loop when pipeline is deliberately restarted (e.g., add-tracks)
+const suppressAutoLoop = new Set<string>();
+
 const PORT = 5000;
 const BASE_OUTPUT_DIR = path.join(process.cwd(), "stream-output");
 const BASE_MUSIC_DIR = path.join(process.cwd(), "music");
@@ -214,6 +217,11 @@ setInterval(() => {
 
 // ── Auto-loop handler ──
 streamEvents.on("ended", async (slug: string) => {
+  // Skip auto-loop if pipeline was deliberately restarted (e.g., add-tracks)
+  if (suppressAutoLoop.has(slug)) {
+    suppressAutoLoop.delete(slug);
+    return;
+  }
   const ch = activeChannels.get(slug);
   if (!ch) return;
   console.log(`🔁 [${slug}] Playlist ended, auto-looping...`);
@@ -352,7 +360,8 @@ async function main() {
 
       console.log(`➕ [${slug}] Adding ${track_ids.length} tracks — restarting pipeline with ${allTracks.length} total`);
 
-      // Stop current pipeline
+      // Suppress auto-loop before stopping — we're restarting deliberately
+      suppressAutoLoop.add(slug);
       stopChannelPipeline(slug);
 
       // Brief delay for ffmpeg to exit
