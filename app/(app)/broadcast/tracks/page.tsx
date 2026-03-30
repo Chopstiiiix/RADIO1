@@ -50,7 +50,7 @@ export default function TracksPage() {
       .eq("id", user.id)
       .single();
     if (ch?.channel_slug) setChannelSlug(ch.channel_slug);
-    if (ch?.is_live) setIsChannelLive(true);
+    setIsChannelLive(ch?.is_live ?? false);
   }
 
   useEffect(() => { loadTracks(); }, []);
