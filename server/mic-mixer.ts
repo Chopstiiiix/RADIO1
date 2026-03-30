@@ -160,6 +160,71 @@ export function setupMicWebSocket(server: Server) {
 }
 
 /**
+ * Start an HTTP-based mic session (for when WebSocket isn't available)
+ * Called when the first audio chunk arrives via POST /api/mic/:slug
+ */
+export function startHttpMicSession(slug: string): MicSession | null {
+  if (activeSessions.has(slug)) return activeSessions.get(slug)!;
+
+  const outputDir = path.join(BASE_OUTPUT_DIR, slug);
+  const micDir = path.join(outputDir, "mic");
+  fs.mkdirSync(micDir, { recursive: true });
+
+  // Clean old mic segments
+  for (const f of fs.readdirSync(micDir)) {
+    fs.unlinkSync(path.join(micDir, f));
+  }
+
+  const micHlsPath = path.join(micDir, "mic.m3u8");
+  const micSegPattern = path.join(micDir, "mic_%04d.m4s");
+
+  const ffmpeg = spawn("ffmpeg", [
+    "-f", "s16le", "-ar", "44100", "-ac", "1", "-i", "pipe:0",
+    "-af", "aformat=channel_layouts=stereo:sample_rates=44100",
+    "-c:a", "aac", "-b:a", "128k",
+    "-f", "hls", "-hls_time", "1", "-hls_list_size", "6",
+    "-hls_segment_type", "fmp4",
+    "-hls_flags", "independent_segments+delete_segments",
+    "-hls_fmp4_init_filename", "mic_init.mp4",
+    "-hls_segment_filename", micSegPattern,
+    micHlsPath,
+  ], { stdio: ["pipe", "pipe", "pipe"] });
+
+  ffmpeg.stderr?.on("data", (data: Buffer) => {
+    const msg = data.toString();
+    if (msg.includes("Error") || msg.includes("error")) {
+      console.error(`🎤 ffmpeg [${slug}]:`, msg.trim());
+    }
+  });
+
+  ffmpeg.on("close", (code) => {
+    console.log(`🎤 [${slug}] Mic FFmpeg exited with code ${code}`);
+    activeSessions.delete(slug);
+  });
+
+  const session: MicSession = {
+    slug, fifoPath: "", fifoFd: null, ffmpegProc: ffmpeg, musicVolume: 0.8, micVolume: 1.0,
+  };
+  activeSessions.set(slug, session);
+  console.log(`🎤 [${slug}] HTTP mic session started`);
+  return session;
+}
+
+/**
+ * Write audio data to an active mic session
+ */
+export function writeMicAudio(slug: string, data: Buffer): boolean {
+  const session = activeSessions.get(slug);
+  if (!session?.ffmpegProc?.stdin || session.ffmpegProc.stdin.destroyed) return false;
+  try {
+    session.ffmpegProc.stdin.write(data);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Check if a mic session is active for a channel
  */
 export function hasMicSession(slug: string): boolean {

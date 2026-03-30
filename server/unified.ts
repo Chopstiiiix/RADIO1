@@ -15,7 +15,7 @@ import { startChannelPipeline, startChannelPipelineFromTracks, stopChannelPipeli
 import { supabase } from "./supabase";
 import { syncTracksForChannel } from "./track-sync";
 import { isAiHostEnabled, getBroadcasterAgents, pregenerateHostSegments } from "./react-agent";
-import { setupMicWebSocket } from "./mic-mixer";
+import { setupMicWebSocket, startHttpMicSession, writeMicAudio, stopMicSession } from "./mic-mixer";
 import type { Response } from "express";
 import { createServer } from "http";
 
@@ -481,6 +481,28 @@ async function main() {
       broadcasterId: ch.broadcasterId,
     }));
     res.json(channels);
+  });
+
+  // HTTP mic audio endpoint (used when WebSocket isn't available)
+  app.post("/api/mic/:slug", (req, res) => {
+    const { slug } = req.params;
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      const data = Buffer.concat(chunks);
+      const session = startHttpMicSession(slug);
+      if (session && writeMicAudio(slug, data)) {
+        res.json({ ok: true });
+      } else {
+        res.status(500).json({ error: "Failed to write mic audio" });
+      }
+    });
+  });
+
+  // Stop mic session when broadcast stops
+  app.post("/api/mic/:slug/stop", (_req, res) => {
+    stopMicSession(_req.params.slug);
+    res.json({ ok: true });
   });
 
   // Serve mic HLS segments

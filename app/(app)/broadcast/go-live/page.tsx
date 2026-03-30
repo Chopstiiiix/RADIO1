@@ -308,7 +308,7 @@ export default function GoLivePage() {
 
   async function toggleMic() {
     if (micActive && micStream) {
-      // Stop mic — close WebSocket, stop tracks, cleanup
+      // Stop mic — stop tracks, cleanup, notify server
       micStream.getTracks().forEach((t) => t.stop());
       setMicStream(null);
       setMicActive(false);
@@ -318,10 +318,8 @@ export default function GoLivePage() {
         processorRef.current.disconnect();
         processorRef.current = null;
       }
-      if (micWsRef.current) {
-        micWsRef.current.close();
-        micWsRef.current = null;
-      }
+      // Stop mic session on server
+      fetch(`/api/mic?slug=${channelSlug}`, { method: "DELETE" }).catch(() => {});
       return;
     }
 
@@ -330,19 +328,7 @@ export default function GoLivePage() {
       setMicStream(stream);
       setMicActive(true);
 
-      // Connect WebSocket to stream mic audio to server
-      // In production, WebSocket connects directly to the Express backend (same host, port 5000)
-      // In dev, Next.js is on 3000 and Express on 5000
-      const isDev = window.location.port === "3000";
-      const wsHost = isDev ? `${window.location.hostname}:5000` : window.location.host;
-      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/mic?slug=${channelSlug}`);
-      ws.binaryType = "arraybuffer";
-      micWsRef.current = ws;
-
-      ws.onopen = () => console.log("🎤 Mic WebSocket connected");
-      ws.onclose = () => console.log("🎤 Mic WebSocket disconnected");
-      ws.onerror = () => setMessage("Mic connection failed — check your network");
+      // Mic audio will be sent via HTTP POST (WebSocket not available through Railway proxy)
 
       // Set up Web Audio: mic → gain → analyser (for metering) + processor (for streaming)
       if (!audioContextRef.current) {
@@ -365,7 +351,6 @@ export default function GoLivePage() {
       processorRef.current = processor;
 
       processor.onaudioprocess = (e) => {
-        if (ws.readyState !== WebSocket.OPEN) return;
         const input = e.inputBuffer.getChannelData(0);
         // Convert float32 to int16
         const pcm = new Int16Array(input.length);
@@ -373,7 +358,12 @@ export default function GoLivePage() {
           const s = Math.max(-1, Math.min(1, input[i]));
           pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
-        ws.send(pcm.buffer);
+        // Send via HTTP POST (non-blocking)
+        fetch(`/api/mic?slug=${channelSlug}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: pcm.buffer,
+        }).catch(() => {});
       };
 
       source.connect(gainNode);
@@ -394,16 +384,7 @@ export default function GoLivePage() {
     }
   }
 
-  // Send volume changes to server via WebSocket
-  useEffect(() => {
-    if (micWsRef.current && micWsRef.current.readyState === WebSocket.OPEN) {
-      micWsRef.current.send(JSON.stringify({
-        type: "volume",
-        micVolume: micVolume / 100,
-        musicVolume: musicVolume / 100,
-      }));
-    }
-  }, [micVolume, musicVolume]);
+  // Mic volume is applied client-side via the gain node (micGainRef)
 
   // Cleanup on unmount
   useEffect(() => {
@@ -411,7 +392,6 @@ export default function GoLivePage() {
       cancelAnimationFrame(animFrameRef.current);
       micStream?.getTracks().forEach((t) => t.stop());
       processorRef.current?.disconnect();
-      micWsRef.current?.close();
     };
   }, [micStream]);
 
