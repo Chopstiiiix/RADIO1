@@ -480,17 +480,27 @@ export default function ChannelPage() {
           marginTop: "6px",
           fontWeight: 500,
         }}>
-          HOST:{" "}
-          <a
-            href={`/listen/profile/${slug}`}
-            style={{
-              color: "inherit",
-              textDecoration: "none",
-              borderBottom: "1px dotted currentColor",
-            }}
-          >
-            {profile?.display_name || "Unknown"}
-          </a>
+          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            HOST:{" "}
+            <a
+              href={`/listen/profile/${slug}`}
+              style={{
+                fontSize: "10px",
+                color: "#f59e0b",
+                textTransform: "uppercase",
+                padding: "2px 6px",
+                backgroundColor: "rgba(245, 158, 11, 0.1)",
+                border: "1px solid rgba(245, 158, 11, 0.2)",
+                borderRadius: "2px",
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textDecoration: "none",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              {profile?.display_name || "Unknown"}
+            </a>
+          </span>
         </div>
         {channel.genre?.length ? (
           <div style={{

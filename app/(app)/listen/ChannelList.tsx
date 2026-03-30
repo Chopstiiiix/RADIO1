@@ -442,17 +442,28 @@ function ChannelCard({ channel, index, likes, nowPlaying }: { channel: any; inde
           <div style={{
             fontSize: "13px",
             color: isLive ? "#d4d4d8" : "#71717a",
-            marginTop: "4px",
+            marginTop: "6px",
             fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
           }}>
-            HOST:{" "}
+            <span style={{ fontSize: "11px" }}>HOST:</span>
             <a
               href={`/listen/profile/${channel.channel_slug}`}
               onClick={(e) => e.stopPropagation()}
               style={{
-                color: "inherit",
+                fontSize: "10px",
+                color: "#f59e0b",
+                textTransform: "uppercase",
+                padding: "2px 6px",
+                backgroundColor: "rgba(245, 158, 11, 0.1)",
+                border: "1px solid rgba(245, 158, 11, 0.2)",
+                borderRadius: "2px",
+                fontWeight: 700,
+                letterSpacing: "0.1em",
                 textDecoration: "none",
-                borderBottom: "1px dotted currentColor",
+                fontFamily: "var(--font-mono)",
               }}
             >
               {profile?.display_name || "Unknown"}
