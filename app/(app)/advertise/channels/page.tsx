@@ -280,14 +280,14 @@ export default function BrowseChannelsPage() {
             backgroundColor: justSent
               ? "transparent"
               : selectedChannels.size > 0 && selectedAd
-                ? "var(--accent-blue)"
+                ? "#f59e0b"
                 : "var(--border-subtle)",
             color: justSent
               ? "#4ADE80"
               : selectedChannels.size > 0 && selectedAd
-                ? "var(--bg-well)"
+                ? "#0a0a0a"
                 : "var(--text-tertiary)",
-            border: justSent ? "1px solid #4ADE80" : "none",
+            border: justSent ? "1px solid #4ADE80" : selectedChannels.size > 0 && selectedAd ? "1px solid #f59e0b" : "none",
             borderRadius: "0px",
             fontSize: justSent ? "11px" : "12px",
             fontWeight: 600,
