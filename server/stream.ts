@@ -153,10 +153,11 @@ function launchFfmpeg(slug: string, outputDir: string, concatFile: string, track
     // Normalize audio: force stereo, 44.1kHz, 16-bit — fixes channel noise
     // from WAV files with unknown channel layouts or mismatched bit depths
     "-af", "aformat=channel_layouts=stereo:sample_rates=44100:sample_fmts=s16",
-    "-c:a", "flac",
+    "-c:a", "aac",
+    "-b:a", "256k",
     "-f", "hls",
-    "-hls_time", "2",
-    "-hls_list_size", "10",
+    "-hls_time", "1",
+    "-hls_list_size", "6",
     "-hls_segment_type", "fmp4",
     "-hls_flags", "independent_segments+delete_segments",
     "-hls_fmp4_init_filename", "init.mp4",
