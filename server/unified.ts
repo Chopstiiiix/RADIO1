@@ -332,11 +332,59 @@ async function main() {
       return res.status(400).json({ error: "broadcaster_id and track_ids required" });
     }
 
-    // Import addTracksToChannel from channel-manager
-    const { addTracksToChannel } = await import("./channel-manager");
-    const success = await addTracksToChannel(broadcaster_id, slug, track_ids);
-    if (success) res.json({ ok: true, message: `Added ${track_ids.length} track(s) to ${slug}` });
-    else res.status(400).json({ error: "Failed to add tracks — channel may not be active" });
+    const ch = activeChannels.get(slug);
+    if (!ch) {
+      return res.status(400).json({ error: "Channel not active" });
+    }
+
+    try {
+      const musicDir = path.join(BASE_MUSIC_DIR, slug);
+      const outputDir = path.join(BASE_OUTPUT_DIR, slug);
+
+      // Sync new tracks additively (don't delete existing files)
+      await syncTracksForChannel(broadcaster_id, slug, musicDir, track_ids, true);
+
+      // Get full set of tracks now on disk (old + new)
+      const allTracks = getChannelTracks(musicDir);
+      if (allTracks.length === 0) {
+        return res.status(400).json({ error: "No tracks available" });
+      }
+
+      console.log(`➕ [${slug}] Adding ${track_ids.length} tracks — restarting pipeline with ${allTracks.length} total`);
+
+      // Stop current pipeline
+      stopChannelPipeline(slug);
+
+      // Brief delay for ffmpeg to exit
+      await new Promise((r) => setTimeout(r, 500));
+
+      // Restart with combined tracks
+      const tracks = startChannelPipelineFromTracks({ slug, musicDir, outputDir }, allTracks);
+      if (tracks.length === 0) {
+        return res.status(400).json({ error: "Failed to restart pipeline" });
+      }
+
+      // Update channel state
+      ch.tracks = tracks;
+      ch.currentIndex = 0;
+      ch.cuedTrack = null;
+
+      // Update now-playing
+      updateNowPlaying(slug, {
+        track: { title: tracks[0].filename.replace(/\.[^.]+$/, ""), artist: "Caster" },
+        upcoming: tracks.slice(1, 4).map(t => ({ title: t.filename.replace(/\.[^.]+$/, ""), artist: "Caster" })),
+        duration: tracks[0].duration,
+        trackStartOffset: 0,
+        ended: false,
+      });
+
+      startTrackTimer(slug);
+
+      res.json({ ok: true, message: `Added ${track_ids.length} track(s) — now playing ${tracks.length} total` });
+    } catch (err) {
+      console.error(`[${slug}] add-tracks error:`, err);
+      res.status(500).json({ error: "Failed to add tracks" });
+    }
   });
 
   app.get("/api/channels/:slug/queue", (req, res) => {
