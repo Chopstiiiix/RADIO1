@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 interface Channel {
   id: string;
@@ -23,17 +24,54 @@ export default function ChannelList({
   followedIds: string[];
   followerMap: Record<string, number>;
 }) {
+  const supabase = createClient();
   const [tab, setTab] = useState<"all" | "following">("all");
+  const [channels, setChannels] = useState<Channel[]>(allChannels);
   const [nowPlayingMap, setNowPlayingMap] = useState<Record<string, string>>({});
 
-  // Poll now-playing for each live channel
+  // Poll channel live status every 5 seconds
   useEffect(() => {
-    const liveSlugs = allChannels.filter((ch) => ch.is_live).map((ch) => ch.channel_slug);
-    if (liveSlugs.length === 0) return;
+    async function refreshChannels() {
+      const ids = allChannels.map((ch) => ch.id);
+      if (ids.length === 0) return;
+      const { data } = await supabase
+        .from("broadcaster_profiles")
+        .select("id, is_live")
+        .in("id", ids);
+      if (data) {
+        const liveMap = new Map(data.map((d) => [d.id, d.is_live]));
+        setChannels((prev) => {
+          const updated = prev.map((ch) => ({
+            ...ch,
+            is_live: liveMap.get(ch.id) ?? ch.is_live,
+          }));
+          // Sort: live channels first
+          updated.sort((a, b) => (a.is_live === b.is_live ? 0 : a.is_live ? -1 : 1));
+          return updated;
+        });
+      }
+    }
+    refreshChannels();
+    const interval = setInterval(refreshChannels, 5000);
+    return () => clearInterval(interval);
+  }, [allChannels, supabase]);
+
+  // Poll now-playing for live channels
+  useEffect(() => {
+    const liveSlugs = channels.filter((ch) => ch.is_live).map((ch) => ch.channel_slug);
 
     const origin = typeof window !== "undefined" ? window.location.origin : "";
 
     async function poll() {
+      // Clear stale entries for channels no longer live
+      setNowPlayingMap((prev) => {
+        const next = { ...prev };
+        for (const slug of Object.keys(next)) {
+          if (!liveSlugs.includes(slug)) delete next[slug];
+        }
+        return next;
+      });
+
       for (const slug of liveSlugs) {
         try {
           const res = await fetch(`${origin}/metadata/api/channels/${slug}/now-playing`);
@@ -56,12 +94,12 @@ export default function ChannelList({
     poll();
     const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
-  }, [allChannels]);
+  }, [channels]);
 
   const followedSet = new Set(followedIds);
   const displayChannels = tab === "following"
-    ? allChannels.filter((ch) => followedSet.has(ch.id))
-    : allChannels;
+    ? channels.filter((ch) => followedSet.has(ch.id))
+    : channels;
 
   return (
     <div style={{
@@ -239,7 +277,7 @@ export default function ChannelList({
               backgroundColor: tab === "all" ? "rgba(245, 158, 11, 0.2)" : "#27272a",
               padding: "1px 5px",
               color: tab === "all" ? "#f59e0b" : "#71717a",
-            }}>{allChannels.length}</span>
+            }}>{channels.length}</span>
           </button>
           <button
             onClick={() => setTab("following")}
