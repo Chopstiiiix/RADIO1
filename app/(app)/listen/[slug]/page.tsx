@@ -480,7 +480,17 @@ export default function ChannelPage() {
           marginTop: "6px",
           fontWeight: 500,
         }}>
-          HOST: {profile?.display_name || "Unknown"}
+          HOST:{" "}
+          <a
+            href={`/listen/profile/${slug}`}
+            style={{
+              color: "inherit",
+              textDecoration: "none",
+              borderBottom: "1px dotted currentColor",
+            }}
+          >
+            {profile?.display_name || "Unknown"}
+          </a>
         </div>
         {channel.genre?.length ? (
           <div style={{

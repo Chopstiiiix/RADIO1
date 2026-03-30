@@ -445,7 +445,18 @@ function ChannelCard({ channel, index, likes, nowPlaying }: { channel: any; inde
             marginTop: "4px",
             fontWeight: 500,
           }}>
-            HOST: {profile?.display_name || "Unknown"}
+            HOST:{" "}
+            <a
+              href={`/listen/profile/${channel.channel_slug}`}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                color: "inherit",
+                textDecoration: "none",
+                borderBottom: "1px dotted currentColor",
+              }}
+            >
+              {profile?.display_name || "Unknown"}
+            </a>
           </div>
           {channel.genre?.length > 0 && (
             <div style={{
