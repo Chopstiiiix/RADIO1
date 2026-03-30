@@ -186,6 +186,7 @@ export default async function BroadcastDashboard() {
         )}
         <a href="/broadcast/tracks/upload" className="action-btn">Upload Track</a>
         <a href="/broadcast/tracks" className="action-btn">Manage Tracks</a>
+        <a href="/broadcast/listeners" className="action-btn">View Listeners</a>
         <a href="/broadcast/agents" className="action-btn">AI Hosts</a>
         <a href="/broadcast/ads" className="action-btn">Review Ads</a>
         <a href="/broadcast/profile" className="action-btn">Edit Profile</a>
