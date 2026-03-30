@@ -13,8 +13,8 @@ interface AiAgent {
   personality: string;
   voice_id: string | null;
   is_active: boolean;
-  price_primary: number;
-  price_cohost: number;
+  price_primary_cents: number;
+  price_cohost_cents: number;
 }
 
 interface AgentSubscription {
@@ -546,11 +546,11 @@ export default function AgentMarketplacePage() {
                 letterSpacing: "0.05em",
                 marginBottom: "16px",
               }}>
-                ${agent.price_primary ?? 50}/mo as Primary
+                ${(agent.price_primary_cents ?? 5000) / 100}/mo as Primary
                 {" "}
                 <span style={{ color: "#3f3f46" }}>|</span>
                 {" "}
-                ${agent.price_cohost ?? 40}/mo as Co-Host
+                ${(agent.price_cohost_cents ?? 4000) / 100}/mo as Co-Host
               </div>
 
               {/* Subscribe buttons (or subscribed badge) */}
