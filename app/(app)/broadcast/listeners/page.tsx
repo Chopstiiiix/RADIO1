@@ -48,14 +48,14 @@ export default function ListenersPage() {
             .in("id", listenerIds);
 
           const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
-          setActiveListeners(
-            sessions
-              .filter((s) => s.listener_id && profileMap.has(s.listener_id))
-              .map((s) => ({
-                ...profileMap.get(s.listener_id)!,
-                started_at: s.started_at,
-              }))
-          );
+          const seen = new Set<string>();
+          const deduped: ActiveListener[] = [];
+          for (const s of sessions) {
+            if (!s.listener_id || seen.has(s.listener_id) || !profileMap.has(s.listener_id)) continue;
+            seen.add(s.listener_id);
+            deduped.push({ ...profileMap.get(s.listener_id)!, started_at: s.started_at });
+          }
+          setActiveListeners(deduped);
         }
       }
 
@@ -111,14 +111,14 @@ export default function ListenersPage() {
             .in("id", listenerIds);
 
           const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
-          setActiveListeners(
-            sessions
-              .filter((s) => s.listener_id && profileMap.has(s.listener_id))
-              .map((s) => ({
-                ...profileMap.get(s.listener_id)!,
-                started_at: s.started_at,
-              }))
-          );
+          const seen = new Set<string>();
+          const deduped: ActiveListener[] = [];
+          for (const s of sessions) {
+            if (!s.listener_id || seen.has(s.listener_id) || !profileMap.has(s.listener_id)) continue;
+            seen.add(s.listener_id);
+            deduped.push({ ...profileMap.get(s.listener_id)!, started_at: s.started_at });
+          }
+          setActiveListeners(deduped);
         }
       } else {
         setActiveListeners([]);
@@ -292,10 +292,13 @@ function ListenerCard({ profile, subtitle, isLive }: {
     .toUpperCase() || "?";
 
   return (
+    <a href={`/broadcast/listeners/${profile.id}`} style={{ textDecoration: "none", color: "inherit" }}>
     <div style={{
       display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px",
       backgroundColor: "rgba(24, 24, 27, 0.3)",
       borderLeft: isLive ? "3px solid #4ADE80" : "2px solid #27272a",
+      cursor: "pointer",
+      transition: "background-color 0.15s",
     }}>
       {/* Avatar */}
       <div style={{
@@ -352,5 +355,6 @@ function ListenerCard({ profile, subtitle, isLive }: {
         }} />
       )}
     </div>
+    </a>
   );
 }
