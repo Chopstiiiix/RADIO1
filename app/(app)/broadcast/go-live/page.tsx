@@ -144,8 +144,8 @@ export default function GoLivePage() {
 
       const loadedTracks = (data as Track[]) || [];
       setTracks(loadedTracks);
-      // Select all by default
-      setSelectedTrackIds(new Set(loadedTracks.map((t) => t.id)));
+      // Start with nothing selected — broadcaster chooses what to broadcast
+      setSelectedTrackIds(new Set());
       setTracksLoading(false);
     }
     loadTracks();
