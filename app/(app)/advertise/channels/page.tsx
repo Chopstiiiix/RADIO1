@@ -28,10 +28,20 @@ export default function BrowseChannelsPage() {
   // Load channels + adverts on mount
   useEffect(() => {
     async function load() {
-      const { data: ch } = await supabase
-        .from("broadcaster_profiles")
-        .select("id, channel_name, channel_slug, genre, is_live, monthly_listeners, profile:profiles!broadcaster_profiles_id_fkey(display_name)")
-        .order("monthly_listeners", { ascending: false });
+      // Only show channels that have uploaded at least one track
+      const { data: broadcasterIds } = await supabase
+        .from("tracks")
+        .select("broadcaster_id")
+        .eq("is_active", true);
+      const activeIds = [...new Set((broadcasterIds || []).map((t) => t.broadcaster_id))];
+
+      const { data: ch } = activeIds.length > 0
+        ? await supabase
+          .from("broadcaster_profiles")
+          .select("id, channel_name, channel_slug, genre, is_live, monthly_listeners, profile:profiles!broadcaster_profiles_id_fkey(display_name)")
+          .in("id", activeIds)
+          .order("monthly_listeners", { ascending: false })
+        : { data: [] };
       setChannels((ch as any) || []);
 
       const { data: { user } } = await supabase.auth.getUser();
