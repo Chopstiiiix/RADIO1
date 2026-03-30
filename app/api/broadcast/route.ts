@@ -36,6 +36,29 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { action, filename, track_ids, use_ai_host } = body;
 
+  if (action === "voice_only") {
+    if (channel.is_live) {
+      return NextResponse.json({ ok: true, message: "Already broadcasting" });
+    }
+
+    try {
+      const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/voice-only`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ broadcaster_id: user.id }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return NextResponse.json({ error: data.error || "Failed to start voice broadcast" }, { status: res.status });
+      }
+
+      return NextResponse.json({ ok: true, message: data.message, slug: channel.channel_slug });
+    } catch {
+      return NextResponse.json({ error: "Broadcast server unavailable" }, { status: 503 });
+    }
+  }
+
   if (action === "start") {
     if (channel.is_live) {
       return NextResponse.json({ ok: true, message: "Already broadcasting" });

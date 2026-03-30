@@ -486,10 +486,6 @@ export default function GoLivePage() {
   }
 
   function handleToggleBroadcast() {
-    if (!isLive && selectedTrackIds.size === 0) {
-      setMessage("Select at least one track to broadcast");
-      return;
-    }
     // Show agreement for new broadcasts, go straight for stopping
     if (!isLive) {
       setShowAgreement(true);
@@ -504,12 +500,15 @@ export default function GoLivePage() {
     setMessage("");
 
     try {
+      const trackIds = Array.from(selectedTrackIds);
+      const isVoiceOnly = !isLive && trackIds.length === 0;
+
       const res = await fetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: isLive ? "stop" : "start",
-          ...(isLive ? {} : { track_ids: Array.from(selectedTrackIds), use_ai_host: aiHostEnabled }),
+          action: isLive ? "stop" : isVoiceOnly ? "voice_only" : "start",
+          ...(isLive || isVoiceOnly ? {} : { track_ids: trackIds }),
         }),
       });
 
@@ -1166,7 +1165,7 @@ export default function GoLivePage() {
       {/* Go Live / Stop button */}
       <button
         onClick={handleToggleBroadcast}
-        disabled={toggling || (!isLive && selectedTrackIds.size === 0)}
+        disabled={toggling}
         style={{
           width: "100%",
           padding: "16px",
@@ -1177,8 +1176,8 @@ export default function GoLivePage() {
           fontWeight: 700,
           textTransform: "uppercase",
           letterSpacing: "0.1em",
-          cursor: toggling || (!isLive && selectedTrackIds.size === 0) ? "not-allowed" : "pointer",
-          opacity: toggling || (!isLive && selectedTrackIds.size === 0) ? 0.6 : 1,
+          cursor: toggling ? "not-allowed" : "pointer",
+          opacity: toggling ? 0.6 : 1,
           fontFamily: "'JetBrains Mono', monospace",
           display: "flex",
           alignItems: "center",
@@ -1203,7 +1202,7 @@ export default function GoLivePage() {
               <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4" />
               <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
             </svg>
-            {toggling ? "STARTING..." : `GO LIVE (${selectedTrackIds.size} TRACK${selectedTrackIds.size !== 1 ? "S" : ""}${aiHostEnabled ? " + AI HOST" : ""})`}
+            {toggling ? "STARTING..." : selectedTrackIds.size > 0 ? `GO LIVE (${selectedTrackIds.size} TRACK${selectedTrackIds.size !== 1 ? "S" : ""}${aiHostEnabled ? " + AI HOST" : ""})` : "GO LIVE (VOICE ONLY)"}
           </>
         )}
       </button>

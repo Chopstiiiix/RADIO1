@@ -360,6 +360,29 @@ async function main() {
     else res.status(400).json({ error: "No tracks available — select tracks to broadcast" });
   });
 
+  app.post("/api/channels/:slug/voice-only", async (req, res) => {
+    const { slug } = req.params;
+    const { broadcaster_id } = req.body;
+    if (!broadcaster_id) return res.status(400).json({ error: "broadcaster_id required" });
+
+    // Voice-only: just mark as live, no FFmpeg pipeline needed — mic stream handles audio
+    await supabase.from("broadcaster_profiles").update({ is_live: true }).eq("channel_slug", slug);
+
+    activeChannels.set(slug, { broadcasterId: broadcaster_id, tracks: [], currentIndex: 0, cuedTrack: null });
+
+    updateNowPlaying(slug, {
+      track: { title: "Voice Broadcast", artist: "Live" },
+      upcoming: [],
+      duration: 0,
+      trackStartOffset: 0,
+      ended: false,
+      type: "host_segment",
+    });
+
+    console.log(`🎤 Channel ${slug} is now LIVE (voice only)`);
+    res.json({ ok: true, message: `Channel ${slug} is live — voice only` });
+  });
+
   app.post("/api/channels/:slug/stop", async (req, res) => {
     await stopChannel(req.params.slug);
     res.json({ ok: true, message: `Channel ${req.params.slug} is now offline` });
