@@ -231,6 +231,8 @@ export async function generateHostAudio(
     adTitle?: string;
     segmentDir?: string;
     maxDurationSeconds?: number;
+    segmentStyle?: "show_open" | "recap" | "transition";
+    recentTracks?: string;
   }
 ): Promise<GeneratedSegment | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -291,6 +293,20 @@ export async function generateHostAudio(
   const incomingDetails = buildTrackDetails(incoming);
   const outgoingDetails = outgoing ? buildTrackDetails(outgoing) : "";
 
+  // Determine time-of-day greeting
+  const hour = new Date().getHours();
+  const timeGreeting = hour < 12 ? "good morning" : hour < 17 ? "good afternoon" : hour < 21 ? "good evening" : "good night";
+  const timeContext = hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 21 ? "evening" : "late night";
+
+  // Segment style hint (passed via options)
+  const segmentStyle = options?.segmentStyle as string | undefined;
+
+  const formatInstruction = isSolo
+    ? `Format each line as: ${primary.name}: <text>`
+    : `Format each line as: AGENT_NAME: <text>\nThe primary host (${primary.name}) should lead and co-hosts respond naturally.`;
+
+  const toneInstruction = `Keep it casual, warm, and natural — like real radio hosts who genuinely love music. No hashtags, no emojis. Reference specific details from the track metadata (producer, featured artists, samples, genre, record label) when available.`;
+
   let prompt: string;
 
   if (isAdIntro) {
@@ -302,9 +318,46 @@ They are about to introduce a short ad break. The ad is for: "${adTitle}"
 After the ad, the next song will be "${incoming.title}" by ${incoming.artist}.
 
 Write a ${isSolo ? "monologue (2-3 sentences)" : "natural, short 3-5 line conversation"} that smoothly transitions to the ad break.
-${isSolo ? `Format each line as: ${primary.name}: <text>` : `Format each line as: AGENT_NAME: <text>\nThe primary host (${primary.name}) should lead.`}
-Keep it casual and warm. No hashtags, no emojis. Reference the upcoming music to build anticipation.`;
+${formatInstruction}
+${toneInstruction}`;
+  } else if (segmentStyle === "show_open") {
+    // Show opening — greet by time of day, introduce hosts, tease first track
+    prompt = `You are writing a SHOW OPENING for an AI radio station broadcast.
+
+${agentDescriptions}
+
+It is currently ${timeContext} time. The hosts are opening the show and about to play the first track: "${incoming.title}" by ${incoming.artist}${incomingDetails}
+
+Write a ${isSolo ? "monologue (3-4 sentences)" : "natural, energetic 4-6 line conversation"} where the hosts:
+1. Greet listeners with a ${timeGreeting} and welcome them to the show
+2. Introduce themselves by name
+3. Build excitement for the first track, mentioning the artist and any interesting details
+4. Cue in the song
+
+${formatInstruction}
+${toneInstruction}`;
+  } else if (segmentStyle === "recap") {
+    // Recap after several songs — reflect on what's been played, tease what's next
+    const recentTracks = options?.recentTracks as string | undefined;
+    prompt = `You are writing a MID-SHOW RECAP segment for an AI radio station.
+
+${agentDescriptions}
+
+The hosts have just played these tracks back-to-back:
+${recentTracks || `"${outgoing?.title}" by ${outgoing?.artist}`}
+
+Next up: "${incoming.title}" by ${incoming.artist}${incomingDetails}
+
+Write a ${isSolo ? "monologue (3-4 sentences)" : "natural, reflective 4-6 line conversation"} where the hosts:
+1. Briefly recap the energy of the last few tracks — what stood out, the vibe
+2. Comment on the variety or genre shifts
+3. Tease and introduce the next track with enthusiasm
+4. Keep the energy flowing
+
+${formatInstruction}
+${toneInstruction}`;
   } else if (outgoing) {
+    // Standard transition between tracks
     prompt = `You are writing a short radio host ${isSolo ? "monologue" : "conversation"} for an AI radio station.
 
 ${agentDescriptions}
@@ -312,20 +365,20 @@ ${agentDescriptions}
 They just finished playing: "${outgoing.title}" by ${outgoing.artist}${outgoingDetails}
 Next up: "${incoming.title}" by ${incoming.artist}${incomingDetails}
 
-Write a ${isSolo ? "monologue (2-3 sentences)" : "natural, short 3-5 line conversation"} transitioning between tracks. Reference specific details about the music -- production, samples, history, vibes.
-${isSolo ? `Format each line as: ${primary.name}: <text>` : `Format each line as: AGENT_NAME: <text>\nThe primary host (${primary.name}) should lead and co-hosts should respond naturally.`}
-Keep it casual and warm. No hashtags, no emojis.`;
+Write a ${isSolo ? "monologue (2-3 sentences)" : "natural, short 3-5 line conversation"} transitioning between tracks. Reference specific details about the music — production, samples, featured artists, genre, history, vibes.
+${formatInstruction}
+${toneInstruction}`;
   } else {
-    // Opening -- no outgoing track
-    prompt = `You are writing a short radio host ${isSolo ? "monologue" : "conversation"} for an AI radio station.
+    // Opening — no outgoing track (fallback)
+    prompt = `You are writing a radio show opening for an AI radio station.
 
 ${agentDescriptions}
 
-They are introducing the first track of the broadcast: "${incoming.title}" by ${incoming.artist}${incomingDetails}
+It is ${timeContext} time. The hosts are opening the broadcast with: "${incoming.title}" by ${incoming.artist}${incomingDetails}
 
-Write a ${isSolo ? "monologue (2-3 sentences)" : "natural, short 3-5 line conversation"} to introduce this track and welcome listeners.
-${isSolo ? `Format each line as: ${primary.name}: <text>` : `Format each line as: AGENT_NAME: <text>\nThe primary host (${primary.name}) should lead.`}
-Keep it casual and warm. No hashtags, no emojis.`;
+Write a ${isSolo ? "monologue (3-4 sentences)" : "natural, energetic 4-6 line conversation"} where hosts greet listeners with "${timeGreeting}", introduce themselves, and build excitement for the first track.
+${formatInstruction}
+${toneInstruction}`;
   }
 
   let dialogueSegments: HostSegment[];
@@ -417,7 +470,11 @@ Keep it casual and warm. No hashtags, no emojis.`;
 // ---------------------------------------------------------------------------
 
 /**
- * Pre-generate host audio segments for every track transition in a playlist.
+ * Pre-generate host audio segments for a playlist using smart patterns:
+ * - Track 0: Show opening (greet by time of day, introduce hosts + first track)
+ * - Short playlists (≤4 tracks): intro on every track
+ * - Longer playlists: let 2-3 tracks play, then do a recap segment
+ *
  * Returns a map of trackIndex -> GeneratedSegment that plays BEFORE that track.
  */
 export async function pregenerateHostSegments(
@@ -454,9 +511,38 @@ export async function pregenerateHostSegments(
     fs.mkdirSync(segmentDir, { recursive: true });
   }
 
+  const isShortPlaylist = tracks.length <= 4;
+  // For longer playlists, decide recap interval (every 2-3 tracks, randomized)
+  const recapInterval = isShortPlaylist ? 1 : (2 + Math.floor(Math.random() * 2)); // 2 or 3
+
+  // Track which indices get segments and what style
+  const segmentPlan: { index: number; style: "show_open" | "recap" | "transition"; recentTracks?: string }[] = [];
+
   for (let i = 0; i < tracks.length; i++) {
-    const incoming = tracks[i];
-    const outgoing = i > 0 ? tracks[i - 1] : null;
+    if (i === 0) {
+      // Always open the show
+      segmentPlan.push({ index: 0, style: "show_open" });
+    } else if (isShortPlaylist) {
+      // Short playlist: intro every track
+      segmentPlan.push({ index: i, style: "transition" });
+    } else if (i % recapInterval === 0) {
+      // Longer playlist: recap every N tracks
+      const recentStart = Math.max(0, i - recapInterval);
+      const recentList = tracks.slice(recentStart, i)
+        .map(t => `"${enrichTrackContext(t, metadataMap).title}" by ${enrichTrackContext(t, metadataMap).artist}`)
+        .join("\n");
+      segmentPlan.push({ index: i, style: "recap", recentTracks: recentList });
+    }
+    // Otherwise: no host segment, let the music play
+  }
+
+  console.log(
+    `🎙️ [${slug}] Segment plan: ${segmentPlan.map(s => `#${s.index}(${s.style})`).join(", ")}`
+  );
+
+  for (const plan of segmentPlan) {
+    const incoming = tracks[plan.index];
+    const outgoing = plan.index > 0 ? tracks[plan.index - 1] : null;
 
     const incomingContext = enrichTrackContext(incoming, metadataMap);
     const outgoingContext = outgoing ? enrichTrackContext(outgoing, metadataMap) : null;
@@ -464,19 +550,20 @@ export async function pregenerateHostSegments(
     try {
       const segment = await generateHostAudio(slug, agents, outgoingContext, incomingContext, {
         segmentDir,
+        segmentStyle: plan.style,
+        recentTracks: plan.recentTracks,
       });
 
       if (segment) {
-        results.set(i, segment);
+        results.set(plan.index, segment);
       }
     } catch (err) {
-      console.error(`🎙️ [${slug}] Failed to generate segment for track ${i}:`, err);
-      // Continue with remaining tracks -- broadcast shouldn't fail
+      console.error(`🎙️ [${slug}] Failed to generate segment for track ${plan.index}:`, err);
     }
   }
 
   console.log(
-    `🎙️ [${slug}] Pre-generation complete: ${results.size}/${tracks.length} segments created`
+    `🎙️ [${slug}] Pre-generation complete: ${results.size}/${segmentPlan.length} segments created`
   );
 
   return results;
