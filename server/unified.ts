@@ -14,6 +14,7 @@ import fs from "fs";
 import { startChannelPipeline, startChannelPipelineFromTracks, stopChannelPipeline, getChannelTracks, streamEvents, type TrackFile } from "./stream";
 import { supabase } from "./supabase";
 import { syncTracksForChannel } from "./track-sync";
+import { isAiHostEnabled, getBroadcasterAgents, pregenerateHostSegments } from "./react-agent";
 import type { Response } from "express";
 
 // Suppress auto-loop when pipeline is deliberately restarted (e.g., add-tracks)
@@ -34,7 +35,7 @@ interface ChannelState {
 
 const activeChannels = new Map<string, ChannelState>();
 
-async function startChannel(broadcasterId: string, slug: string, trackIds?: string[], useAiHost?: boolean): Promise<boolean> {
+async function startChannel(broadcasterId: string, slug: string, trackIds?: string[]): Promise<boolean> {
   const musicDir = path.join(BASE_MUSIC_DIR, slug);
   const outputDir = path.join(BASE_OUTPUT_DIR, slug);
   fs.mkdirSync(outputDir, { recursive: true });
@@ -43,13 +44,60 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
   // Sync tracks from Supabase Storage to local disk before starting
   await syncTracksForChannel(broadcasterId, slug, musicDir, trackIds);
 
-  let tracks: TrackFile[];
-  const allTracks = getChannelTracks(musicDir);
-  if (allTracks.length === 0) return false;
+  const baseTracks = getChannelTracks(musicDir);
+  if (baseTracks.length === 0) return false;
 
-  // Use all synced tracks (they're already filtered by trackIds in syncTracksForChannel)
-  tracks = startChannelPipelineFromTracks({ slug, musicDir, outputDir }, allTracks);
+  // Check if broadcaster has AI host enabled (reads from DB — no frontend flag needed)
+  let finalTracks = baseTracks;
+  const shouldUseAiHost = await isAiHostEnabled(broadcasterId);
+  if (shouldUseAiHost) {
+    try {
+      const agents = await getBroadcasterAgents(broadcasterId);
+      if (agents.length > 0) {
+        console.log(`🎙️ [${slug}] AI Host enabled — ${agents.map(a => `${a.name} (${a.role})`).join(", ")}`);
 
+        const segmentDir = path.join(musicDir, "_host_segments");
+        fs.mkdirSync(segmentDir, { recursive: true });
+
+        // Clean old host segments
+        if (fs.existsSync(segmentDir)) {
+          for (const f of fs.readdirSync(segmentDir)) {
+            fs.unlinkSync(path.join(segmentDir, f));
+          }
+        }
+
+        const trackMeta = baseTracks.map(t => ({
+          filename: t.filename,
+          title: t.filename.replace(/\.[^.]+$/, "").split(" - ").slice(1).join(" - ") || t.filename.replace(/\.[^.]+$/, ""),
+          artist: t.filename.replace(/\.[^.]+$/, "").split(" - ")[0] || "Unknown",
+          duration: t.duration,
+        }));
+
+        const hostSegments = await pregenerateHostSegments(slug, broadcasterId, trackMeta, segmentDir);
+
+        if (hostSegments.size > 0) {
+          const interleaved: TrackFile[] = [];
+          for (let i = 0; i < baseTracks.length; i++) {
+            const segment = hostSegments.get(i);
+            if (segment) {
+              interleaved.push({
+                path: segment.audioPath,
+                filename: path.basename(segment.audioPath),
+                duration: segment.duration,
+              });
+            }
+            interleaved.push(baseTracks[i]);
+          }
+          finalTracks = interleaved;
+          console.log(`🎙️ [${slug}] Interleaved ${hostSegments.size} host segments into ${baseTracks.length} tracks`);
+        }
+      }
+    } catch (err) {
+      console.error(`🎙️ [${slug}] AI Host generation failed, continuing without:`, err);
+    }
+  }
+
+  const tracks = startChannelPipelineFromTracks({ slug, musicDir, outputDir }, finalTracks);
   if (tracks.length === 0) return false;
 
   activeChannels.set(slug, { broadcasterId, tracks, currentIndex: 0, cuedTrack: null });
@@ -294,7 +342,7 @@ async function main() {
 
   app.post("/api/channels/:slug/start", async (req, res) => {
     const { slug } = req.params;
-    const { broadcaster_id, track_ids, use_ai_host } = req.body;
+    const { broadcaster_id, track_ids } = req.body;
     if (!broadcaster_id) return res.status(400).json({ error: "broadcaster_id required" });
 
     const { data: channel } = await supabase
@@ -305,7 +353,7 @@ async function main() {
       .single();
 
     if (!channel) return res.status(404).json({ error: "Channel not found" });
-    const success = await startChannel(broadcaster_id, slug, track_ids, use_ai_host);
+    const success = await startChannel(broadcaster_id, slug, track_ids);
     if (success) res.json({ ok: true, message: `Channel ${slug} is now live` });
     else res.status(400).json({ error: "No tracks available — select tracks to broadcast" });
   });
