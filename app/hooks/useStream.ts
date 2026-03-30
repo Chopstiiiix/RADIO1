@@ -21,6 +21,8 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
   const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const micAudioRef = useRef<HTMLAudioElement | null>(null);
+  const micHlsRef = useRef<Hls | null>(null);
   const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number>(0);
@@ -74,6 +76,11 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
     if (audio) audio.pause();
     hlsRef.current?.destroy();
     hlsRef.current = null;
+    // Stop mic stream too
+    micAudioRef.current?.pause();
+    micHlsRef.current?.destroy();
+    micHlsRef.current = null;
+    micAudioRef.current = null;
     setIsPlaying(false);
     setElapsed(0);
   }, []);
@@ -110,6 +117,34 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
         }
       });
       hlsRef.current = hls;
+
+      // Also try to play mic stream (separate HLS)
+      const micUrl = slug
+        ? `${window.location.origin}/stream/${slug}/mic/mic.m3u8`
+        : null;
+      if (micUrl) {
+        const micAudio = new Audio();
+        micAudio.crossOrigin = "anonymous";
+        micAudioRef.current = micAudio;
+        const micHls = new Hls({
+          liveSyncDurationCount: 1,
+          liveMaxLatencyDurationCount: 3,
+          liveDurationInfinity: true,
+        });
+        micHls.loadSource(micUrl);
+        micHls.attachMedia(micAudio);
+        micHls.on(Hls.Events.MANIFEST_PARSED, () => {
+          micAudio.play().catch(() => {}); // May fail if no mic stream exists
+        });
+        micHls.on(Hls.Events.ERROR, (_event, errData) => {
+          // Silently ignore mic errors — mic may not be active
+          if (errData.fatal) {
+            micHls.destroy();
+            micHlsRef.current = null;
+          }
+        });
+        micHlsRef.current = micHls;
+      }
     } else if (audio.canPlayType("application/vnd.apple.mpegurl")) {
       audio.src = streamUrl;
       audio.play();
@@ -145,6 +180,7 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
   useEffect(() => {
     return () => {
       hlsRef.current?.destroy();
+      micHlsRef.current?.destroy();
       audioCtxRef.current?.close();
       cancelAnimationFrame(rafRef.current);
     };

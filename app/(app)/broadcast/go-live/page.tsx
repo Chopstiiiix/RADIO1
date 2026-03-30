@@ -77,6 +77,8 @@ export default function GoLivePage() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const micGainRef = useRef<GainNode | null>(null);
   const musicGainRef = useRef<GainNode | null>(null);
+  const micWsRef = useRef<WebSocket | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micLevelRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -306,12 +308,20 @@ export default function GoLivePage() {
 
   async function toggleMic() {
     if (micActive && micStream) {
-      // Stop mic
+      // Stop mic — close WebSocket, stop tracks, cleanup
       micStream.getTracks().forEach((t) => t.stop());
       setMicStream(null);
       setMicActive(false);
       cancelAnimationFrame(animFrameRef.current);
       if (micLevelRef.current) micLevelRef.current.style.width = "0%";
+      if (processorRef.current) {
+        processorRef.current.disconnect();
+        processorRef.current = null;
+      }
+      if (micWsRef.current) {
+        micWsRef.current.close();
+        micWsRef.current = null;
+      }
       return;
     }
 
@@ -320,11 +330,27 @@ export default function GoLivePage() {
       setMicStream(stream);
       setMicActive(true);
 
-      // Set up Web Audio for level metering
+      // Connect WebSocket to stream mic audio to server
+      // In production, WebSocket connects directly to the Express backend (same host, port 5000)
+      // In dev, Next.js is on 3000 and Express on 5000
+      const isDev = window.location.port === "3000";
+      const wsHost = isDev ? `${window.location.hostname}:5000` : window.location.host;
+      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/mic?slug=${channelSlug}`);
+      ws.binaryType = "arraybuffer";
+      micWsRef.current = ws;
+
+      ws.onopen = () => console.log("🎤 Mic WebSocket connected");
+      ws.onclose = () => console.log("🎤 Mic WebSocket disconnected");
+      ws.onerror = () => setMessage("Mic connection failed — check your network");
+
+      // Set up Web Audio: mic → gain → analyser (for metering) + processor (for streaming)
       if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
+        audioContextRef.current = new AudioContext({ sampleRate: 44100 });
       }
       const ctx = audioContextRef.current;
+      if (ctx.state === "suspended") await ctx.resume();
+
       const source = ctx.createMediaStreamSource(stream);
       const gainNode = ctx.createGain();
       gainNode.gain.value = micVolume / 100;
@@ -334,9 +360,33 @@ export default function GoLivePage() {
       analyser.fftSize = 256;
       analyserRef.current = analyser;
 
+      // ScriptProcessor to capture raw PCM and send via WebSocket
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+
+      processor.onaudioprocess = (e) => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        const input = e.inputBuffer.getChannelData(0);
+        // Convert float32 to int16
+        const pcm = new Int16Array(input.length);
+        for (let i = 0; i < input.length; i++) {
+          const s = Math.max(-1, Math.min(1, input[i]));
+          pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        ws.send(pcm.buffer);
+      };
+
       source.connect(gainNode);
       gainNode.connect(analyser);
-      // Don't connect to destination to avoid feedback
+      gainNode.connect(processor);
+      processor.connect(ctx.destination); // Required for onaudioprocess to fire
+      // Mute the processor output to avoid feedback
+      const muteGain = ctx.createGain();
+      muteGain.gain.value = 0;
+      processor.disconnect();
+      gainNode.connect(processor);
+      processor.connect(muteGain);
+      muteGain.connect(ctx.destination);
 
       animateMicLevel();
     } catch {
@@ -344,11 +394,24 @@ export default function GoLivePage() {
     }
   }
 
+  // Send volume changes to server via WebSocket
+  useEffect(() => {
+    if (micWsRef.current && micWsRef.current.readyState === WebSocket.OPEN) {
+      micWsRef.current.send(JSON.stringify({
+        type: "volume",
+        micVolume: micVolume / 100,
+        musicVolume: musicVolume / 100,
+      }));
+    }
+  }, [micVolume, musicVolume]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       cancelAnimationFrame(animFrameRef.current);
       micStream?.getTracks().forEach((t) => t.stop());
+      processorRef.current?.disconnect();
+      micWsRef.current?.close();
     };
   }, [micStream]);
 

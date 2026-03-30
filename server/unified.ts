@@ -15,7 +15,9 @@ import { startChannelPipeline, startChannelPipelineFromTracks, stopChannelPipeli
 import { supabase } from "./supabase";
 import { syncTracksForChannel } from "./track-sync";
 import { isAiHostEnabled, getBroadcasterAgents, pregenerateHostSegments } from "./react-agent";
+import { setupMicWebSocket } from "./mic-mixer";
 import type { Response } from "express";
+import { createServer } from "http";
 
 // Suppress auto-loop when pipeline is deliberately restarted (e.g., add-tracks)
 const suppressAutoLoop = new Set<string>();
@@ -458,9 +460,34 @@ async function main() {
     res.json(channels);
   });
 
-  app.listen(PORT, "0.0.0.0", () => {
+  // Serve mic HLS segments
+  app.use("/stream/:slug/mic", (req, res, next) => {
+    const { slug } = req.params;
+    const micDir = path.join(BASE_OUTPUT_DIR, slug, "mic");
+    if (!fs.existsSync(micDir)) {
+      return res.status(404).json({ error: "No mic stream" });
+    }
+    express.static(micDir, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".m3u8")) {
+          res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+          res.setHeader("Cache-Control", "no-cache");
+        } else if (filePath.endsWith(".m4s")) {
+          res.setHeader("Content-Type", "video/iso.segment");
+        } else if (filePath.endsWith(".mp4")) {
+          res.setHeader("Content-Type", "video/mp4");
+        }
+      },
+    })(req, res, next);
+  });
+
+  const server = createServer(app);
+  setupMicWebSocket(server);
+
+  server.listen(PORT, "0.0.0.0", () => {
     console.log(`\n🔥 Caster backend live on port ${PORT}`);
     console.log(`   📡 Stream:   /stream/{slug}/stream.m3u8`);
+    console.log(`   🎤 Mic:      /ws/mic?slug={slug}`);
     console.log(`   📊 Metadata: /metadata/channels/{slug}/now-playing`);
     console.log(`   🔧 API:      /api/channels/*\n`);
   });
