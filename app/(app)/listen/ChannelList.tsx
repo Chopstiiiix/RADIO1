@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface Channel {
   id: string;
@@ -22,6 +22,37 @@ export default function ChannelList({
   followedIds: string[];
 }) {
   const [tab, setTab] = useState<"all" | "following">("all");
+  const [nowPlayingMap, setNowPlayingMap] = useState<Record<string, string>>({});
+
+  // Connect SSE for each live channel to get now-playing track
+  useEffect(() => {
+    const liveSlugs = allChannels.filter((ch) => ch.is_live).map((ch) => ch.channel_slug);
+    if (liveSlugs.length === 0) return;
+
+    const sources: EventSource[] = [];
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+
+    for (const slug of liveSlugs) {
+      const es = new EventSource(`${origin}/metadata/channels/${slug}/now-playing`);
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.track && !data.ended) {
+            setNowPlayingMap((prev) => ({ ...prev, [slug]: data.track.title }));
+          } else if (data.ended) {
+            setNowPlayingMap((prev) => {
+              const next = { ...prev };
+              delete next[slug];
+              return next;
+            });
+          }
+        } catch { /* ignore */ }
+      };
+      sources.push(es);
+    }
+
+    return () => sources.forEach((es) => es.close());
+  }, [allChannels]);
 
   const followedSet = new Set(followedIds);
   const displayChannels = tab === "following"
@@ -263,7 +294,7 @@ export default function ChannelList({
           </div>
         ) : (
           displayChannels.map((ch, index) => (
-            <ChannelCard key={ch.id} channel={ch} index={index} likes={likeMap[ch.channel_slug] || 0} />
+            <ChannelCard key={ch.id} channel={ch} index={index} likes={likeMap[ch.channel_slug] || 0} nowPlaying={nowPlayingMap[ch.channel_slug] || null} />
           ))
         )}
       </div>
@@ -313,7 +344,7 @@ export default function ChannelList({
   );
 }
 
-function ChannelCard({ channel, index, likes }: { channel: any; index: number; likes: number }) {
+function ChannelCard({ channel, index, likes, nowPlaying }: { channel: any; index: number; likes: number; nowPlaying: string | null }) {
   const isLive = channel.is_live;
   const profile = channel.profile as any;
   const chNum = String(index + 1).padStart(2, "0");
@@ -421,6 +452,43 @@ function ChannelCard({ channel, index, likes }: { channel: any; index: number; l
               marginTop: "2px",
             }}>
               GEN: {channel.genre.slice(0, 3).join(" / ").toUpperCase()}
+            </div>
+          )}
+          {isLive && nowPlaying && (
+            <div style={{
+              fontSize: "11px",
+              color: "#fbbf24",
+              marginTop: "6px",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              overflow: "hidden",
+            }}>
+              <span style={{
+                width: "4px",
+                height: "4px",
+                borderRadius: "50%",
+                backgroundColor: "#f59e0b",
+                flexShrink: 0,
+                animation: "live-dot-pulse 1.5s ease-in-out infinite",
+              }} />
+              <span style={{
+                fontSize: "10px",
+                color: "#52525b",
+                letterSpacing: "0.05em",
+                flexShrink: 0,
+              }}>
+                NOW:
+              </span>
+              <span style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontWeight: 600,
+                letterSpacing: "-0.02em",
+              }}>
+                {nowPlaying.replace(/\s+/g, "_").toUpperCase()}
+              </span>
             </div>
           )}
         </div>
