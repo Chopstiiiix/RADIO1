@@ -946,222 +946,6 @@ export default function GoLivePage() {
         </div>
       )}
 
-      {/* ──── TRACK SELECTION ──── */}
-      {(
-        <div style={{
-          backgroundColor: "rgba(24, 24, 27, 0.3)",
-          borderLeft: "3px solid #f59e0b",
-          overflow: "hidden",
-          marginBottom: "16px",
-        }}>
-          <div style={{
-            padding: "12px 16px",
-            borderBottom: "1px solid #1a1a1e",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}>
-            <span style={{
-              fontSize: "10px",
-              color: "#f59e0b",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-              fontFamily: "var(--font-mono)",
-            }}>
-              {isLive ? "TRACK STATUS" : "SELECT TRACKS TO BROADCAST"}
-            </span>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                onClick={selectAllTracks}
-                style={{
-                  fontSize: "9px", color: "#71717a", background: "none", border: "none",
-                  cursor: "pointer", textTransform: "uppercase", fontFamily: "var(--font-mono)",
-                  letterSpacing: "0.05em",
-                }}
-              >All</button>
-              <button
-                onClick={deselectAllTracks}
-                style={{
-                  fontSize: "9px", color: "#71717a", background: "none", border: "none",
-                  cursor: "pointer", textTransform: "uppercase", fontFamily: "var(--font-mono)",
-                  letterSpacing: "0.05em",
-                }}
-              >None</button>
-              <a href="/broadcast/tracks/upload" style={{
-                fontSize: "9px", color: "#71717a", textDecoration: "none",
-                textTransform: "uppercase", fontFamily: "var(--font-mono)", letterSpacing: "0.05em",
-              }}>+ Upload</a>
-            </div>
-          </div>
-
-          {tracksLoading ? (
-            <div style={{ padding: "20px" }}><InlineLoader /></div>
-          ) : tracks.length === 0 ? (
-            <div style={{ padding: "32px 16px", textAlign: "center" }}>
-              <p style={{
-                color: "#52525b", fontSize: "11px", textTransform: "uppercase",
-                fontFamily: "var(--font-mono)", marginBottom: "8px",
-              }}>No active tracks</p>
-              <a href="/broadcast/tracks/upload" style={{
-                color: "#f59e0b", fontSize: "11px", textDecoration: "none",
-                textTransform: "uppercase", fontFamily: "var(--font-mono)",
-              }}>Upload tracks to get started</a>
-            </div>
-          ) : (
-            <div style={{ maxHeight: "400px", overflowY: "auto" }}>
-              {tracks.map((track) => {
-                const isSelected = selectedTrackIds.has(track.id);
-                const serverFilename = getServerFilename(track);
-                const isBroadcasting = liveQueueFilenames.has(serverFilename);
-
-                return (
-                  <div
-                    key={track.id}
-                    onClick={() => !isBroadcasting && toggleTrackSelection(track.id)}
-                    style={{
-                      padding: "10px 16px",
-                      borderBottom: "1px solid rgba(39, 39, 42, 0.5)",
-                      backgroundColor: isBroadcasting
-                        ? "rgba(245, 158, 11, 0.03)"
-                        : isSelected
-                        ? "rgba(245, 158, 11, 0.06)"
-                        : "transparent",
-                      cursor: isBroadcasting ? "default" : "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      transition: "background-color 0.1s",
-                    }}
-                  >
-                    {/* Checkbox or broadcasting indicator */}
-                    {isBroadcasting ? (
-                      <div style={{
-                        width: "14px",
-                        height: "14px",
-                        backgroundColor: "#f59e0b",
-                        flexShrink: 0,
-                        animation: "orange-blink 1.2s ease-in-out infinite",
-                      }} />
-                    ) : (
-                      <div style={{
-                        width: "18px",
-                        height: "18px",
-                        border: isSelected ? "2px solid #f59e0b" : "2px solid #3f3f46",
-                        backgroundColor: isSelected ? "#f59e0b" : "transparent",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                        transition: "all 0.1s",
-                      }}>
-                        {isSelected && (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Track info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: isBroadcasting ? "var(--text-primary)" : isSelected ? "var(--text-primary)" : "#71717a",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}>
-                        {track.title}
-                      </div>
-                      <div style={{ fontSize: "10px", color: "#52525b" }}>
-                        {track.primary_artist} · {formatDuration(track.duration_seconds)}
-                      </div>
-                    </div>
-
-                    {/* Status label */}
-                    <span style={{
-                      fontSize: "9px",
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      fontFamily: "var(--font-mono)",
-                      letterSpacing: "0.05em",
-                      flexShrink: 0,
-                      color: isBroadcasting ? "#4ADE80" : isSelected ? "#f59e0b" : "transparent",
-                      animation: isBroadcasting ? "active-pulse 2s ease-in-out infinite" : "none",
-                    }}>
-                      {isBroadcasting ? "ACTIVE" : isSelected ? "READY" : ""}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Add to Broadcast button — shows when live and tracks are selected */}
-          {isLive && selectedTrackIds.size > 0 && (
-            <div style={{ padding: "12px 16px", borderTop: "1px solid #1a1a1e" }}>
-              <button
-                onClick={async () => {
-                  setToggling(true);
-                  setMessage("");
-                  try {
-                    const res = await fetch("/api/broadcast", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ action: "add_tracks", track_ids: Array.from(selectedTrackIds) }),
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                      setMessage(`${selectedTrackIds.size} track${selectedTrackIds.size > 1 ? "s" : ""} added to broadcast!`);
-                      setSelectedTrackIds(new Set());
-                      // Refresh queue
-                      if (channelSlug) {
-                        const qRes = await fetch(`/api/channels/${channelSlug}/queue`);
-                        if (qRes.ok) {
-                          const qData = await qRes.json();
-                          if (qData.queue) setLiveQueueFilenames(new Set(qData.queue));
-                        }
-                      }
-                    } else {
-                      setMessage(data.error || "Failed to add tracks");
-                    }
-                  } catch {
-                    setMessage("Broadcast server unavailable");
-                  }
-                  setToggling(false);
-                }}
-                disabled={toggling}
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  backgroundColor: "#f59e0b",
-                  color: "#0a0a0a",
-                  border: "none",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  cursor: toggling ? "not-allowed" : "pointer",
-                  opacity: toggling ? 0.6 : 1,
-                  fontFamily: "var(--font-mono)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                {toggling ? "ADDING..." : `ADD TO BROADCAST (${selectedTrackIds.size})`}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Go Live / Stop button */}
       <button
         onClick={handleToggleBroadcast}
@@ -1452,7 +1236,7 @@ export default function GoLivePage() {
             </button>
           </div>
 
-          {/* Music Panel */}
+          {/* Music Panel — merged track selection + library */}
           {activePanel === "music" && (
             <div style={{
               backgroundColor: "rgba(24, 24, 27, 0.3)",
@@ -1473,43 +1257,32 @@ export default function GoLivePage() {
                   letterSpacing: "0.1em",
                   fontFamily: "var(--font-mono)",
                 }}>
-                  TRACK LIBRARY — {tracks.length} tracks
+                  {isLive ? `TRACK LIBRARY — ${tracks.length} tracks` : `SELECT TRACKS — ${tracks.length} available`}
                 </span>
-                <a href="/broadcast/tracks/upload" style={{
-                  fontSize: "10px",
-                  color: "#71717a",
-                  textDecoration: "none",
-                  textTransform: "uppercase",
-                  fontFamily: "var(--font-mono)",
-                  letterSpacing: "0.05em",
-                }}>
-                  + Upload
-                </a>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={selectAllTracks} style={{
+                    fontSize: "9px", color: "#71717a", background: "none", border: "none",
+                    cursor: "pointer", textTransform: "uppercase", fontFamily: "var(--font-mono)", letterSpacing: "0.05em",
+                  }}>All</button>
+                  <button onClick={deselectAllTracks} style={{
+                    fontSize: "9px", color: "#71717a", background: "none", border: "none",
+                    cursor: "pointer", textTransform: "uppercase", fontFamily: "var(--font-mono)", letterSpacing: "0.05em",
+                  }}>None</button>
+                  <a href="/broadcast/tracks/upload" style={{
+                    fontSize: "9px", color: "#71717a", textDecoration: "none",
+                    textTransform: "uppercase", fontFamily: "var(--font-mono)", letterSpacing: "0.05em",
+                  }}>+ Upload</a>
+                </div>
               </div>
 
               {tracksLoading ? (
                 <div style={{ padding: "20px" }}><InlineLoader /></div>
               ) : tracks.length === 0 ? (
-                <div style={{
-                  padding: "32px 16px",
-                  textAlign: "center",
-                }}>
-                  <p style={{
-                    color: "#52525b",
-                    fontSize: "11px",
-                    textTransform: "uppercase",
-                    fontFamily: "var(--font-mono)",
-                    marginBottom: "8px",
-                  }}>
+                <div style={{ padding: "32px 16px", textAlign: "center" }}>
+                  <p style={{ color: "#52525b", fontSize: "11px", textTransform: "uppercase", fontFamily: "var(--font-mono)", marginBottom: "8px" }}>
                     No active tracks
                   </p>
-                  <a href="/broadcast/tracks/upload" style={{
-                    color: "#f59e0b",
-                    fontSize: "11px",
-                    textDecoration: "none",
-                    textTransform: "uppercase",
-                    fontFamily: "var(--font-mono)",
-                  }}>
+                  <a href="/broadcast/tracks/upload" style={{ color: "#f59e0b", fontSize: "11px", textDecoration: "none", textTransform: "uppercase", fontFamily: "var(--font-mono)" }}>
                     Upload tracks to get started
                   </a>
                 </div>
@@ -1521,63 +1294,59 @@ export default function GoLivePage() {
                     const isCued = cuedFilename === serverFilename;
                     const isInLiveQueue = liveQueueFilenames.has(serverFilename);
                     const isBroadcasting = isInLiveQueue || isCurrentlyPlaying;
+                    const isSelected = selectedTrackIds.has(track.id);
 
                     return (
-                      <div key={track.id} style={{
-                        padding: "10px 16px",
-                        borderBottom: "1px solid rgba(39, 39, 42, 0.5)",
-                        backgroundColor: isCurrentlyPlaying
-                          ? "rgba(245, 158, 11, 0.06)"
-                          : isBroadcasting
-                          ? "rgba(245, 158, 11, 0.03)"
-                          : isCued
-                          ? "rgba(74, 222, 128, 0.04)"
-                          : "transparent",
-                      }}>
-                        <div style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}>
-                          {/* Status indicator: orange blinking box for live, gray dot for idle */}
+                      <div
+                        key={track.id}
+                        onClick={() => !isBroadcasting && toggleTrackSelection(track.id)}
+                        style={{
+                          padding: "10px 16px",
+                          borderBottom: "1px solid rgba(39, 39, 42, 0.5)",
+                          backgroundColor: isCurrentlyPlaying
+                            ? "rgba(245, 158, 11, 0.06)"
+                            : isBroadcasting
+                            ? "rgba(245, 158, 11, 0.03)"
+                            : isSelected
+                            ? "rgba(245, 158, 11, 0.06)"
+                            : "transparent",
+                          cursor: isBroadcasting ? "default" : "pointer",
+                          transition: "background-color 0.1s",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          {/* Indicator: orange blinking box (broadcasting) / checkbox (idle) */}
                           {isBroadcasting ? (
                             <div style={{
-                              width: "14px",
-                              height: "14px",
-                              backgroundColor: "#f59e0b",
-                              flexShrink: 0,
-                              animation: "orange-blink 1.2s ease-in-out infinite",
+                              width: "14px", height: "14px", backgroundColor: "#f59e0b",
+                              flexShrink: 0, animation: "orange-blink 1.2s ease-in-out infinite",
                             }} />
                           ) : (
                             <div style={{
-                              width: "6px",
-                              height: "6px",
-                              borderRadius: "50%",
-                              backgroundColor: isCued ? "#4ADE80" : "#3f3f46",
-                              boxShadow: isCued ? "0 0 6px rgba(74, 222, 128, 0.6)" : "none",
-                              flexShrink: 0,
-                            }} />
+                              width: "18px", height: "18px",
+                              border: isSelected ? "2px solid #f59e0b" : "2px solid #3f3f46",
+                              backgroundColor: isSelected ? "#f59e0b" : "transparent",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              flexShrink: 0, transition: "all 0.1s",
+                            }}>
+                              {isSelected && (
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              )}
+                            </div>
                           )}
 
                           {/* Track info */}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: isCurrentlyPlaying ? "#f59e0b" : isBroadcasting ? "var(--text-primary)" : isCued ? "#4ADE80" : "var(--text-primary)",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
+                              fontSize: "12px", fontWeight: 600,
+                              color: isCurrentlyPlaying ? "#f59e0b" : isBroadcasting ? "var(--text-primary)" : isSelected ? "var(--text-primary)" : "#71717a",
+                              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                             }}>
                               {track.title}
-                              {isCued && !isBroadcasting && (
-                                <span style={{
-                                  fontSize: "9px",
-                                  color: "#4ADE80",
-                                  marginLeft: "6px",
-                                  fontFamily: "var(--font-mono)",
-                                  letterSpacing: "0.05em",
-                                }}>
+                              {isCued && isBroadcasting && (
+                                <span style={{ fontSize: "9px", color: "#4ADE80", marginLeft: "6px", fontFamily: "var(--font-mono)", letterSpacing: "0.05em" }}>
                                   CUED
                                 </span>
                               )}
@@ -1587,48 +1356,27 @@ export default function GoLivePage() {
                             </div>
                           </div>
 
-                          {/* Action buttons (cue/skip) — only for non-playing live tracks */}
+                          {/* Cue/Skip buttons for broadcasting tracks */}
                           {isBroadcasting && !isCurrentlyPlaying && (
                             <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                              <button
-                                onClick={() => handleCue(track)}
-                                title="Cue next"
-                                style={{
-                                  width: "28px",
-                                  height: "28px",
-                                  backgroundColor: isCued ? "rgba(74, 222, 128, 0.15)" : "transparent",
-                                  border: isCued ? "1px solid #4ADE80" : "1px solid #3f3f46",
-                                  color: isCued ? "#4ADE80" : "#71717a",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  borderRadius: "0px",
-                                }}
-                              >
+                              <button onClick={(e) => { e.stopPropagation(); handleCue(track); }} title="Cue next" style={{
+                                width: "28px", height: "28px",
+                                backgroundColor: isCued ? "rgba(74, 222, 128, 0.15)" : "transparent",
+                                border: isCued ? "1px solid #4ADE80" : "1px solid #3f3f46",
+                                color: isCued ? "#4ADE80" : "#71717a",
+                                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "0px",
+                              }}>
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="5 12 12 5 19 12" />
-                                  <line x1="12" y1="19" x2="12" y2="5" />
+                                  <polyline points="5 12 12 5 19 12" /><line x1="12" y1="19" x2="12" y2="5" />
                                 </svg>
                               </button>
-                              <button
-                                onClick={() => handlePlay(track)}
-                                disabled={skipping}
-                                title="Play now"
-                                style={{
-                                  width: "28px",
-                                  height: "28px",
-                                  backgroundColor: "transparent",
-                                  border: "1px solid #f59e0b",
-                                  color: "#f59e0b",
-                                  cursor: skipping ? "not-allowed" : "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  borderRadius: "0px",
-                                  opacity: skipping ? 0.5 : 1,
-                                }}
-                              >
+                              <button onClick={(e) => { e.stopPropagation(); handlePlay(track); }} disabled={skipping} title="Play now" style={{
+                                width: "28px", height: "28px", backgroundColor: "transparent",
+                                border: "1px solid #f59e0b", color: "#f59e0b",
+                                cursor: skipping ? "not-allowed" : "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                borderRadius: "0px", opacity: skipping ? 0.5 : 1,
+                              }}>
                                 <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                                   <polygon points="5,3 19,12 5,21" />
                                 </svg>
@@ -1636,23 +1384,59 @@ export default function GoLivePage() {
                             </div>
                           )}
 
-                          {/* ACTIVE status for broadcasting tracks / PLAYING for current */}
+                          {/* Status label */}
                           <span style={{
-                            fontSize: "9px",
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            fontFamily: "var(--font-mono)",
-                            letterSpacing: "0.05em",
-                            flexShrink: 0,
-                            color: isCurrentlyPlaying ? "#f59e0b" : isBroadcasting ? "#4ADE80" : "transparent",
+                            fontSize: "9px", fontWeight: 700, textTransform: "uppercase",
+                            fontFamily: "var(--font-mono)", letterSpacing: "0.05em", flexShrink: 0,
+                            color: isCurrentlyPlaying ? "#f59e0b" : isBroadcasting ? "#4ADE80" : isSelected ? "#f59e0b" : "transparent",
                             animation: isBroadcasting && !isCurrentlyPlaying ? "active-pulse 2s ease-in-out infinite" : "none",
                           }}>
-                            {isCurrentlyPlaying ? "PLAYING" : isBroadcasting ? "ACTIVE" : ""}
+                            {isCurrentlyPlaying ? "PLAYING" : isBroadcasting ? "ACTIVE" : isSelected ? "READY" : ""}
                           </span>
                         </div>
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Add to Broadcast — shows when live and tracks are selected */}
+              {isLive && selectedTrackIds.size > 0 && (
+                <div style={{ padding: "12px 16px", borderTop: "1px solid #1a1a1e" }}>
+                  <button
+                    onClick={async () => {
+                      setToggling(true); setMessage("");
+                      try {
+                        const res = await fetch("/api/broadcast", {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "add_tracks", track_ids: Array.from(selectedTrackIds) }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setMessage(`${selectedTrackIds.size} track${selectedTrackIds.size > 1 ? "s" : ""} added!`);
+                          setSelectedTrackIds(new Set());
+                          if (channelSlug) {
+                            const qRes = await fetch(`/api/channels/${channelSlug}/queue`);
+                            if (qRes.ok) { const qData = await qRes.json(); if (qData.queue) setLiveQueueFilenames(new Set(qData.queue)); }
+                          }
+                        } else { setMessage(data.error || "Failed to add tracks"); }
+                      } catch { setMessage("Broadcast server unavailable"); }
+                      setToggling(false);
+                    }}
+                    disabled={toggling}
+                    style={{
+                      width: "100%", padding: "10px", backgroundColor: "#f59e0b", color: "#0a0a0a",
+                      border: "none", fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
+                      letterSpacing: "0.05em", cursor: toggling ? "not-allowed" : "pointer",
+                      opacity: toggling ? 0.6 : 1, fontFamily: "var(--font-mono)",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    {toggling ? "ADDING..." : `ADD TO BROADCAST (${selectedTrackIds.size})`}
+                  </button>
                 </div>
               )}
             </div>
