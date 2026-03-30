@@ -48,6 +48,7 @@ export default function ChannelPage() {
   const [togglingFollow, setTogglingFollow] = useState(false);
   const [broadcasterId, setBroadcasterId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [followerCount, setFollowerCount] = useState(0);
 
   // Share state
   const [showShareToast, setShowShareToast] = useState(false);
@@ -67,13 +68,20 @@ export default function ChannelPage() {
       if (!ch) return;
       setBroadcasterId(ch.id);
 
-      const { data: follow } = await supabase
-        .from("follows")
-        .select("id")
-        .eq("follower_id", user.id)
-        .eq("broadcaster_id", ch.id)
-        .maybeSingle();
-      setIsFollowing(!!follow);
+      const [followRes, countRes] = await Promise.all([
+        supabase
+          .from("follows")
+          .select("id")
+          .eq("follower_id", user.id)
+          .eq("broadcaster_id", ch.id)
+          .maybeSingle(),
+        supabase
+          .from("follows")
+          .select("*", { count: "exact", head: true })
+          .eq("broadcaster_id", ch.id),
+      ]);
+      setIsFollowing(!!followRes.data);
+      setFollowerCount(countRes.count ?? 0);
     }
     checkFollow();
   }, [slug, supabase]);
@@ -89,11 +97,13 @@ export default function ChannelPage() {
         .eq("follower_id", currentUserId)
         .eq("broadcaster_id", broadcasterId);
       setIsFollowing(false);
+      setFollowerCount((c) => Math.max(0, c - 1));
     } else {
       await supabase
         .from("follows")
         .insert({ follower_id: currentUserId, broadcaster_id: broadcasterId });
       setIsFollowing(true);
+      setFollowerCount((c) => c + 1);
     }
     setTogglingFollow(false);
   }
@@ -382,7 +392,7 @@ export default function ChannelPage() {
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
-              {(channel.monthly_listeners || 0).toLocaleString()}
+              {followerCount.toLocaleString()}
             </span>
             <span style={{
               padding: "2px 6px", fontSize: "10px",
