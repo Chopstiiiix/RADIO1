@@ -1109,6 +1109,9 @@ export default function GoLivePage() {
                 />
               </div>
             )}
+
+            {/* Multiband spectrum analyzer */}
+            {micActive && <MicSpectrum analyserNode={analyserRef.current} />}
           </div>
 
           {/* Music volume */}
@@ -1515,6 +1518,109 @@ export default function GoLivePage() {
           onCancel={() => setShowAgreement(false)}
         />
       )}
+    </div>
+  );
+}
+
+function MicSpectrum({ analyserNode }: { analyserNode: AnalyserNode | null }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !analyserNode) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement!.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const BANDS = 32;
+    const barWidth = rect.width / BANDS - 2;
+    const freqData = new Uint8Array(analyserNode.frequencyBinCount);
+
+    function draw() {
+      if (!ctx || !analyserNode) return;
+      analyserNode.getByteFrequencyData(freqData);
+
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const binSize = Math.floor(freqData.length / BANDS);
+
+      for (let i = 0; i < BANDS; i++) {
+        // Average the frequency bins for this band
+        let sum = 0;
+        for (let j = 0; j < binSize; j++) {
+          sum += freqData[i * binSize + j];
+        }
+        const avg = sum / binSize;
+        const barHeight = (avg / 255) * rect.height;
+
+        const x = i * (barWidth + 2) + 1;
+        const y = rect.height - barHeight;
+
+        // Color gradient: green → amber → red based on level
+        let r: number, g: number, b: number;
+        const level = avg / 255;
+        if (level < 0.5) {
+          // Green to amber
+          r = Math.round(74 + (245 - 74) * (level * 2));
+          g = Math.round(222 + (158 - 222) * (level * 2));
+          b = Math.round(128 + (11 - 128) * (level * 2));
+        } else {
+          // Amber to red
+          r = Math.round(245 + (226 - 245) * ((level - 0.5) * 2));
+          g = Math.round(158 + (74 - 158) * ((level - 0.5) * 2));
+          b = Math.round(11 + (74 - 11) * ((level - 0.5) * 2));
+        }
+
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.9)`;
+        ctx.fillRect(x, y, barWidth, barHeight);
+
+        // Peak cap line
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.4)`;
+        ctx.fillRect(x, y - 2, barWidth, 1);
+      }
+
+      rafRef.current = requestAnimationFrame(draw);
+    }
+
+    draw();
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [analyserNode]);
+
+  return (
+    <div style={{
+      padding: "12px 16px",
+      borderTop: "1px solid #1a1a1e",
+    }}>
+      <div style={{
+        fontSize: "9px",
+        color: "#52525b",
+        textTransform: "uppercase",
+        letterSpacing: "0.1em",
+        marginBottom: "8px",
+        fontFamily: "var(--font-mono)",
+        display: "flex",
+        justifyContent: "space-between",
+      }}>
+        <span>SPECTRUM</span>
+        <span style={{ color: "#4ADE80" }}>ACTIVE</span>
+      </div>
+      <div style={{
+        height: "60px",
+        backgroundColor: "#0a0a0a",
+        border: "1px solid #1a1a1e",
+        overflow: "hidden",
+      }}>
+        <canvas
+          ref={canvasRef}
+          style={{ display: "block", width: "100%", height: "100%" }}
+        />
+      </div>
     </div>
   );
 }
