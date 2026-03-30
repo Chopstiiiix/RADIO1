@@ -15,12 +15,21 @@ export default async function ListenPage() {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Only show channels that have uploaded at least one track
+  const { data: broadcasterIdsWithTracks } = await supabase
+    .from("tracks")
+    .select("broadcaster_id")
+    .eq("is_active", true);
+
+  const activeIds = [...new Set((broadcasterIdsWithTracks || []).map((t) => t.broadcaster_id))];
+
   const { data: channels } = await supabase
     .from("broadcaster_profiles")
     .select(`
       id, channel_name, channel_slug, genre, is_live, monthly_listeners,
       profile:profiles!broadcaster_profiles_id_fkey(display_name, bio)
     `)
+    .in("id", activeIds.length > 0 ? activeIds : ["none"])
     .order("is_live", { ascending: false })
     .order("monthly_listeners", { ascending: false });
 
