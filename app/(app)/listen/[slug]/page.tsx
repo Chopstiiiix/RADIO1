@@ -562,31 +562,6 @@ export default function ChannelPage() {
           </h3>
         </div>
 
-        {/* Upcoming block */}
-        {nextTrack && (
-          <div style={{
-            margin: "0 20px 20px",
-            padding: "12px 16px",
-            backgroundColor: "rgba(24, 24, 27, 0.8)",
-            borderLeft: "4px solid #f59e0b",
-            fontSize: "11px",
-            lineHeight: 1.5,
-            color: "#a1a1aa",
-            alignSelf: "flex-start",
-            zIndex: 10,
-            maxWidth: "80%",
-            boxShadow: "inset 0 0 20px rgba(245, 158, 11, 0.05), 0 0 15px rgba(245, 158, 11, 0.1)",
-          }}>
-            <div style={{ fontSize: "10px", color: "#52525b", letterSpacing: "0.1em", marginBottom: "4px" }}>
-              QUEUE
-            </div>
-            <span style={{ color: "#fbbf24", fontWeight: 700, textTransform: "uppercase", letterSpacing: "-0.02em" }}>
-              {nextTrack.title.replace(/\s+/g, "_")}
-            </span>
-            {nextTrack.artist && <span style={{ color: "#71717a" }}> — {nextTrack.artist}</span>}
-          </div>
-        )}
-
         {/* Visualizer (positioned absolute at bottom) */}
         <div style={{
           position: "absolute",
