@@ -538,9 +538,13 @@ export default function GoLivePage() {
           color: #f59e0b;
           background: rgba(245, 158, 11, 0.08);
         }
-        @keyframes live-dot-blink {
-          0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(74, 222, 128, 0.8); }
-          50% { opacity: 0.3; box-shadow: 0 0 2px rgba(74, 222, 128, 0.3); }
+        @keyframes orange-blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.25; }
+        }
+        @keyframes active-pulse {
+          0%, 100% { color: #4ADE80; }
+          50% { color: #86efac; }
         }
       `}</style>
 
@@ -1339,6 +1343,7 @@ export default function GoLivePage() {
                     const serverFilename = getServerFilename(track);
                     const isCued = cuedFilename === serverFilename;
                     const isInLiveQueue = liveQueueFilenames.has(serverFilename);
+                    const isBroadcasting = isInLiveQueue || isCurrentlyPlaying;
 
                     return (
                       <div key={track.id} style={{
@@ -1346,10 +1351,10 @@ export default function GoLivePage() {
                         borderBottom: "1px solid rgba(39, 39, 42, 0.5)",
                         backgroundColor: isCurrentlyPlaying
                           ? "rgba(245, 158, 11, 0.06)"
+                          : isBroadcasting
+                          ? "rgba(245, 158, 11, 0.03)"
                           : isCued
                           ? "rgba(74, 222, 128, 0.04)"
-                          : isInLiveQueue
-                          ? "rgba(74, 222, 128, 0.02)"
                           : "transparent",
                       }}>
                         <div style={{
@@ -1357,41 +1362,38 @@ export default function GoLivePage() {
                           alignItems: "center",
                           gap: "10px",
                         }}>
-                          {/* Status indicator */}
-                          <div style={{
-                            width: "6px",
-                            height: "6px",
-                            borderRadius: "50%",
-                            backgroundColor: isCurrentlyPlaying
-                              ? "#f59e0b"
-                              : isCued
-                              ? "#4ADE80"
-                              : isInLiveQueue
-                              ? "#4ADE80"
-                              : "#3f3f46",
-                            boxShadow: isCurrentlyPlaying
-                              ? "0 0 6px rgba(245, 158, 11, 0.8)"
-                              : isCued
-                              ? "0 0 6px rgba(74, 222, 128, 0.6)"
-                              : "none",
-                            animation: isInLiveQueue && !isCurrentlyPlaying && !isCued
-                              ? "live-dot-blink 1.5s ease-in-out infinite"
-                              : "none",
-                            flexShrink: 0,
-                          }} />
+                          {/* Status indicator: orange blinking box for live, gray dot for idle */}
+                          {isBroadcasting ? (
+                            <div style={{
+                              width: "14px",
+                              height: "14px",
+                              backgroundColor: "#f59e0b",
+                              flexShrink: 0,
+                              animation: "orange-blink 1.2s ease-in-out infinite",
+                            }} />
+                          ) : (
+                            <div style={{
+                              width: "6px",
+                              height: "6px",
+                              borderRadius: "50%",
+                              backgroundColor: isCued ? "#4ADE80" : "#3f3f46",
+                              boxShadow: isCued ? "0 0 6px rgba(74, 222, 128, 0.6)" : "none",
+                              flexShrink: 0,
+                            }} />
+                          )}
 
                           {/* Track info */}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{
                               fontSize: "12px",
                               fontWeight: 600,
-                              color: isCurrentlyPlaying ? "#f59e0b" : isCued ? "#4ADE80" : "var(--text-primary)",
+                              color: isCurrentlyPlaying ? "#f59e0b" : isBroadcasting ? "var(--text-primary)" : isCued ? "#4ADE80" : "var(--text-primary)",
                               whiteSpace: "nowrap",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                             }}>
                               {track.title}
-                              {isCued && (
+                              {isCued && !isBroadcasting && (
                                 <span style={{
                                   fontSize: "9px",
                                   color: "#4ADE80",
@@ -1402,28 +1404,15 @@ export default function GoLivePage() {
                                   CUED
                                 </span>
                               )}
-                              {isInLiveQueue && !isCurrentlyPlaying && !isCued && (
-                                <span style={{
-                                  fontSize: "9px",
-                                  color: "#4ADE80",
-                                  marginLeft: "6px",
-                                  fontFamily: "var(--font-mono)",
-                                  letterSpacing: "0.05em",
-                                  opacity: 0.7,
-                                }}>
-                                  LIVE
-                                </span>
-                              )}
                             </div>
                             <div style={{ fontSize: "10px", color: "#52525b" }}>
                               {track.primary_artist} · {formatDuration(track.duration_seconds)}
                             </div>
                           </div>
 
-                          {/* Action buttons */}
-                          {!isCurrentlyPlaying && (
+                          {/* Action buttons (cue/skip) — only for non-playing live tracks */}
+                          {isBroadcasting && !isCurrentlyPlaying && (
                             <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                              {/* Cue button */}
                               <button
                                 onClick={() => handleCue(track)}
                                 title="Cue next"
@@ -1445,8 +1434,6 @@ export default function GoLivePage() {
                                   <line x1="12" y1="19" x2="12" y2="5" />
                                 </svg>
                               </button>
-
-                              {/* Play now button */}
                               <button
                                 onClick={() => handlePlay(track)}
                                 disabled={skipping}
@@ -1472,20 +1459,19 @@ export default function GoLivePage() {
                             </div>
                           )}
 
-                          {/* Currently playing indicator */}
-                          {isCurrentlyPlaying && (
-                            <span style={{
-                              fontSize: "9px",
-                              fontWeight: 700,
-                              color: "#f59e0b",
-                              textTransform: "uppercase",
-                              fontFamily: "var(--font-mono)",
-                              letterSpacing: "0.05em",
-                              flexShrink: 0,
-                            }}>
-                              PLAYING
-                            </span>
-                          )}
+                          {/* ACTIVE status for broadcasting tracks / PLAYING for current */}
+                          <span style={{
+                            fontSize: "9px",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            fontFamily: "var(--font-mono)",
+                            letterSpacing: "0.05em",
+                            flexShrink: 0,
+                            color: isCurrentlyPlaying ? "#f59e0b" : isBroadcasting ? "#4ADE80" : "transparent",
+                            animation: isBroadcasting && !isCurrentlyPlaying ? "active-pulse 2s ease-in-out infinite" : "none",
+                          }}>
+                            {isCurrentlyPlaying ? "PLAYING" : isBroadcasting ? "ACTIVE" : ""}
+                          </span>
                         </div>
                       </div>
                     );
