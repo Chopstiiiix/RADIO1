@@ -171,6 +171,10 @@ export default function TracksPage() {
       return;
     }
 
+    if (selectedTracks.size === 1 && !isChannelLive) {
+      setBroadcastMessage("Tip: select 2+ tracks for continuous playback — 1 track will loop on repeat");
+    }
+
     setBroadcasting(true);
     setBroadcastMessage("");
 
@@ -324,7 +328,7 @@ export default function TracksPage() {
           {broadcastMessage && (
             <p style={{
               fontSize: "11px",
-              color: (broadcastMessage.includes("queued") || broadcastMessage.includes("broadcasting") || broadcastMessage.includes("ended")) ? "#4ADE80" : "#E24A4A",
+              color: broadcastMessage.includes("Tip") ? "#f59e0b" : (broadcastMessage.includes("queued") || broadcastMessage.includes("broadcasting") || broadcastMessage.includes("ended") || broadcastMessage.includes("added")) ? "#4ADE80" : "#E24A4A",
               marginBottom: "12px",
               fontFamily: "var(--font-mono)",
               letterSpacing: "0.05em",
