@@ -20,7 +20,7 @@ interface AiAgent {
 interface AgentSubscription {
   id: string;
   agent_id: string;
-  role: "primary" | "co-host";
+  role: "primary" | "cohost";
   status: string;
   ai_agent?: AiAgent;
 }
@@ -111,23 +111,33 @@ export default function AgentMarketplacePage() {
     return subscriptions.find((s) => s.agent_id === agentId);
   }
 
-  async function handleSubscribe(agentId: string, role: "primary" | "co-host") {
+  async function handleSubscribe(agentId: string, role: "primary" | "cohost") {
+    if (!userId) return;
     setSubscribingId(agentId + "-" + role);
     try {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agent_id: agentId, role }),
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      // Direct subscription (bypassing Stripe for testing)
+      const { error } = await supabase
+        .from("agent_subscriptions")
+        .upsert({
+          broadcaster_id: userId,
+          agent_id: agentId,
+          role,
+          status: "active",
+        }, { onConflict: "broadcaster_id,agent_id" });
+
+      if (error) {
+        alert("Error: " + error.message);
       } else {
-        setSuccessMessage("");
-        alert("Error creating checkout session.");
+        // Enable AI host automatically
+        await supabase
+          .from("broadcaster_agent_configs")
+          .upsert({ broadcaster_id: userId, ai_host_enabled: true }, { onConflict: "broadcaster_id" });
+        setAiHostEnabled(true);
+        setSuccessMessage("Agent added successfully!");
+        await loadData();
       }
     } catch {
-      alert("Error creating checkout session.");
+      alert("Error adding agent.");
     }
     setSubscribingId(null);
   }
@@ -137,7 +147,7 @@ export default function AgentMarketplacePage() {
     setSwapping(true);
 
     const updates = subscriptions.map((sub) => {
-      const newRole = sub.role === "primary" ? "co-host" : "primary";
+      const newRole = sub.role === "primary" ? "cohost" : "primary";
       return supabase
         .from("agent_subscriptions")
         .update({ role: newRole })
@@ -182,7 +192,7 @@ export default function AgentMarketplacePage() {
   if (loading) return <InlineLoader />;
 
   const primarySub = subscriptions.find((s) => s.role === "primary");
-  const cohostSubs = subscriptions.filter((s) => s.role === "co-host");
+  const cohostSubs = subscriptions.filter((s) => s.role === "cohost");
   const hasSubscriptions = subscriptions.length > 0;
 
   return (
@@ -578,7 +588,7 @@ export default function AgentMarketplacePage() {
                     {subscribingId === agent.id + "-primary" ? "Loading..." : "Subscribe as Primary"}
                   </button>
                   <button
-                    onClick={() => handleSubscribe(agent.id, "co-host")}
+                    onClick={() => handleSubscribe(agent.id, "cohost")}
                     disabled={subscribingId === agent.id + "-co-host"}
                     style={{
                       flex: 1,
