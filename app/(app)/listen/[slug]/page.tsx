@@ -629,7 +629,8 @@ export default function ChannelPage() {
               width: `${rulerWidthPct}%`,
               height: "100%",
               transform: `translateX(calc(${rulerTranslateOrigin}% - ${progress}%))`,
-              transition: "transform 1s linear",
+              transition: "transform 0.3s linear",
+              willChange: "transform",
             }}>
               {/* Generate tick marks: minutes with second numbers, sub-ticks between seconds */}
               {(() => {
@@ -637,8 +638,8 @@ export default function ChannelPage() {
                 const totalWidth = rulerWidthPct;
                 const ticks: React.ReactNode[] = [];
 
-                // 4 sub-ticks between each second (every 250ms)
-                const step = 0.25;
+                // Reduce tick density for long tracks / mobile performance
+                const step = dur > 120 ? 1 : dur > 30 ? 0.5 : 0.25;
                 const totalSteps = Math.ceil(dur / step);
 
                 for (let i = 0; i <= totalSteps; i++) {

@@ -30,6 +30,10 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
     if (!audio || audioCtxRef.current) return;
 
     const ctx = new AudioContext();
+    // Resume AudioContext on mobile (requires user gesture)
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
     const source = ctx.createMediaElementSource(audio);
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 256;

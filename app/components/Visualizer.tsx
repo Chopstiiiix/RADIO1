@@ -18,15 +18,18 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    let currentDpr = window.devicePixelRatio || 1;
     const resize = () => {
-      const dpr = window.devicePixelRatio || 1;
+      currentDpr = window.devicePixelRatio || 1;
       const rect = canvas.parentElement!.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
+      canvas.width = rect.width * currentDpr;
+      canvas.height = rect.height * currentDpr;
+      ctx.setTransform(currentDpr, 0, 0, currentDpr, 0, 0);
     };
     resize();
     window.addEventListener("resize", resize);
+    // Handle mobile orientation changes
+    window.addEventListener("orientationchange", () => setTimeout(resize, 100));
 
     const waveColor = { r: 120, g: 179, b: 206 }; // #78B3CE
 
@@ -98,6 +101,7 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
 
     return () => {
       window.removeEventListener("resize", resize);
+      window.removeEventListener("orientationchange", resize);
       cancelAnimationFrame(animFrameRef.current);
     };
   }, [analyserNode, isPlaying]);
