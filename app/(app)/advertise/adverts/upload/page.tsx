@@ -17,9 +17,16 @@ export default function UploadAdvertPage() {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
+  const MAX_FILE_SIZE_MB = 50;
+  const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return setError("Select an audio file");
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      return setError(`File too large — maximum ${MAX_FILE_SIZE_MB}MB allowed (yours is ${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+    }
 
     setUploading(true);
     setError("");
