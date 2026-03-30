@@ -70,10 +70,10 @@ function parseTrackFromFile(tf: TrackFile, startOffset: number): Track {
   return { ...base, artist: "Unknown Artist", title: name.trim(), type: "track" };
 }
 
-// HLS latency: hls_time(4s) * liveSyncDurationCount(3) = ~12s
+// HLS latency: hls_time(2s) * liveSyncDurationCount(2) = ~4s
 // The encoded time in m3u8 runs ahead of what listeners actually hear.
 // Subtract this to sync metadata with actual playback.
-const HLS_LATENCY_OFFSET = 12;
+const HLS_LATENCY_OFFSET = 4;
 
 function getTotalEncodedTime(outputDir: string): number {
   const m3u8Path = path.join(outputDir, "stream.m3u8");

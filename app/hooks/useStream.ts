@@ -92,8 +92,10 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
 
     if (Hls.isSupported()) {
       const hls = new Hls({
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 10,
+        liveSyncDurationCount: 2,
+        liveMaxLatencyDurationCount: 4,
+        liveDurationInfinity: true,
+        highBufferWatchdogPeriod: 1,
       });
       hls.loadSource(streamUrl);
       hls.attachMedia(audio);
