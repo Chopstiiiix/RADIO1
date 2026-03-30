@@ -205,7 +205,7 @@ export default function ChannelPage() {
     }
 
     poll();
-    const interval = setInterval(poll, 2000);
+    const interval = setInterval(poll, 1000);
     return () => clearInterval(interval);
   }, [slug]);
 

@@ -227,32 +227,44 @@ export default function GoLivePage() {
     fetchQueue();
   }, [isLive, channelSlug]);
 
-  // SSE for now playing when live
+  // Poll now-playing metadata when live
+  const lastTrackRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isLive || !channelSlug) return;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const es = new EventSource(`${origin}/metadata/channels/${channelSlug}/now-playing`);
-    es.onmessage = (event) => {
+    const url = `${origin}/metadata/api/channels/${channelSlug}/now-playing`;
+
+    async function poll() {
       try {
-        const data = JSON.parse(event.data);
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
         if (data.track && !data.ended) {
+          // Only reset elapsed timer when track actually changes
+          const trackKey = `${data.track.title}::${data.track.artist}`;
+          if (trackKey !== lastTrackRef.current) {
+            lastTrackRef.current = trackKey;
+            trackStartTimeRef.current = Date.now();
+            setTrackElapsed(0);
+          }
           setNowPlaying(data.track.title);
           setNowPlayingArtist(data.track.artist || null);
           setNowPlayingType(data.type || "track");
           setTrackDuration(data.duration || 0);
-          // Reset elapsed timer when track changes
-          trackStartTimeRef.current = Date.now();
-          setTrackElapsed(0);
-        } else {
+        } else if (data.ended) {
           setNowPlaying(null);
           setNowPlayingArtist(null);
           setNowPlayingType("track");
           setTrackDuration(0);
           setTrackElapsed(0);
+          lastTrackRef.current = null;
         }
       } catch { /* ignore */ }
-    };
-    return () => es.close();
+    }
+
+    poll();
+    const interval = setInterval(poll, 1000);
+    return () => clearInterval(interval);
   }, [isLive, channelSlug]);
 
   // Elapsed time ticker

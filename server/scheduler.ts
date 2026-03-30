@@ -70,6 +70,11 @@ function parseTrackFromFile(tf: TrackFile, startOffset: number): Track {
   return { ...base, artist: "Unknown Artist", title: name.trim(), type: "track" };
 }
 
+// HLS latency: hls_time(4s) * liveSyncDurationCount(3) = ~12s
+// The encoded time in m3u8 runs ahead of what listeners actually hear.
+// Subtract this to sync metadata with actual playback.
+const HLS_LATENCY_OFFSET = 12;
+
 function getTotalEncodedTime(outputDir: string): number {
   const m3u8Path = path.join(outputDir, "stream.m3u8");
   if (!fs.existsSync(m3u8Path)) return 0;
@@ -82,7 +87,9 @@ function getTotalEncodedTime(outputDir: string): number {
       if (!isNaN(dur)) total += dur;
     }
   }
-  return total;
+
+  // Adjust for HLS playback latency — listeners are behind the encode head
+  return Math.max(0, total - HLS_LATENCY_OFFSET);
 }
 
 function getTrackIndexAtTime(playlist: Track[], encodedTime: number): number {
@@ -175,7 +182,7 @@ export async function startChannelScheduler(config: ChannelConfig, trackFiles: T
   // Initial broadcast
   broadcastTrack(slug, playlist, 0);
 
-  // Poll m3u8 every second
+  // Poll m3u8 every 500ms for tight sync
   state.pollTimer = setInterval(() => {
     const encodedTime = getTotalEncodedTime(outputDir);
     const trackIndex = getTrackIndexAtTime(playlist, encodedTime);
@@ -189,7 +196,7 @@ export async function startChannelScheduler(config: ChannelConfig, trackFiles: T
       state.currentTrackIndex = trackIndex;
       broadcastTrack(slug, playlist, trackIndex);
     }
-  }, 1000);
+  }, 500);
 
   channelSchedulers.set(slug, state);
   console.log(`⏰ [${slug}] Scheduler started`);
