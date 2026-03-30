@@ -949,46 +949,63 @@ export default function GoLivePage() {
             <div style={{ maxHeight: "400px", overflowY: "auto" }}>
               {tracks.map((track) => {
                 const isSelected = selectedTrackIds.has(track.id);
+                const serverFilename = getServerFilename(track);
+                const isBroadcasting = liveQueueFilenames.has(serverFilename);
+
                 return (
                   <div
                     key={track.id}
-                    onClick={() => toggleTrackSelection(track.id)}
+                    onClick={() => !isBroadcasting && toggleTrackSelection(track.id)}
                     style={{
                       padding: "10px 16px",
                       borderBottom: "1px solid rgba(39, 39, 42, 0.5)",
-                      backgroundColor: isSelected ? "rgba(245, 158, 11, 0.06)" : "transparent",
-                      cursor: "pointer",
+                      backgroundColor: isBroadcasting
+                        ? "rgba(245, 158, 11, 0.03)"
+                        : isSelected
+                        ? "rgba(245, 158, 11, 0.06)"
+                        : "transparent",
+                      cursor: isBroadcasting ? "default" : "pointer",
                       display: "flex",
                       alignItems: "center",
                       gap: "10px",
                       transition: "background-color 0.1s",
                     }}
                   >
-                    {/* Checkbox */}
-                    <div style={{
-                      width: "18px",
-                      height: "18px",
-                      border: isSelected ? "2px solid #f59e0b" : "2px solid #3f3f46",
-                      backgroundColor: isSelected ? "#f59e0b" : "transparent",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                      transition: "all 0.1s",
-                    }}>
-                      {isSelected && (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </div>
+                    {/* Checkbox or broadcasting indicator */}
+                    {isBroadcasting ? (
+                      <div style={{
+                        width: "14px",
+                        height: "14px",
+                        backgroundColor: "#f59e0b",
+                        flexShrink: 0,
+                        animation: "orange-blink 1.2s ease-in-out infinite",
+                      }} />
+                    ) : (
+                      <div style={{
+                        width: "18px",
+                        height: "18px",
+                        border: isSelected ? "2px solid #f59e0b" : "2px solid #3f3f46",
+                        backgroundColor: isSelected ? "#f59e0b" : "transparent",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        transition: "all 0.1s",
+                      }}>
+                        {isSelected && (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </div>
+                    )}
 
                     {/* Track info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
                         fontSize: "12px",
                         fontWeight: 600,
-                        color: isSelected ? "var(--text-primary)" : "#71717a",
+                        color: isBroadcasting ? "var(--text-primary)" : isSelected ? "var(--text-primary)" : "#71717a",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -999,6 +1016,20 @@ export default function GoLivePage() {
                         {track.primary_artist} · {formatDuration(track.duration_seconds)}
                       </div>
                     </div>
+
+                    {/* Status label */}
+                    <span style={{
+                      fontSize: "9px",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      fontFamily: "var(--font-mono)",
+                      letterSpacing: "0.05em",
+                      flexShrink: 0,
+                      color: isBroadcasting ? "#4ADE80" : isSelected ? "#f59e0b" : "transparent",
+                      animation: isBroadcasting ? "active-pulse 2s ease-in-out infinite" : "none",
+                    }}>
+                      {isBroadcasting ? "ACTIVE" : isSelected ? "READY" : ""}
+                    </span>
                   </div>
                 );
               })}
