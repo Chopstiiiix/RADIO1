@@ -884,8 +884,8 @@ export default function GoLivePage() {
         </div>
       )}
 
-      {/* ──── TRACK SELECTION (before going live) ──── */}
-      {!isLive && (
+      {/* ──── TRACK SELECTION ──── */}
+      {(
         <div style={{
           backgroundColor: "rgba(24, 24, 27, 0.3)",
           borderLeft: "3px solid #f59e0b",
@@ -906,7 +906,7 @@ export default function GoLivePage() {
               letterSpacing: "0.1em",
               fontFamily: "var(--font-mono)",
             }}>
-              SELECT TRACKS TO BROADCAST
+              {isLive ? "TRACK STATUS" : "SELECT TRACKS TO BROADCAST"}
             </span>
             <div style={{ display: "flex", gap: "8px" }}>
               <button
