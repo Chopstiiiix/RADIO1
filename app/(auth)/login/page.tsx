@@ -211,6 +211,21 @@ function LoginForm() {
             description="Place ads on popular channels"
           />
         </div>
+
+        {/* Footer */}
+        <div style={{
+          marginTop: "40px",
+          textAlign: "center",
+          fontSize: "9px",
+          color: "#3f3f46",
+          letterSpacing: "0.05em",
+          lineHeight: 1.8,
+          fontFamily: "'JetBrains Mono', monospace",
+          textTransform: "uppercase",
+        }}>
+          <div>&copy; 2026 Caster. Created by <span style={{ color: "#52525b" }}>Chopstix</span></div>
+          <div>Powered by <span style={{ color: "#52525b" }}>Inspire-Edge</span> &amp; <span style={{ color: "#52525b" }}>Navada-Edge</span></div>
+        </div>
       </div>
     </div>
   );
