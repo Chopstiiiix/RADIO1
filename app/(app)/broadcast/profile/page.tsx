@@ -396,6 +396,7 @@ export default function BroadcasterProfile() {
               resize: "vertical",
               outline: "none",
               fontFamily: "var(--font-mono)",
+              textAlign: "center",
             }}
           />
         </div>

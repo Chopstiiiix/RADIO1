@@ -300,6 +300,7 @@ export default function ProfilePage() {
               resize: "vertical",
               outline: "none",
               fontFamily: "var(--font-mono)",
+              textAlign: "center",
             }}
           />
         </div>

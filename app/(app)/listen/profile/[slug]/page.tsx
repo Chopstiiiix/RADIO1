@@ -261,7 +261,7 @@ export default function BroadcasterPublicProfile() {
           <div style={{ fontSize: "10px", color: "#52525b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px", fontFamily: "var(--font-mono)" }}>
             Bio
           </div>
-          <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+          <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6, textAlign: "center" }}>
             {profile.bio}
           </div>
         </div>
