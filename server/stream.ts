@@ -24,25 +24,58 @@ export const streamEvents = new EventEmitter();
 // Per-channel ffmpeg processes
 const channelProcesses = new Map<string, ReturnType<typeof spawn>>();
 
+/**
+ * Normalize a single track to WAV s16le stereo 44100Hz.
+ * Returns the path to the normalized file.
+ */
+function normalizeTrack(srcPath: string, normDir: string): string {
+  const basename = path.basename(srcPath, path.extname(srcPath)) + ".wav";
+  const normPath = path.join(normDir, basename);
+
+  // Skip if already normalized
+  if (fs.existsSync(normPath)) return normPath;
+
+  try {
+    execSync(
+      `ffmpeg -y -i "${srcPath}" -af "aformat=channel_layouts=stereo:sample_rates=44100:sample_fmts=s16" -c:a pcm_s16le "${normPath}"`,
+      { encoding: "utf-8", stdio: "pipe" }
+    );
+  } catch (err) {
+    console.error(`Failed to normalize ${srcPath}:`, err);
+    return srcPath; // Fallback to original
+  }
+
+  return normPath;
+}
+
 function getTrackFiles(musicDir: string): TrackFile[] {
   if (!fs.existsSync(musicDir)) return [];
-  return fs
+
+  // Normalize all tracks to a uniform format for clean concat
+  const normDir = path.join(musicDir, "_normalized");
+  fs.mkdirSync(normDir, { recursive: true });
+
+  const sourceFiles = fs
     .readdirSync(musicDir)
     .filter((f) => /\.(mp3|flac|wav|m4a|ogg)$/i.test(f))
-    .sort()
-    .map((f) => {
-      const fullPath = path.join(musicDir, f);
-      let duration = 180;
-      try {
-        const out = execSync(
-          `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${fullPath}"`,
-          { encoding: "utf-8" }
-        ).trim();
-        const parsed = parseFloat(out);
-        if (parsed > 0) duration = parsed;
-      } catch { /* fallback */ }
-      return { path: fullPath, filename: f, duration };
-    });
+    .sort();
+
+  return sourceFiles.map((f) => {
+    const srcPath = path.join(musicDir, f);
+    const normPath = normalizeTrack(srcPath, normDir);
+
+    let duration = 180;
+    try {
+      const out = execSync(
+        `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${normPath}"`,
+        { encoding: "utf-8" }
+      ).trim();
+      const parsed = parseFloat(out);
+      if (parsed > 0) duration = parsed;
+    } catch { /* fallback */ }
+
+    return { path: normPath, filename: f, duration };
+  });
 }
 
 function generateConcatFile(tracks: TrackFile[], outputDir: string): string {
@@ -57,7 +90,7 @@ export function getChannelTracks(musicDir: string): TrackFile[] {
 }
 
 export function startChannelPipelineFromTracks(config: ChannelConfig, tracks: TrackFile[]): TrackFile[] {
-  const { slug, outputDir } = config;
+  const { slug, musicDir, outputDir } = config;
 
   // Clean old segments
   if (fs.existsSync(outputDir)) {
@@ -73,9 +106,19 @@ export function startChannelPipelineFromTracks(config: ChannelConfig, tracks: Tr
     return [];
   }
 
-  const concatFile = generateConcatFile(tracks, outputDir);
+  // Ensure all tracks are normalized before concat
+  const normDir = path.join(musicDir, "_normalized");
+  fs.mkdirSync(normDir, { recursive: true });
+  const normalizedTracks = tracks.map((t) => {
+    // Skip if already in the normalized dir
+    if (t.path.includes("_normalized")) return t;
+    const normPath = normalizeTrack(t.path, normDir);
+    return { ...t, path: normPath };
+  });
 
-  return launchFfmpeg(slug, outputDir, concatFile, tracks);
+  const concatFile = generateConcatFile(normalizedTracks, outputDir);
+
+  return launchFfmpeg(slug, outputDir, concatFile, normalizedTracks);
 }
 
 export function startChannelPipeline(config: ChannelConfig): TrackFile[] {
