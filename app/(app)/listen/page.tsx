@@ -55,9 +55,20 @@ export default async function ListenPage() {
     followedIds = (follows || []).map((f) => f.broadcaster_id);
   }
 
+  // Get follower counts per broadcaster
+  const { data: allFollows } = await supabase
+    .from("follows")
+    .select("broadcaster_id");
+  const followerMap: Record<string, number> = {};
+  if (allFollows) {
+    for (const row of allFollows) {
+      followerMap[row.broadcaster_id] = (followerMap[row.broadcaster_id] || 0) + 1;
+    }
+  }
+
   const allChannels = (channels || []) as unknown as Channel[];
 
-  return <ChannelList allChannels={allChannels} likeMap={likeMap} followedIds={followedIds} />;
+  return <ChannelList allChannels={allChannels} likeMap={likeMap} followedIds={followedIds} followerMap={followerMap} />;
 }
 
 function ChannelCard({ channel, index, likes }: { channel: any; index: number; likes: number }) {

@@ -16,10 +16,12 @@ export default function ChannelList({
   allChannels,
   likeMap,
   followedIds,
+  followerMap,
 }: {
   allChannels: Channel[];
   likeMap: Record<string, number>;
   followedIds: string[];
+  followerMap: Record<string, number>;
 }) {
   const [tab, setTab] = useState<"all" | "following">("all");
   const [nowPlayingMap, setNowPlayingMap] = useState<Record<string, string>>({});
@@ -296,7 +298,7 @@ export default function ChannelList({
           </div>
         ) : (
           displayChannels.map((ch, index) => (
-            <ChannelCard key={ch.id} channel={ch} index={index} likes={likeMap[ch.channel_slug] || 0} nowPlaying={nowPlayingMap[ch.channel_slug] || null} />
+            <ChannelCard key={ch.id} channel={ch} index={index} likes={likeMap[ch.channel_slug] || 0} followers={followerMap[ch.id] || 0} nowPlaying={nowPlayingMap[ch.channel_slug] || null} />
           ))
         )}
       </div>
@@ -346,7 +348,7 @@ export default function ChannelList({
   );
 }
 
-function ChannelCard({ channel, index, likes, nowPlaying }: { channel: any; index: number; likes: number; nowPlaying: string | null }) {
+function ChannelCard({ channel, index, likes, followers, nowPlaying }: { channel: any; index: number; likes: number; followers: number; nowPlaying: string | null }) {
   const isLive = channel.is_live;
   const profile = channel.profile as any;
   const chNum = String(index + 1).padStart(2, "0");
@@ -561,7 +563,7 @@ function ChannelCard({ channel, index, likes, nowPlaying }: { channel: any; inde
             {likes.toLocaleString()}
           </span>
 
-          {/* Listener count */}
+          {/* Follower count */}
           <span style={{
             fontSize: "10px",
             letterSpacing: "0.05em",
@@ -573,10 +575,8 @@ function ChannelCard({ channel, index, likes, nowPlaying }: { channel: any; inde
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
               <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
-            {listeners.toLocaleString()}
+            {followers.toLocaleString()}
           </span>
 
           {/* Signal bars */}

@@ -20,6 +20,7 @@ export default function SearchPage() {
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
   const [userId, setUserId] = useState<string | null>(null);
   const [togglingFollow, setTogglingFollow] = useState<string | null>(null);
+  const [followerCounts, setFollowerCounts] = useState<Record<string, number>>({});
 
   // Load current user and their follows
   useEffect(() => {
@@ -58,7 +59,23 @@ export default function SearchPage() {
       .or(`channel_name.ilike.%${cleanTerm}%,handle.ilike.%${cleanTerm}%`)
       .limit(20);
 
-    setResults((data || []) as unknown as Broadcaster[]);
+    const broadcasters = (data || []) as unknown as Broadcaster[];
+    setResults(broadcasters);
+
+    // Fetch follower counts for results
+    if (broadcasters.length > 0) {
+      const ids = broadcasters.map((b) => b.id);
+      const { data: follows } = await supabase
+        .from("follows")
+        .select("broadcaster_id")
+        .in("broadcaster_id", ids);
+      const counts: Record<string, number> = {};
+      for (const f of follows || []) {
+        counts[f.broadcaster_id] = (counts[f.broadcaster_id] || 0) + 1;
+      }
+      setFollowerCounts(counts);
+    }
+
     setSearching(false);
   }, [supabase]);
 
@@ -303,6 +320,13 @@ export default function SearchPage() {
                       letterSpacing: "0.05em",
                     }}>LIVE</span>
                   )}
+                  <span style={{ display: "flex", alignItems: "center", gap: "3px", color: "#52525b" }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                    </svg>
+                    {followerCounts[b.id] || 0}
+                  </span>
                 </div>
               </a>
 

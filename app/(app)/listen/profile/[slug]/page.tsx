@@ -34,6 +34,7 @@ export default function BroadcasterPublicProfile() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [togglingFollow, setTogglingFollow] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [followerCount, setFollowerCount] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -63,6 +64,13 @@ export default function BroadcasterPublicProfile() {
       setProfile(profileRes.data as UserProfile);
       setTrackCount(trackRes.count ?? 0);
 
+      // Get real follower count
+      const { count: fCount } = await supabase
+        .from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("broadcaster_id", ch.id);
+      setFollowerCount(fCount ?? 0);
+
       if (userRes.data.user) {
         setCurrentUserId(userRes.data.user.id);
         const { data: follow } = await supabase
@@ -87,12 +95,14 @@ export default function BroadcasterPublicProfile() {
         .eq("follower_id", currentUserId)
         .eq("broadcaster_id", channel.id);
       setIsFollowing(false);
+      setFollowerCount((c) => Math.max(0, c - 1));
     } else {
       await supabase.from("follows").insert({
         follower_id: currentUserId,
         broadcaster_id: channel.id,
       });
       setIsFollowing(true);
+      setFollowerCount((c) => c + 1);
     }
     setTogglingFollow(false);
   }
@@ -215,9 +225,9 @@ export default function BroadcasterPublicProfile() {
           padding: "14px", backgroundColor: "rgba(24, 24, 27, 0.3)", borderLeft: "3px solid #f59e0b",
         }}>
           <div style={{ fontSize: "10px", color: "#52525b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px", fontFamily: "var(--font-mono)" }}>
-            Listeners
+            Followers
           </div>
-          <div style={{ fontSize: "16px", fontWeight: 700 }}>{channel.monthly_listeners}</div>
+          <div style={{ fontSize: "16px", fontWeight: 700 }}>{followerCount}</div>
         </div>
       </div>
 
