@@ -10,7 +10,8 @@ export async function syncTracksForChannel(
   broadcasterId: string,
   slug: string,
   musicDir: string,
-  trackIds?: string[]
+  trackIds?: string[],
+  additive?: boolean
 ): Promise<void> {
   console.log(`🔄 [${slug}] Syncing tracks from Supabase...${trackIds ? ` (${trackIds.length} selected)` : ""}`);
 
@@ -50,8 +51,8 @@ export async function syncTracksForChannel(
     expectedFiles.add(`${safeName}${ext}`);
   }
 
-  // Remove old tracks not in this selection so only selected tracks broadcast
-  if (trackIds && trackIds.length > 0) {
+  // Remove old tracks not in this selection (skip when adding to existing broadcast)
+  if (trackIds && trackIds.length > 0 && !additive) {
     for (const f of fs.readdirSync(musicDir)) {
       if (/\.(mp3|flac|wav|m4a|ogg)$/i.test(f) && !expectedFiles.has(f)) {
         fs.unlinkSync(path.join(musicDir, f));

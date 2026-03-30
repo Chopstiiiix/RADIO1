@@ -174,6 +174,42 @@ export async function restartChannel(slug: string) {
   await startChannel(channel.broadcasterId, slug);
 }
 
+/**
+ * Add tracks to a running broadcast. Syncs new tracks to disk,
+ * then restarts the pipeline with the combined playlist (current + new).
+ */
+export async function addTracksToChannel(broadcasterId: string, slug: string, trackIds: string[]): Promise<boolean> {
+  const channel = activeChannels.get(slug);
+  if (!channel) return false;
+
+  const { config } = channel;
+
+  // Sync the new tracks additively (don't delete existing files)
+  await syncTracksForChannel(broadcasterId, slug, config.musicDir, trackIds, true);
+
+  // Get the full set of tracks now on disk (old + new)
+  const allTracks = getChannelTracks(config.musicDir);
+  if (allTracks.length === 0) return false;
+
+  console.log(`➕ [${slug}] Adding tracks — restarting pipeline with ${allTracks.length} total tracks`);
+
+  // Stop current pipeline + scheduler
+  stopChannelPipeline(slug);
+  stopChannelScheduler(slug);
+
+  // Brief delay for ffmpeg to exit
+  await new Promise((r) => setTimeout(r, 500));
+
+  // Restart with combined tracks
+  const tracks = startChannelPipelineFromTracks(config, allTracks);
+  if (tracks.length > 0) {
+    await startChannelScheduler(config, tracks, broadcasterId);
+    console.log(`▶️  [${slug}] Pipeline restarted with ${tracks.length} tracks`);
+  }
+
+  return tracks.length > 0;
+}
+
 // ──── Queue / Cue management ────
 
 // Per-channel cued track filename (next up)

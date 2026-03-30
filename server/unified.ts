@@ -325,6 +325,20 @@ async function main() {
     else res.status(400).json({ error: "Track not found or channel not active" });
   });
 
+  app.post("/api/channels/:slug/add-tracks", async (req, res) => {
+    const { slug } = req.params;
+    const { broadcaster_id, track_ids } = req.body;
+    if (!broadcaster_id || !track_ids?.length) {
+      return res.status(400).json({ error: "broadcaster_id and track_ids required" });
+    }
+
+    // Import addTracksToChannel from channel-manager
+    const { addTracksToChannel } = await import("./channel-manager");
+    const success = await addTracksToChannel(broadcaster_id, slug, track_ids);
+    if (success) res.json({ ok: true, message: `Added ${track_ids.length} track(s) to ${slug}` });
+    else res.status(400).json({ error: "Failed to add tracks — channel may not be active" });
+  });
+
   app.get("/api/channels/:slug/queue", (req, res) => {
     const queue = getChannelQueue(req.params.slug);
     if (queue) res.json(queue);

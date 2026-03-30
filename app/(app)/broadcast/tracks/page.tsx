@@ -186,29 +186,53 @@ export default function TracksPage() {
       return;
     }
 
-    // Start the broadcast immediately
+    // If already live, add tracks to running broadcast; otherwise start new
+    const action = isChannelLive ? "add_tracks" : "start";
     try {
       const res = await fetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "start", track_ids: Array.from(selectedTracks) }),
+        body: JSON.stringify({ action, track_ids: Array.from(selectedTracks) }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setBroadcastMessage(data.error || "Failed to start broadcast");
+        setBroadcastMessage(data.error || `Failed to ${isChannelLive ? "add tracks" : "start broadcast"}`);
         setBroadcasting(false);
         return;
       }
 
-      setBroadcastMessage(`${selectedTracks.size} track${selectedTracks.size > 1 ? "s" : ""} broadcasting live!`);
+      const count = selectedTracks.size;
+      setBroadcastMessage(
+        isChannelLive
+          ? `${count} track${count > 1 ? "s" : ""} added to broadcast!`
+          : `${count} track${count > 1 ? "s" : ""} broadcasting live!`
+      );
       setSelectedTracks(new Set());
       setIsChannelLive(true);
 
       // Set channel slug so SSE connects for live indicators
       if (data.slug) {
         setChannelSlug(data.slug);
+      }
+
+      // Re-fetch queue to update broadcasting indicators
+      if (channelSlug) {
+        try {
+          const qRes = await fetch(`/api/channels/${channelSlug}/queue`);
+          if (qRes.ok) {
+            const qData = await qRes.json();
+            if (qData.queue && Array.isArray(qData.queue)) {
+              const titles = new Set<string>();
+              for (const filename of qData.queue) {
+                const name = filename.replace(/\.[^.]+$/, "");
+                titles.add(normalize(name));
+              }
+              setBroadcastingTitles(titles);
+            }
+          }
+        } catch { /* ignore */ }
       }
 
       loadTracks();
@@ -405,10 +429,10 @@ export default function TracksPage() {
                   <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
                 </svg>
                 {broadcasting
-                  ? "BROADCASTING..."
+                  ? (isChannelLive ? "ADDING..." : "BROADCASTING...")
                   : selectedTracks.size > 0
-                    ? `BROADCAST (${selectedTracks.size})`
-                    : "BROADCAST"
+                    ? (isChannelLive ? `ADD TO BROADCAST (${selectedTracks.size})` : `BROADCAST (${selectedTracks.size})`)
+                    : (isChannelLive ? "ADD TO BROADCAST" : "BROADCAST")
                 }
               </button>
             </div>

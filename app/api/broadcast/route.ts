@@ -119,5 +119,28 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ error: "Invalid action — use 'start', 'stop', 'skip', or 'cue'" }, { status: 400 });
+  if (action === "add_tracks") {
+    if (!track_ids?.length) {
+      return NextResponse.json({ error: "track_ids required" }, { status: 400 });
+    }
+    if (!channel.is_live) {
+      return NextResponse.json({ error: "Channel is not live — start a broadcast first" }, { status: 400 });
+    }
+    try {
+      const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/add-tracks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ broadcaster_id: user.id, track_ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return NextResponse.json({ error: data.error }, { status: res.status });
+      }
+      return NextResponse.json({ ok: true, message: data.message, slug: channel.channel_slug });
+    } catch {
+      return NextResponse.json({ error: "Broadcast server unavailable" }, { status: 503 });
+    }
+  }
+
+  return NextResponse.json({ error: "Invalid action — use 'start', 'stop', 'skip', 'cue', or 'add_tracks'" }, { status: 400 });
 }
