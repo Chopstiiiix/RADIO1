@@ -181,18 +181,16 @@ export default function ChannelPage() {
   const nextSlug = currentIndex < allSlugs.length - 1 ? allSlugs[currentIndex + 1] : allSlugs[0];
   const canNavigate = allSlugs.length > 1;
 
-  // Connect to per-channel metadata SSE
+  // Poll per-channel metadata (SSE doesn't work through Next.js rewrite proxy)
   useEffect(() => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const url = `${origin}/metadata/channels/${slug}/now-playing`;
-    let eventSource: EventSource | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    const url = `${origin}/metadata/api/channels/${slug}/now-playing`;
 
-    function connect() {
-      eventSource = new EventSource(url);
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
+    async function poll() {
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
           setMetadata({
             track: data.track ?? null,
             upcoming: data.upcoming ?? [],
@@ -202,19 +200,13 @@ export default function ChannelPage() {
             isLive: !data.ended,
             type: data.type ?? "track",
           });
-        } catch { /* ignore */ }
-      };
-      eventSource.onerror = () => {
-        eventSource?.close();
-        reconnectTimer = setTimeout(connect, 5000);
-      };
+        }
+      } catch { /* ignore */ }
     }
 
-    connect();
-    return () => {
-      eventSource?.close();
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-    };
+    poll();
+    const interval = setInterval(poll, 2000);
+    return () => clearInterval(interval);
   }, [slug]);
 
   // Auto-stop on broadcast end

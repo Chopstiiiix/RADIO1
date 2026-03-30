@@ -28,6 +28,7 @@ export default function TracksPage() {
   const [broadcastingTitles, setBroadcastingTitles] = useState<Set<string>>(new Set());
   const [channelSlug, setChannelSlug] = useState<string | null>(null);
   const [isChannelLive, setIsChannelLive] = useState(false);
+  const [endingBroadcast, setEndingBroadcast] = useState(false);
 
   async function loadTracks() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -98,6 +99,30 @@ export default function TracksPage() {
     };
     return () => es.close();
   }, [channelSlug]);
+
+  async function endBroadcast() {
+    setEndingBroadcast(true);
+    setBroadcastMessage("");
+    try {
+      const res = await fetch("/api/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "stop" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setBroadcastMessage("Broadcast ended");
+        setIsChannelLive(false);
+        setBroadcastingTitles(new Set());
+        setNowPlayingTitle(null);
+      } else {
+        setBroadcastMessage(data.error || "Failed to stop broadcast");
+      }
+    } catch {
+      setBroadcastMessage("Broadcast server unavailable");
+    }
+    setEndingBroadcast(false);
+  }
 
   async function toggleActive(id: string, current: boolean) {
     await supabase.from("tracks").update({ is_active: !current }).eq("id", id);
@@ -275,7 +300,7 @@ export default function TracksPage() {
           {broadcastMessage && (
             <p style={{
               fontSize: "11px",
-              color: (broadcastMessage.includes("queued") || broadcastMessage.includes("broadcasting")) ? "#4ADE80" : "#E24A4A",
+              color: (broadcastMessage.includes("queued") || broadcastMessage.includes("broadcasting") || broadcastMessage.includes("ended")) ? "#4ADE80" : "#E24A4A",
               marginBottom: "12px",
               fontFamily: "var(--font-mono)",
               letterSpacing: "0.05em",
@@ -313,49 +338,80 @@ export default function TracksPage() {
               {selectedTracks.size === selectableCount && selectableCount > 0 ? "DESELECT ALL" : "SELECT ALL"}
             </button>
 
-            <button
-              type="button"
-              onClick={handleBroadcast}
-              disabled={broadcasting}
-              className={selectedTracks.size > 0 && !broadcasting ? "broadcast-glow" : ""}
-              style={{
-                padding: "8px 20px",
-                backgroundColor: selectedTracks.size > 0
-                  ? "#4ADE80"
-                  : "rgba(24, 24, 27, 0.5)",
-                color: selectedTracks.size > 0
-                  ? "#0a0a0a"
-                  : "#52525b",
-                border: selectedTracks.size > 0
-                  ? "1px solid #4ADE80"
-                  : "1px solid #27272a",
-                borderRadius: "0px",
-                fontSize: "11px",
-                fontWeight: 700,
-                cursor: broadcasting ? "not-allowed" : "pointer",
-                opacity: broadcasting ? 0.6 : 1,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" />
-                <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4" />
-                <circle cx="12" cy="12" r="2" fill="currentColor" />
-                <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4" />
-                <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
-              </svg>
-              {broadcasting
-                ? "BROADCASTING..."
-                : selectedTracks.size > 0
-                  ? `BROADCAST (${selectedTracks.size})`
-                  : "BROADCAST"
-              }
-            </button>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              {isChannelLive && (
+                <button
+                  type="button"
+                  onClick={endBroadcast}
+                  disabled={endingBroadcast}
+                  style={{
+                    padding: "8px 16px",
+                    backgroundColor: "transparent",
+                    color: "#E24A4A",
+                    border: "1px solid #E24A4A",
+                    borderRadius: "0px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    cursor: endingBroadcast ? "not-allowed" : "pointer",
+                    opacity: endingBroadcast ? 0.6 : 1,
+                    fontFamily: "var(--font-mono)",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                    <rect x="4" y="4" width="16" height="16" />
+                  </svg>
+                  {endingBroadcast ? "STOPPING..." : "END"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleBroadcast}
+                disabled={broadcasting}
+                className={selectedTracks.size > 0 && !broadcasting ? "broadcast-glow" : ""}
+                style={{
+                  padding: "8px 20px",
+                  backgroundColor: selectedTracks.size > 0
+                    ? "#4ADE80"
+                    : "rgba(24, 24, 27, 0.5)",
+                  color: selectedTracks.size > 0
+                    ? "#0a0a0a"
+                    : "#52525b",
+                  border: selectedTracks.size > 0
+                    ? "1px solid #4ADE80"
+                    : "1px solid #27272a",
+                  borderRadius: "0px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  cursor: broadcasting ? "not-allowed" : "pointer",
+                  opacity: broadcasting ? 0.6 : 1,
+                  fontFamily: "var(--font-mono)",
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" />
+                  <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4" />
+                  <circle cx="12" cy="12" r="2" fill="currentColor" />
+                  <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4" />
+                  <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
+                </svg>
+                {broadcasting
+                  ? "BROADCASTING..."
+                  : selectedTracks.size > 0
+                    ? `BROADCAST (${selectedTracks.size})`
+                    : "BROADCAST"
+                }
+              </button>
+            </div>
           </div>
         </>
       )}

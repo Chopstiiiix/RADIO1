@@ -24,34 +24,36 @@ export default function ChannelList({
   const [tab, setTab] = useState<"all" | "following">("all");
   const [nowPlayingMap, setNowPlayingMap] = useState<Record<string, string>>({});
 
-  // Connect SSE for each live channel to get now-playing track
+  // Poll now-playing for each live channel
   useEffect(() => {
     const liveSlugs = allChannels.filter((ch) => ch.is_live).map((ch) => ch.channel_slug);
     if (liveSlugs.length === 0) return;
 
-    const sources: EventSource[] = [];
     const origin = typeof window !== "undefined" ? window.location.origin : "";
 
-    for (const slug of liveSlugs) {
-      const es = new EventSource(`${origin}/metadata/channels/${slug}/now-playing`);
-      es.onmessage = (event) => {
+    async function poll() {
+      for (const slug of liveSlugs) {
         try {
-          const data = JSON.parse(event.data);
-          if (data.track && !data.ended) {
-            setNowPlayingMap((prev) => ({ ...prev, [slug]: data.track.title }));
-          } else if (data.ended) {
-            setNowPlayingMap((prev) => {
-              const next = { ...prev };
-              delete next[slug];
-              return next;
-            });
+          const res = await fetch(`${origin}/metadata/api/channels/${slug}/now-playing`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.track && !data.ended) {
+              setNowPlayingMap((prev) => ({ ...prev, [slug]: data.track.title }));
+            } else {
+              setNowPlayingMap((prev) => {
+                const next = { ...prev };
+                delete next[slug];
+                return next;
+              });
+            }
           }
         } catch { /* ignore */ }
-      };
-      sources.push(es);
+      }
     }
 
-    return () => sources.forEach((es) => es.close());
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
   }, [allChannels]);
 
   const followedSet = new Set(followedIds);
