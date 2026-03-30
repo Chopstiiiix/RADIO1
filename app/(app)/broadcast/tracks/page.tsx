@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import TrashButton from "@/app/components/TrashButton";
+import BroadcastAgreement from "@/app/components/BroadcastAgreement";
 import InlineLoader from "@/app/components/InlineLoader";
 
 interface Track {
@@ -29,6 +30,7 @@ export default function TracksPage() {
   const [channelSlug, setChannelSlug] = useState<string | null>(null);
   const [isChannelLive, setIsChannelLive] = useState(false);
   const [endingBroadcast, setEndingBroadcast] = useState(false);
+  const [showAgreement, setShowAgreement] = useState(false);
 
   async function loadTracks() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -165,7 +167,7 @@ export default function TracksPage() {
     setBroadcastMessage("");
   }
 
-  async function handleBroadcast() {
+  function handleBroadcastClick() {
     if (selectedTracks.size === 0) {
       setBroadcastMessage("Select at least one track");
       return;
@@ -175,6 +177,16 @@ export default function TracksPage() {
       setBroadcastMessage("Tip: select 2+ tracks for continuous playback — 1 track will loop on repeat");
     }
 
+    // Show agreement for new broadcasts, skip for adding tracks to existing
+    if (!isChannelLive) {
+      setShowAgreement(true);
+    } else {
+      executeBroadcast();
+    }
+  }
+
+  async function executeBroadcast() {
+    setShowAgreement(false);
     setBroadcasting(true);
     setBroadcastMessage("");
 
@@ -398,7 +410,7 @@ export default function TracksPage() {
               )}
               <button
                 type="button"
-                onClick={handleBroadcast}
+                onClick={handleBroadcastClick}
                 disabled={broadcasting}
                 className={selectedTracks.size > 0 && !broadcasting ? "broadcast-glow" : ""}
                 style={{
@@ -599,6 +611,15 @@ export default function TracksPage() {
             );
           })}
         </div>
+      )}
+
+      {/* Broadcast Agreement Modal */}
+      {showAgreement && (
+        <BroadcastAgreement
+          trackCount={selectedTracks.size}
+          onAccept={executeBroadcast}
+          onCancel={() => setShowAgreement(false)}
+        />
       )}
     </div>
   );

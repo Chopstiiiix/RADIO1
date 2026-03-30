@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import InlineLoader from "@/app/components/InlineLoader";
+import BroadcastAgreement from "@/app/components/BroadcastAgreement";
 
 interface Track {
   id: string;
@@ -53,6 +54,7 @@ export default function GoLivePage() {
   // Cue system
   const [cuedFilename, setCuedFilename] = useState<string | null>(null);
   const [skipping, setSkipping] = useState(false);
+  const [showAgreement, setShowAgreement] = useState(false);
 
   // Live queue filenames (tracks currently in broadcast rotation)
   const [liveQueueFilenames, setLiveQueueFilenames] = useState<Set<string>>(new Set());
@@ -420,15 +422,23 @@ export default function GoLivePage() {
       .upsert({ broadcaster_id: user.id, ai_host_enabled: newVal, updated_at: new Date().toISOString() }, { onConflict: "broadcaster_id" });
   }
 
-  async function toggleBroadcast() {
-    setToggling(true);
-    setMessage("");
-
+  function handleToggleBroadcast() {
     if (!isLive && selectedTrackIds.size === 0) {
       setMessage("Select at least one track to broadcast");
-      setToggling(false);
       return;
     }
+    // Show agreement for new broadcasts, go straight for stopping
+    if (!isLive) {
+      setShowAgreement(true);
+    } else {
+      executeToggleBroadcast();
+    }
+  }
+
+  async function executeToggleBroadcast() {
+    setShowAgreement(false);
+    setToggling(true);
+    setMessage("");
 
     try {
       const res = await fetch("/api/broadcast", {
@@ -999,7 +1009,7 @@ export default function GoLivePage() {
 
       {/* Go Live / Stop button */}
       <button
-        onClick={toggleBroadcast}
+        onClick={handleToggleBroadcast}
         disabled={toggling || (!isLive && selectedTrackIds.size === 0)}
         style={{
           width: "100%",
@@ -1576,6 +1586,15 @@ export default function GoLivePage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Broadcast Agreement Modal */}
+      {showAgreement && (
+        <BroadcastAgreement
+          trackCount={selectedTrackIds.size}
+          onAccept={executeToggleBroadcast}
+          onCancel={() => setShowAgreement(false)}
+        />
       )}
     </div>
   );
