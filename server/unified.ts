@@ -36,6 +36,26 @@ interface ChannelState {
 
 const activeChannels = new Map<string, ChannelState>();
 
+/** Parse "Artist - Title.ext" filename into metadata. */
+function parseTrackMeta(filename: string): { title: string; artist: string } {
+  const name = filename.replace(/\.[^.]+$/, ""); // strip extension
+  const sep = name.indexOf(" - ");
+  if (sep !== -1) {
+    return { artist: name.slice(0, sep).trim(), title: name.slice(sep + 3).trim() };
+  }
+  return { artist: "Unknown", title: name.trim() };
+}
+
+/** Build upcoming list from tracks array starting at index. */
+function buildUpcoming(tracks: TrackFile[], fromIndex: number, count = 3) {
+  const upcoming = [];
+  for (let i = 1; i <= count; i++) {
+    const idx = (fromIndex + i) % tracks.length;
+    upcoming.push(parseTrackMeta(tracks[idx].filename));
+  }
+  return upcoming;
+}
+
 async function startChannel(broadcasterId: string, slug: string, trackIds?: string[]): Promise<boolean> {
   // Clean up any stale state from a previous session
   stopChannelPipeline(slug);
@@ -122,11 +142,12 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
   await supabase.from("broadcaster_profiles").update({ is_live: true }).eq("channel_slug", slug);
 
   updateNowPlaying(slug, {
-    track: { title: tracks[0].filename.replace(/\.[^.]+$/, ""), artist: "Caster" },
-    upcoming: tracks.slice(1, 4).map(t => ({ title: t.filename.replace(/\.[^.]+$/, ""), artist: "Caster" })),
+    track: parseTrackMeta(tracks[0].filename),
+    upcoming: buildUpcoming(tracks, 0),
     duration: tracks[0].duration,
     trackStartOffset: 0,
     ended: false,
+    type: "track",
   });
 
   startTrackTimer(slug);
@@ -170,23 +191,20 @@ function startTrackTimer(slug: string) {
     }
 
     const next = current.tracks[current.currentIndex];
-    const upcoming = [];
-    for (let i = 1; i <= 3; i++) {
-      const idx = (current.currentIndex + i) % current.tracks.length;
-      upcoming.push({ title: current.tracks[idx].filename.replace(/\.[^.]+$/, ""), artist: "Caster" });
-    }
 
     let cumulativeOffset = 0;
     for (let i = 0; i < current.currentIndex; i++) {
       cumulativeOffset += current.tracks[i].duration;
     }
 
+    const isHostSeg = next.filename.includes("_host_segments");
     updateNowPlaying(slug, {
-      track: { title: next.filename.replace(/\.[^.]+$/, ""), artist: "Caster" },
-      upcoming,
+      track: parseTrackMeta(next.filename),
+      upcoming: buildUpcoming(current.tracks, current.currentIndex),
       duration: next.duration,
       trackStartOffset: cumulativeOffset,
       ended: false,
+      type: isHostSeg ? "host_segment" : "track",
     });
 
     startTrackTimer(slug);
@@ -204,18 +222,13 @@ async function skipToTrack(slug: string, filename: string): Promise<boolean> {
   let cumulativeOffset = 0;
   for (let i = 0; i < idx; i++) cumulativeOffset += ch.tracks[i].duration;
 
-  const upcoming = [];
-  for (let i = 1; i <= 3; i++) {
-    const ui = (idx + i) % ch.tracks.length;
-    upcoming.push({ title: ch.tracks[ui].filename.replace(/\.[^.]+$/, ""), artist: "Caster" });
-  }
-
   updateNowPlaying(slug, {
-    track: { title: track.filename.replace(/\.[^.]+$/, ""), artist: "Caster" },
-    upcoming,
+    track: parseTrackMeta(track.filename),
+    upcoming: buildUpcoming(ch.tracks, idx),
     duration: track.duration,
     trackStartOffset: cumulativeOffset,
     ended: false,
+    type: "track",
   });
   return true;
 }
@@ -391,17 +404,24 @@ async function main() {
     // Start mixer for voice-only — mic PCM will flow directly to HLS output
     startMixer(slug);
 
+    // Get broadcaster display name for metadata
+    const { data: bp } = await supabase
+      .from("broadcaster_profiles")
+      .select("channel_name")
+      .eq("id", broadcaster_id)
+      .single();
+
     await supabase.from("broadcaster_profiles").update({ is_live: true }).eq("channel_slug", slug);
 
     activeChannels.set(slug, { broadcasterId: broadcaster_id, tracks: [], currentIndex: 0, cuedTrack: null });
 
     updateNowPlaying(slug, {
-      track: { title: "Voice Broadcast", artist: "Live" },
+      track: { title: "Live Broadcast", artist: bp?.channel_name || slug },
       upcoming: [],
       duration: 0,
       trackStartOffset: 0,
       ended: false,
-      type: "host_segment",
+      type: "track",
     });
 
     console.log(`🎤 Channel ${slug} is now LIVE (voice only)`);
@@ -483,11 +503,12 @@ async function main() {
 
       // Update now-playing
       updateNowPlaying(slug, {
-        track: { title: tracks[0].filename.replace(/\.[^.]+$/, ""), artist: "Caster" },
-        upcoming: tracks.slice(1, 4).map(t => ({ title: t.filename.replace(/\.[^.]+$/, ""), artist: "Caster" })),
+        track: parseTrackMeta(tracks[0].filename),
+        upcoming: buildUpcoming(tracks, 0),
         duration: tracks[0].duration,
         trackStartOffset: 0,
         ended: false,
+        type: "track",
       });
 
       startTrackTimer(slug);

@@ -548,28 +548,27 @@ export default function ChannelPage() {
             marginBottom: "8px",
             letterSpacing: "0.1em",
           }}>
-            {metadata.type === "host_segment" ? "AI_HOST" : metadata.track ? "NOW_PLAYING" : "AWAITING_SIGNAL"}
+            {metadata.track ? "NOW_PLAYING" : "AWAITING_SIGNAL"}
           </div>
           <h2 className={metadata.track ? "glow-text" : ""} style={{
             fontSize: "20px",
             fontWeight: 700,
             letterSpacing: "-0.02em",
-            color: metadata.type === "host_segment" ? "#78B3CE" : metadata.track ? "#fbbf24" : "#a1a1aa",
+            color: metadata.track ? "#fbbf24" : "#a1a1aa",
             textTransform: "uppercase",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
           }}>
-            {metadata.type === "host_segment" ? "DJ_SEGMENT" : metadata.track?.title.replace(/\s+/g, "_") || "—"}
+            {metadata.track?.title.replace(/\s+/g, "_") || "—"}
           </h2>
           <h3 style={{
             fontSize: "13px",
             fontWeight: 500,
-            color: metadata.type === "host_segment" ? "#78B3CE" : metadata.track ? "#d4d4d8" : "#71717a",
+            color: metadata.track ? "#d4d4d8" : "#71717a",
             marginTop: "4px",
           }}>
-            {metadata.type === "host_segment" ? "AI Radio Host" : `HOST: ${metadata.track?.artist || profile?.display_name || "Unknown"}`}
-          </h3>
+            {metadata.track?.artist || profile?.display_name || "—"}</h3>
         </div>
 
         {/* Visualizer (positioned absolute at bottom) */}

@@ -53,7 +53,7 @@ function parseTrackFromFile(tf: TrackFile, startOffset: number): Track {
   // Detect host segments (files from _host_segments directory)
   const isHostSegment = tf.path.includes("_host_segments");
   if (isHostSegment) {
-    return { ...base, artist: "AI Host", title: "DJ Segment", type: "host_segment" };
+    return { ...base, artist: "AI Host", title: "Host Segment", type: "host_segment" };
   }
 
   // Try DB metadata first

@@ -740,7 +740,7 @@ export default function GoLivePage() {
             {/* Track title + artist */}
             <div style={{
               fontSize: "12px",
-              color: nowPlayingType === "host_segment" ? "#78B3CE" : "#fbbf24",
+              color: "#fbbf24",
               textTransform: "uppercase",
               letterSpacing: "0.05em",
               marginBottom: "4px",
@@ -749,7 +749,7 @@ export default function GoLivePage() {
               overflow: "hidden",
               textOverflow: "ellipsis",
             }}>
-              {nowPlayingType === "host_segment" ? "DJ Segment" : nowPlaying}
+              {nowPlaying || "—"}
             </div>
             {nowPlayingArtist && (
               <div style={{
