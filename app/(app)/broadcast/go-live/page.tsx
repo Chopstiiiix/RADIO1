@@ -281,19 +281,34 @@ export default function GoLivePage() {
     return () => clearInterval(interval);
   }, [isLive, nowPlaying, trackDuration]);
 
-  // Update music gain when volume changes
+  // Update music gain when volume changes — local monitor + broadcast mix
   useEffect(() => {
     if (musicGainRef.current) {
       musicGainRef.current.gain.value = musicVolume / 100;
     }
-  }, [musicVolume]);
+    // Send to backend mixer so listeners hear the change
+    if (isLive && channelSlug) {
+      fetch(`/api/channels/${channelSlug}/volume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ music_volume: musicVolume / 100 }),
+      }).catch(() => {});
+    }
+  }, [musicVolume, isLive, channelSlug]);
 
-  // Update mic gain when volume changes
+  // Update mic gain when volume changes — local monitor + broadcast mix
   useEffect(() => {
     if (micGainRef.current) {
       micGainRef.current.gain.value = micVolume / 100;
     }
-  }, [micVolume]);
+    if (isLive && channelSlug) {
+      fetch(`/api/channels/${channelSlug}/volume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mic_volume: micVolume / 100 }),
+      }).catch(() => {});
+    }
+  }, [micVolume, isLive, channelSlug]);
 
   // Mic level visualizer
   const animateMicLevel = useCallback(() => {

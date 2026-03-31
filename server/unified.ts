@@ -15,7 +15,7 @@ import { startChannelPipeline, startChannelPipelineFromTracks, stopChannelPipeli
 import { supabase } from "./supabase";
 import { syncTracksForChannel } from "./track-sync";
 import { isAiHostEnabled, getBroadcasterAgents, pregenerateHostSegments } from "./react-agent";
-import { startMixer, connectMusicSource, writeMicAudio, stopMicInput, stopMixer } from "./mic-mixer";
+import { startMixer, connectMusicSource, writeMicAudio, stopMicInput, stopMixer, setMixerVolumes } from "./mic-mixer";
 import type { Response } from "express";
 
 // Suppress auto-loop when pipeline is deliberately restarted (e.g., add-tracks)
@@ -531,6 +531,16 @@ async function main() {
   app.post("/api/mic/:slug/stop", (req, res) => {
     stopMicInput(req.params.slug);
     res.json({ ok: true });
+  });
+
+  // ── Broadcast volume control ──
+  app.use("/api/channels/:slug/volume", express.json());
+  app.post("/api/channels/:slug/volume", (req, res) => {
+    const { slug } = req.params;
+    const { music_volume, mic_volume } = req.body;
+    const ok = setMixerVolumes(slug, music_volume, mic_volume);
+    if (ok) res.json({ ok: true });
+    else res.status(404).json({ error: "Channel not active" });
   });
 
   app.listen(PORT, "0.0.0.0", () => {

@@ -20,6 +20,8 @@ interface MixerSession {
   micActive: boolean;
   micPending: Buffer[];
   micPendingBytes: number;
+  musicVolume: number; // 0-1, controls broadcast music level
+  micVolume: number;   // 0-1, controls broadcast mic level
 }
 
 const mixers = new Map<string, MixerSession>();
@@ -97,6 +99,8 @@ export function startMixer(slug: string): void {
     micActive: false,
     micPending: [],
     micPendingBytes: 0,
+    musicVolume: 0.8,
+    micVolume: 1.0,
   };
 
   mixers.set(slug, session);
@@ -118,8 +122,13 @@ export function connectMusicSource(slug: string, musicProc: ChildProcess): void 
     if (!output || output.destroyed) return;
 
     if (!session.micActive || session.micPendingBytes === 0) {
-      // No mic data — pass music through directly
-      try { output.write(chunk); } catch { /* ignore */ }
+      // No mic data — apply music volume and pass through
+      if (session.musicVolume === 1.0) {
+        try { output.write(chunk); } catch { /* ignore */ }
+      } else {
+        const scaled = applyVolume(chunk, session.musicVolume);
+        try { output.write(scaled); } catch { /* ignore */ }
+      }
     } else {
       // Mix music + mic
       const mixed = mixMusicAndMic(chunk, session);
@@ -165,6 +174,18 @@ export function writeMicAudio(slug: string, data: Buffer): boolean {
     if (removed) session.micPendingBytes -= removed.length;
   }
 
+  return true;
+}
+
+/**
+ * Update broadcast volume levels.
+ * musicVolume/micVolume are 0-1 floats controlling the mix sent to listeners.
+ */
+export function setMixerVolumes(slug: string, musicVolume?: number, micVolume?: number): boolean {
+  const session = mixers.get(slug);
+  if (!session) return false;
+  if (musicVolume !== undefined) session.musicVolume = Math.max(0, Math.min(1, musicVolume));
+  if (micVolume !== undefined) session.micVolume = Math.max(0, Math.min(1, micVolume));
   return true;
 }
 
@@ -215,9 +236,20 @@ function monoToStereo(mono: Buffer): Buffer {
   return stereo;
 }
 
+/** Scale all s16le samples in a buffer by a volume factor (0-1). */
+function applyVolume(buf: Buffer, vol: number): Buffer {
+  const out = Buffer.alloc(buf.length);
+  const count = buf.length / 2;
+  for (let i = 0; i < count; i++) {
+    const val = Math.round(buf.readInt16LE(i * 2) * vol);
+    out.writeInt16LE(Math.max(-32768, Math.min(32767, val)), i * 2);
+  }
+  return out;
+}
+
 /**
  * Mix a music chunk (stereo s16le) with pending mic data (mono s16le).
- * Music is ducked to 70% when mic is active so the voice cuts through.
+ * Volume levels are controlled by the broadcaster via setMixerVolumes.
  */
 function mixMusicAndMic(musicChunk: Buffer, session: MixerSession): Buffer {
   // For N bytes of stereo music we need N/2 bytes of mono mic
@@ -231,11 +263,13 @@ function mixMusicAndMic(musicChunk: Buffer, session: MixerSession): Buffer {
   const sampleCount = musicChunk.length / 2; // total s16 samples (L+R interleaved)
   const micSampleCount = stereoMic.length / 2;
 
+  const mVol = session.musicVolume;
+  const vVol = session.micVolume;
+
   for (let i = 0; i < sampleCount; i++) {
     const music = musicChunk.readInt16LE(i * 2);
     const mic = i < micSampleCount ? stereoMic.readInt16LE(i * 2) : 0;
-    // Duck music, keep mic at full volume
-    const val = Math.round(music * 0.7 + mic * 1.0);
+    const val = Math.round(music * mVol + mic * vVol);
     mixed.writeInt16LE(Math.max(-32768, Math.min(32767, val)), i * 2);
   }
 
