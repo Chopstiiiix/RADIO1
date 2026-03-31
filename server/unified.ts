@@ -37,6 +37,11 @@ interface ChannelState {
 const activeChannels = new Map<string, ChannelState>();
 
 async function startChannel(broadcasterId: string, slug: string, trackIds?: string[]): Promise<boolean> {
+  // Clean up any stale state from a previous session
+  stopChannelPipeline(slug);
+  stopMixer(slug);
+  activeChannels.delete(slug);
+
   const musicDir = path.join(BASE_MUSIC_DIR, slug);
   const outputDir = path.join(BASE_OUTPUT_DIR, slug);
   fs.mkdirSync(outputDir, { recursive: true });
@@ -378,6 +383,10 @@ async function main() {
     const { slug } = req.params;
     const { broadcaster_id } = req.body;
     if (!broadcaster_id) return res.status(400).json({ error: "broadcaster_id required" });
+
+    // Clean up any stale state before starting fresh
+    stopChannelPipeline(slug);
+    stopMixer(slug);
 
     // Start mixer for voice-only — mic PCM will flow directly to HLS output
     startMixer(slug);

@@ -37,10 +37,6 @@ export async function POST(req: NextRequest) {
   const { action, filename, track_ids, use_ai_host } = body;
 
   if (action === "voice_only") {
-    if (channel.is_live) {
-      return NextResponse.json({ ok: true, message: "Already broadcasting" });
-    }
-
     try {
       const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/voice-only`, {
         method: "POST",
@@ -60,10 +56,6 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "start") {
-    if (channel.is_live) {
-      return NextResponse.json({ ok: true, message: "Already broadcasting" });
-    }
-
     try {
       const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/start`, {
         method: "POST",
