@@ -21,7 +21,7 @@ import type { Response } from "express";
 // Suppress auto-loop when pipeline is deliberately restarted (e.g., add-tracks)
 const suppressAutoLoop = new Set<string>();
 
-const PORT = 5000;
+const PORT = parseInt(process.env.BACKEND_PORT || "5001");
 const BASE_OUTPUT_DIR = path.join(process.cwd(), "stream-output");
 const BASE_MUSIC_DIR = path.join(process.cwd(), "music");
 

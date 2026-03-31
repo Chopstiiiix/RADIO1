@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-const BROADCAST_API = process.env.BROADCAST_API_URL || "http://localhost:5000";
+const BROADCAST_API = process.env.BROADCAST_API_URL || "http://localhost:5001";
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient();

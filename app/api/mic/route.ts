@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BROADCAST_API = process.env.BROADCAST_API_URL || "http://localhost:5000";
+const BROADCAST_API = process.env.BROADCAST_API_URL || "http://localhost:5001";
 
 /**
  * POST /api/mic — Receives mic audio chunks and forwards to backend
