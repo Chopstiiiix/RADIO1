@@ -135,6 +135,46 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
     }
   }, []);
 
+  /** Try to autoplay the stream. Returns true if playback started, false if browser blocked it. */
+  const autoplay = useCallback((): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const audio = audioRef.current;
+      if (!audio || isPlaying) { resolve(isPlaying); return; }
+
+      setupAnalyser();
+      const streamUrl = getStreamUrl(slug);
+
+      if (Hls.isSupported()) {
+        const hls = new Hls({
+          liveSyncDurationCount: 2,
+          liveMaxLatencyDurationCount: 3,
+          liveDurationInfinity: true,
+          highBufferWatchdogPeriod: 1,
+          maxBufferLength: 4,
+          maxMaxBufferLength: 8,
+        });
+        hls.loadSource(streamUrl);
+        hls.attachMedia(audio);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          audio.play()
+            .then(() => { setIsPlaying(true); resolve(true); })
+            .catch(() => resolve(false)); // browser blocked autoplay
+        });
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.fatal) { stop(); resolve(false); }
+        });
+        hlsRef.current = hls;
+      } else if (audio.canPlayType("application/vnd.apple.mpegurl")) {
+        audio.src = streamUrl;
+        audio.play()
+          .then(() => { setIsPlaying(true); resolve(true); })
+          .catch(() => resolve(false));
+      } else {
+        resolve(false);
+      }
+    });
+  }, [isPlaying, setupAnalyser, stop, slug]);
+
   const toggleMute = useCallback(() => {
     setIsMuted((prev) => !prev);
   }, []);
@@ -153,7 +193,7 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
   }, []);
 
   return {
-    isPlaying, toggle, stop, audioRef, analyserNode,
+    isPlaying, toggle, stop, autoplay, audioRef, analyserNode,
     elapsed,
     skipNext, skipPrev,
     volume, isMuted, toggleMute, changeVolume,

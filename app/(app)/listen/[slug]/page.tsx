@@ -226,6 +226,26 @@ export default function ChannelPage() {
     }
   }, [metadata.ended, stream.isPlaying, stream.stop]);
 
+  // Autoplay when channel is live — show "tap to join" if browser blocks
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const autoplayAttempted = useRef(false);
+
+  useEffect(() => {
+    if (!metadata.isLive || metadata.ended || stream.isPlaying || autoplayAttempted.current) return;
+    autoplayAttempted.current = true;
+    stream.autoplay().then((ok) => {
+      if (!ok) setAutoplayBlocked(true);
+    });
+  }, [metadata.isLive, metadata.ended, stream.isPlaying, stream.autoplay]);
+
+  // Reset autoplay state when channel goes offline then back live
+  useEffect(() => {
+    if (metadata.ended) {
+      autoplayAttempted.current = false;
+      setAutoplayBlocked(false);
+    }
+  }, [metadata.ended]);
+
   // Track listener session
   useEffect(() => {
     let sessionId: string | null = null;
@@ -532,6 +552,46 @@ export default function ChannelPage() {
         position: "relative",
         overflow: "hidden",
       }}>
+        {/* Tap to join live — shown when browser blocks autoplay */}
+        {autoplayBlocked && metadata.isLive && !stream.isPlaying && (
+          <button
+            onClick={() => {
+              stream.toggle();
+              setAutoplayBlocked(false);
+            }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 50,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "12px",
+              background: "rgba(0,0,0,0.85)",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            <div style={{
+              width: "64px", height: "64px", borderRadius: "50%",
+              border: "2px solid #06b6d4",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="#06b6d4" stroke="none">
+                <path d="M6 4l15 8-15 8z" />
+              </svg>
+            </div>
+            <span style={{
+              fontSize: "13px", fontWeight: 700, color: "#06b6d4",
+              textTransform: "uppercase", letterSpacing: "0.1em",
+              fontFamily: "var(--font-mono)",
+            }}>
+              TAP TO JOIN LIVE
+            </span>
+          </button>
+        )}
+
         {/* Track metadata */}
         <div style={{
           padding: "20px",
@@ -817,30 +877,32 @@ export default function ChannelPage() {
               </svg>
             </button>
 
-            {/* Play / Pause */}
-            <button
-              onClick={stream.toggle}
-              disabled={metadata.ended}
-              style={{
-                background: "none", border: "none", padding: "12px",
-                cursor: metadata.ended ? "default" : "pointer",
-                color: metadata.ended ? "#3f3f46" : "#71717a",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "color 0.2s",
-                opacity: metadata.ended ? 0.3 : 1,
-              }}
-            >
-              {stream.isPlaying ? (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                  <rect x="6" y="4" width="4" height="16" />
-                  <rect x="14" y="4" width="4" height="16" />
-                </svg>
-              ) : (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                  <path d="M6 4l15 8-15 8z" />
-                </svg>
-              )}
-            </button>
+            {/* Play / Pause — hidden when live broadcast is playing */}
+            {!(metadata.isLive && stream.isPlaying) && (
+              <button
+                onClick={stream.toggle}
+                disabled={metadata.ended}
+                style={{
+                  background: "none", border: "none", padding: "12px",
+                  cursor: metadata.ended ? "default" : "pointer",
+                  color: metadata.ended ? "#3f3f46" : "#71717a",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "color 0.2s",
+                  opacity: metadata.ended ? 0.3 : 1,
+                }}
+              >
+                {stream.isPlaying ? (
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                    <rect x="6" y="4" width="4" height="16" />
+                    <rect x="14" y="4" width="4" height="16" />
+                  </svg>
+                ) : (
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                    <path d="M6 4l15 8-15 8z" />
+                  </svg>
+                )}
+              </button>
+            )}
 
             {/* Next Channel */}
             <button
