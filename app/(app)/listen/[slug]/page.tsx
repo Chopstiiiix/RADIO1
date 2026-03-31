@@ -35,6 +35,7 @@ export default function ChannelPage() {
     ended: false,
     isLive: false,
     type: "track" as "track" | "host_segment" | "advert",
+    mode: "tracks" as "tracks" | "live_mic",
   });
 
   const stream = useStream(metadata.trackStartOffset, metadata.duration, slug);
@@ -209,6 +210,7 @@ export default function ChannelPage() {
             ended: data.ended ?? false,
             isLive: !data.ended,
             type: data.type ?? "track",
+            mode: data.mode ?? "tracks",
           });
         }
       } catch { /* ignore */ }
@@ -226,17 +228,18 @@ export default function ChannelPage() {
     }
   }, [metadata.ended, stream.isPlaying, stream.stop]);
 
-  // Autoplay when channel is live — show "tap to join" if browser blocks
+  // Autoplay when live_mic mode — show "tap to join" if browser blocks
+  const isLiveMic = metadata.isLive && metadata.mode === "live_mic";
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const autoplayAttempted = useRef(false);
 
   useEffect(() => {
-    if (!metadata.isLive || metadata.ended || stream.isPlaying || autoplayAttempted.current) return;
+    if (!isLiveMic || metadata.ended || stream.isPlaying || autoplayAttempted.current) return;
     autoplayAttempted.current = true;
     stream.autoplay().then((ok) => {
       if (!ok) setAutoplayBlocked(true);
     });
-  }, [metadata.isLive, metadata.ended, stream.isPlaying, stream.autoplay]);
+  }, [isLiveMic, metadata.ended, stream.isPlaying, stream.autoplay]);
 
   // Reset autoplay state when channel goes offline then back live
   useEffect(() => {
@@ -552,8 +555,8 @@ export default function ChannelPage() {
         position: "relative",
         overflow: "hidden",
       }}>
-        {/* Tap to join live — shown when browser blocks autoplay */}
-        {autoplayBlocked && metadata.isLive && !stream.isPlaying && (
+        {/* Tap to join live — shown when browser blocks autoplay in live_mic mode */}
+        {autoplayBlocked && isLiveMic && !stream.isPlaying && (
           <button
             onClick={() => {
               stream.toggle();
@@ -877,8 +880,8 @@ export default function ChannelPage() {
               </svg>
             </button>
 
-            {/* Play / Pause — hidden when live broadcast is playing */}
-            {!(metadata.isLive && stream.isPlaying) && (
+            {/* Play / Pause — hidden when live_mic broadcast is playing */}
+            {!(isLiveMic && stream.isPlaying) && (
               <button
                 onClick={stream.toggle}
                 disabled={metadata.ended}

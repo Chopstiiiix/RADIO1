@@ -56,7 +56,7 @@ function buildUpcoming(tracks: TrackFile[], fromIndex: number, count = 3) {
   return upcoming;
 }
 
-async function startChannel(broadcasterId: string, slug: string, trackIds?: string[]): Promise<boolean> {
+async function startChannel(broadcasterId: string, slug: string, trackIds?: string[], mode: "tracks" | "live_mic" = "tracks"): Promise<boolean> {
   // Clean up any stale state from a previous session
   stopChannelPipeline(slug);
   stopMixer(slug);
@@ -148,6 +148,7 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
     trackStartOffset: 0,
     ended: false,
     type: "track",
+    mode,
   });
 
   startTrackTimer(slug);
@@ -262,6 +263,7 @@ interface NowPlayingState {
   trackStartOffset: number;
   ended: boolean;
   type?: "track" | "host_segment" | "advert";
+  mode?: "tracks" | "live_mic";
 }
 
 const channelStates = new Map<string, NowPlayingState>();
@@ -376,7 +378,7 @@ async function main() {
 
   app.post("/api/channels/:slug/start", async (req, res) => {
     const { slug } = req.params;
-    const { broadcaster_id, track_ids } = req.body;
+    const { broadcaster_id, track_ids, mode } = req.body;
     if (!broadcaster_id) return res.status(400).json({ error: "broadcaster_id required" });
 
     const { data: channel } = await supabase
@@ -387,7 +389,7 @@ async function main() {
       .single();
 
     if (!channel) return res.status(404).json({ error: "Channel not found" });
-    const success = await startChannel(broadcaster_id, slug, track_ids);
+    const success = await startChannel(broadcaster_id, slug, track_ids, mode || "tracks");
     if (success) res.json({ ok: true, message: `Channel ${slug} is now live` });
     else res.status(400).json({ error: "No tracks available — select tracks to broadcast" });
   });
@@ -422,9 +424,10 @@ async function main() {
       trackStartOffset: 0,
       ended: false,
       type: "track",
+      mode: "live_mic",
     });
 
-    console.log(`🎤 Channel ${slug} is now LIVE (voice only)`);
+    console.log(`🎤 Channel ${slug} is now LIVE (voice only, mode: live_mic)`);
     res.json({ ok: true, message: `Channel ${slug} is live — voice only` });
   });
 

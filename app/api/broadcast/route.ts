@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { action, filename, track_ids, use_ai_host } = body;
+  const { action, filename, track_ids, use_ai_host, mode } = body;
 
   if (action === "voice_only") {
     try {
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broadcaster_id: user.id, track_ids, use_ai_host: use_ai_host ?? false }),
+        body: JSON.stringify({ broadcaster_id: user.id, track_ids, use_ai_host: use_ai_host ?? false, mode: mode || "tracks" }),
       });
 
       const data = await res.json();

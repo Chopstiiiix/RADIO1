@@ -504,6 +504,7 @@ export default function GoLivePage() {
         body: JSON.stringify({
           action: isLive ? "stop" : isVoiceOnly ? "voice_only" : "start",
           ...(isLive || isVoiceOnly ? {} : { track_ids: trackIds }),
+          ...(!isLive ? { mode: "live_mic" } : {}),
         }),
       });
 
