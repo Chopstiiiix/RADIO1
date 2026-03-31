@@ -1,7 +1,6 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import { startStreamServer } from "./stream";
 import { startMetadataServer } from "./metadata-server";
 import { startChannel, stopChannel, getActiveChannels, skipToTrack, cueTrack, getCuedTrack, getChannelQueue } from "./channel-manager";
 import { supabase } from "./supabase";
@@ -13,8 +12,7 @@ const API_PORT = 8002;
 async function main() {
   console.log("🎙️  Caster Server Starting...\n");
 
-  // Start the HTTP servers
-  startStreamServer(STREAM_PORT);
+  // Start the metadata server
   startMetadataServer(METADATA_PORT);
 
   // REST API for channel management

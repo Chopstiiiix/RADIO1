@@ -2,7 +2,7 @@
  * Caster backend server — runs on port 5000
  *
  * Next.js rewrites proxy these paths from the public port:
- *   /stream/:slug/*    → HLS segments
+ *   /stream/:slug/*    → HLS segments (single mixed stream)
  *   /metadata/*         → SSE + REST metadata
  *   /api/channels/*     → Channel management REST API
  */
@@ -15,9 +15,8 @@ import { startChannelPipeline, startChannelPipelineFromTracks, stopChannelPipeli
 import { supabase } from "./supabase";
 import { syncTracksForChannel } from "./track-sync";
 import { isAiHostEnabled, getBroadcasterAgents, pregenerateHostSegments } from "./react-agent";
-import { setupMicWebSocket, startHttpMicSession, writeMicAudio, stopMicSession } from "./mic-mixer";
+import { startMixer, connectMusicSource, writeMicAudio, stopMicInput, stopMixer } from "./mic-mixer";
 import type { Response } from "express";
-import { createServer } from "http";
 
 // Suppress auto-loop when pipeline is deliberately restarted (e.g., add-tracks)
 const suppressAutoLoop = new Set<string>();
@@ -99,9 +98,20 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
     }
   }
 
-  const tracks = startChannelPipelineFromTracks({ slug, musicDir, outputDir }, finalTracks);
-  if (tracks.length === 0) return false;
+  // Start the unified mixer (creates output HLS FFmpeg)
+  startMixer(slug);
 
+  // Start the music decoder (raw PCM output)
+  const result = startChannelPipelineFromTracks({ slug, musicDir, outputDir }, finalTracks);
+  if (!result) {
+    stopMixer(slug);
+    return false;
+  }
+
+  // Pipe music PCM into the mixer
+  connectMusicSource(slug, result.process);
+
+  const tracks = result.tracks;
   activeChannels.set(slug, { broadcasterId, tracks, currentIndex: 0, cuedTrack: null });
 
   await supabase.from("broadcaster_profiles").update({ is_live: true }).eq("channel_slug", slug);
@@ -120,6 +130,8 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
 
 async function stopChannel(slug: string) {
   stopChannelPipeline(slug);
+  stopMicInput(slug);
+  stopMixer(slug);
   activeChannels.delete(slug);
   await supabase.from("broadcaster_profiles").update({ is_live: false }).eq("channel_slug", slug);
   updateNowPlaying(slug, { track: null, upcoming: [], ended: true });
@@ -277,10 +289,12 @@ streamEvents.on("ended", async (slug: string) => {
   console.log(`🔁 [${slug}] Playlist ended, auto-looping...`);
   const musicDir = path.join(BASE_MUSIC_DIR, slug);
   const outputDir = path.join(BASE_OUTPUT_DIR, slug);
-  const tracks = startChannelPipeline({ slug, musicDir, outputDir });
-  if (tracks.length > 0) {
+  const result = startChannelPipeline({ slug, musicDir, outputDir });
+  if (result) {
+    // Reconnect new music decoder to existing mixer
+    connectMusicSource(slug, result.process);
     ch.currentIndex = 0;
-    ch.tracks = tracks;
+    ch.tracks = result.tracks;
     startTrackTimer(slug);
   }
 });
@@ -292,7 +306,7 @@ async function main() {
   const app = express();
   app.use(cors());
 
-  // ── Stream routes: /stream/:slug/* ──
+  // ── Stream routes: /stream/:slug/* (single mixed HLS output) ──
   app.use("/stream/:slug", (req, res, next) => {
     const { slug } = req.params;
     const channelOutputDir = path.join(BASE_OUTPUT_DIR, slug);
@@ -365,7 +379,9 @@ async function main() {
     const { broadcaster_id } = req.body;
     if (!broadcaster_id) return res.status(400).json({ error: "broadcaster_id required" });
 
-    // Voice-only: just mark as live, no FFmpeg pipeline needed — mic stream handles audio
+    // Start mixer for voice-only — mic PCM will flow directly to HLS output
+    startMixer(slug);
+
     await supabase.from("broadcaster_profiles").update({ is_live: true }).eq("channel_slug", slug);
 
     activeChannels.set(slug, { broadcasterId: broadcaster_id, tracks: [], currentIndex: 0, cuedTrack: null });
@@ -440,11 +456,16 @@ async function main() {
       // Brief delay for ffmpeg to exit
       await new Promise((r) => setTimeout(r, 500));
 
-      // Restart with combined tracks
-      const tracks = startChannelPipelineFromTracks({ slug, musicDir, outputDir }, allTracks);
-      if (tracks.length === 0) {
+      // Restart music decoder with combined tracks (mixer stays running)
+      const result = startChannelPipelineFromTracks({ slug, musicDir, outputDir }, allTracks);
+      if (!result) {
         return res.status(400).json({ error: "Failed to restart pipeline" });
       }
+
+      // Reconnect new music decoder to existing mixer
+      connectMusicSource(slug, result.process);
+
+      const tracks = result.tracks;
 
       // Update channel state
       ch.tracks = tracks;
@@ -483,56 +504,30 @@ async function main() {
     res.json(channels);
   });
 
-  // HTTP mic audio endpoint (used when WebSocket isn't available)
+  // ── Mic audio endpoint (writes into the unified mixer) ──
   app.post("/api/mic/:slug", (req, res) => {
     const { slug } = req.params;
     const chunks: Buffer[] = [];
     req.on("data", (chunk: Buffer) => chunks.push(chunk));
     req.on("end", () => {
       const data = Buffer.concat(chunks);
-      const session = startHttpMicSession(slug);
-      if (session && writeMicAudio(slug, data)) {
+      if (writeMicAudio(slug, data)) {
         res.json({ ok: true });
       } else {
-        res.status(500).json({ error: "Failed to write mic audio" });
+        res.status(500).json({ error: "Failed to write mic audio — is the channel live?" });
       }
     });
   });
 
-  // Stop mic session when broadcast stops
-  app.post("/api/mic/:slug/stop", (_req, res) => {
-    stopMicSession(_req.params.slug);
+  app.post("/api/mic/:slug/stop", (req, res) => {
+    stopMicInput(req.params.slug);
     res.json({ ok: true });
   });
 
-  // Serve mic HLS segments
-  app.use("/stream/:slug/mic", (req, res, next) => {
-    const { slug } = req.params;
-    const micDir = path.join(BASE_OUTPUT_DIR, slug, "mic");
-    if (!fs.existsSync(micDir)) {
-      return res.status(404).json({ error: "No mic stream" });
-    }
-    express.static(micDir, {
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith(".m3u8")) {
-          res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-          res.setHeader("Cache-Control", "no-cache");
-        } else if (filePath.endsWith(".m4s")) {
-          res.setHeader("Content-Type", "video/iso.segment");
-        } else if (filePath.endsWith(".mp4")) {
-          res.setHeader("Content-Type", "video/mp4");
-        }
-      },
-    })(req, res, next);
-  });
-
-  const server = createServer(app);
-  setupMicWebSocket(server);
-
-  server.listen(PORT, "0.0.0.0", () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`\n🔥 Caster backend live on port ${PORT}`);
     console.log(`   📡 Stream:   /stream/{slug}/stream.m3u8`);
-    console.log(`   🎤 Mic:      /ws/mic?slug={slug}`);
+    console.log(`   🎤 Mic:      POST /api/mic/{slug}`);
     console.log(`   📊 Metadata: /metadata/channels/{slug}/now-playing`);
     console.log(`   🔧 API:      /api/channels/*\n`);
   });

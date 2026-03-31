@@ -1,243 +1,270 @@
-// Live microphone mixer — receives mic audio via WebSocket, mixes with music stream
-// Architecture: Browser mic → WebSocket → FIFO pipe → FFmpeg amix → HLS
+// Unified audio mixer — combines music PCM + mic PCM into single HLS output
+//
+// Architecture:
+//   Music FFmpeg (raw PCM stdout) ---+
+//                                    +--> Node.js mixer --> Output FFmpeg --> HLS
+//   Mic HTTP POST (raw PCM) --------+
+//
+// Single stream.m3u8 for listeners — no separate mic stream.
 
-import { WebSocketServer, WebSocket } from "ws";
 import fs from "fs";
 import path from "path";
-import { spawn, execSync, type ChildProcess } from "child_process";
-import type { Server } from "http";
+import { spawn, type ChildProcess } from "child_process";
 
 const BASE_OUTPUT_DIR = path.join(process.cwd(), "stream-output");
 
-interface MicSession {
+interface MixerSession {
   slug: string;
-  fifoPath: string;
-  fifoFd: number | null;
-  ffmpegProc: ChildProcess | null;
-  musicVolume: number; // 0-1
-  micVolume: number;   // 0-1
+  outputProc: ChildProcess;
+  musicConnected: boolean;
+  micActive: boolean;
+  micPending: Buffer[];
+  micPendingBytes: number;
 }
 
-const activeSessions = new Map<string, MicSession>();
+const mixers = new Map<string, MixerSession>();
 
 /**
- * Create a named FIFO pipe for mic audio input
+ * Start the mixer — creates the output HLS FFmpeg process.
+ * Call this once when a channel goes live.
  */
-function createFifo(fifoPath: string) {
-  try {
-    if (fs.existsSync(fifoPath)) fs.unlinkSync(fifoPath);
-    execSync(`mkfifo "${fifoPath}"`);
-  } catch (err) {
-    console.error("Failed to create FIFO:", err);
+export function startMixer(slug: string): void {
+  // Clean up existing mixer if any
+  stopMixer(slug);
+
+  const outputDir = path.join(BASE_OUTPUT_DIR, slug);
+  fs.mkdirSync(outputDir, { recursive: true });
+
+  // Clean old HLS segments
+  for (const f of fs.readdirSync(outputDir)) {
+    if (
+      f.endsWith(".ts") ||
+      f.endsWith(".m3u8") ||
+      f.endsWith(".m4s") ||
+      f === "init.mp4"
+    ) {
+      fs.unlinkSync(path.join(outputDir, f));
+    }
   }
-}
 
-/**
- * Start the mic mixing FFmpeg process.
- * Takes the existing HLS stream + mic FIFO → remuxes with amix → overwrites HLS output.
- *
- * Instead of mixing into FFmpeg (complex), we use a simpler approach:
- * Write mic PCM to a file that the client-side can request separately,
- * OR we restart the main FFmpeg with an additional input.
- *
- * Simplest approach: Write mic audio as a separate HLS stream that the client mixes.
- */
-export function setupMicWebSocket(server: Server) {
-  const wss = new WebSocketServer({ server, path: "/ws/mic" });
-
-  wss.on("connection", (ws: WebSocket, req) => {
-    const url = new URL(req.url || "", `http://${req.headers.host}`);
-    const slug = url.searchParams.get("slug");
-
-    if (!slug) {
-      ws.close(4000, "slug required");
-      return;
+  // Remove legacy mic subdirectory
+  const micDir = path.join(outputDir, "mic");
+  if (fs.existsSync(micDir)) {
+    for (const f of fs.readdirSync(micDir)) {
+      fs.unlinkSync(path.join(micDir, f));
     }
+    try { fs.rmdirSync(micDir); } catch { /* ignore */ }
+  }
 
-    console.log(`🎤 [${slug}] Mic WebSocket connected`);
-
-    const outputDir = path.join(BASE_OUTPUT_DIR, slug);
-    const micDir = path.join(outputDir, "mic");
-    fs.mkdirSync(micDir, { recursive: true });
-
-    // Start a separate FFmpeg that encodes mic audio to HLS
-    const micHlsPath = path.join(micDir, "mic.m3u8");
-    const micSegPattern = path.join(micDir, "mic_%04d.m4s");
-    const micInitPath = "mic_init.mp4";
-
-    // Clean old mic segments
-    if (fs.existsSync(micDir)) {
-      for (const f of fs.readdirSync(micDir)) {
-        fs.unlinkSync(path.join(micDir, f));
-      }
-    }
-
-    // FFmpeg: read raw PCM from stdin → encode to HLS
-    const ffmpeg = spawn("ffmpeg", [
+  // Output FFmpeg: raw stereo PCM stdin --> AAC HLS
+  const outputProc = spawn(
+    "ffmpeg",
+    [
       "-f", "s16le",
       "-ar", "44100",
-      "-ac", "1",
+      "-ac", "2",
       "-i", "pipe:0",
-      "-af", "aformat=channel_layouts=stereo:sample_rates=44100",
       "-c:a", "aac",
-      "-b:a", "128k",
+      "-b:a", "256k",
       "-f", "hls",
       "-hls_time", "1",
       "-hls_list_size", "6",
       "-hls_segment_type", "fmp4",
       "-hls_flags", "independent_segments+delete_segments",
-      "-hls_fmp4_init_filename", micInitPath,
-      "-hls_segment_filename", micSegPattern,
-      micHlsPath,
-    ], { stdio: ["pipe", "pipe", "pipe"] });
+      "-hls_fmp4_init_filename", "init.mp4",
+      "-hls_segment_filename", path.join(outputDir, "segment_%04d.m4s"),
+      path.join(outputDir, "stream.m3u8"),
+    ],
+    { stdio: ["pipe", "pipe", "pipe"] },
+  );
 
-    ffmpeg.stderr?.on("data", (data: Buffer) => {
-      const msg = data.toString();
-      if (msg.includes("Error") || msg.includes("error")) {
-        console.error(`🎤 ffmpeg [${slug}]:`, msg.trim());
-      }
-    });
-
-    ffmpeg.on("close", (code) => {
-      console.log(`🎤 [${slug}] Mic FFmpeg exited with code ${code}`);
-      activeSessions.delete(slug);
-    });
-
-    const session: MicSession = {
-      slug,
-      fifoPath: "",
-      fifoFd: null,
-      ffmpegProc: ffmpeg,
-      musicVolume: 0.8,
-      micVolume: 1.0,
-    };
-    activeSessions.set(slug, session);
-
-    ws.on("message", (data: Buffer | string) => {
-      if (typeof data === "string") {
-        // Control message (volume changes)
-        try {
-          const msg = JSON.parse(data);
-          if (msg.type === "volume") {
-            if (msg.musicVolume !== undefined) session.musicVolume = msg.musicVolume;
-            if (msg.micVolume !== undefined) session.micVolume = msg.micVolume;
-          }
-        } catch { /* ignore */ }
-        return;
-      }
-
-      // Binary data — raw PCM audio from mic
-      if (ffmpeg.stdin && !ffmpeg.stdin.destroyed) {
-        try {
-          // Apply mic volume by scaling PCM samples
-          const pcm = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
-          const vol = session.micVolume;
-          if (vol !== 1.0) {
-            for (let i = 0; i < pcm.length; i++) {
-              pcm[i] = Math.max(-32768, Math.min(32767, Math.round(pcm[i] * vol)));
-            }
-          }
-          ffmpeg.stdin.write(Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength));
-        } catch { /* ignore write errors */ }
-      }
-    });
-
-    ws.on("close", () => {
-      console.log(`🎤 [${slug}] Mic WebSocket disconnected`);
-      if (ffmpeg.stdin && !ffmpeg.stdin.destroyed) {
-        ffmpeg.stdin.end();
-      }
-      ffmpeg.kill("SIGTERM");
-      activeSessions.delete(slug);
-    });
-
-    ws.on("error", (err) => {
-      console.error(`🎤 [${slug}] Mic WebSocket error:`, err.message);
-    });
-  });
-
-  console.log("🎤 Mic WebSocket server ready on /ws/mic");
-}
-
-/**
- * Start an HTTP-based mic session (for when WebSocket isn't available)
- * Called when the first audio chunk arrives via POST /api/mic/:slug
- */
-export function startHttpMicSession(slug: string): MicSession | null {
-  if (activeSessions.has(slug)) return activeSessions.get(slug)!;
-
-  const outputDir = path.join(BASE_OUTPUT_DIR, slug);
-  const micDir = path.join(outputDir, "mic");
-  fs.mkdirSync(micDir, { recursive: true });
-
-  // Clean old mic segments
-  for (const f of fs.readdirSync(micDir)) {
-    fs.unlinkSync(path.join(micDir, f));
-  }
-
-  const micHlsPath = path.join(micDir, "mic.m3u8");
-  const micSegPattern = path.join(micDir, "mic_%04d.m4s");
-
-  const ffmpeg = spawn("ffmpeg", [
-    "-f", "s16le", "-ar", "44100", "-ac", "1", "-i", "pipe:0",
-    "-af", "aformat=channel_layouts=stereo:sample_rates=44100",
-    "-c:a", "aac", "-b:a", "128k",
-    "-f", "hls", "-hls_time", "1", "-hls_list_size", "6",
-    "-hls_segment_type", "fmp4",
-    "-hls_flags", "independent_segments+delete_segments",
-    "-hls_fmp4_init_filename", "mic_init.mp4",
-    "-hls_segment_filename", micSegPattern,
-    micHlsPath,
-  ], { stdio: ["pipe", "pipe", "pipe"] });
-
-  ffmpeg.stderr?.on("data", (data: Buffer) => {
+  outputProc.stderr?.on("data", (data: Buffer) => {
     const msg = data.toString();
     if (msg.includes("Error") || msg.includes("error")) {
-      console.error(`🎤 ffmpeg [${slug}]:`, msg.trim());
+      console.error(`🔊 mixer ffmpeg [${slug}]:`, msg.trim());
     }
   });
 
-  ffmpeg.on("close", (code) => {
-    console.log(`🎤 [${slug}] Mic FFmpeg exited with code ${code}`);
-    activeSessions.delete(slug);
+  outputProc.on("close", (code) => {
+    console.log(`🔊 [${slug}] Mixer FFmpeg exited with code ${code}`);
+    mixers.delete(slug);
   });
 
-  const session: MicSession = {
-    slug, fifoPath: "", fifoFd: null, ffmpegProc: ffmpeg, musicVolume: 0.8, micVolume: 1.0,
+  const session: MixerSession = {
+    slug,
+    outputProc,
+    musicConnected: false,
+    micActive: false,
+    micPending: [],
+    micPendingBytes: 0,
   };
-  activeSessions.set(slug, session);
-  console.log(`🎤 [${slug}] HTTP mic session started`);
-  return session;
+
+  mixers.set(slug, session);
+  console.log(`🔊 [${slug}] Mixer started — single HLS output`);
 }
 
 /**
- * Write audio data to an active mic session
+ * Connect a music source (FFmpeg process with raw PCM on stdout) to the mixer.
+ * Can be called multiple times (e.g. on auto-loop restart).
+ */
+export function connectMusicSource(slug: string, musicProc: ChildProcess): void {
+  const session = mixers.get(slug);
+  if (!session) return;
+
+  session.musicConnected = true;
+
+  musicProc.stdout?.on("data", (chunk: Buffer) => {
+    const output = session.outputProc.stdin;
+    if (!output || output.destroyed) return;
+
+    if (!session.micActive || session.micPendingBytes === 0) {
+      // No mic data — pass music through directly
+      try { output.write(chunk); } catch { /* ignore */ }
+    } else {
+      // Mix music + mic
+      const mixed = mixMusicAndMic(chunk, session);
+      try { output.write(mixed); } catch { /* ignore */ }
+    }
+  });
+
+  musicProc.on("close", () => {
+    session.musicConnected = false;
+  });
+}
+
+/**
+ * Write mic audio (mono s16le 44100Hz) into the mixer.
+ * Called on every HTTP POST from the broadcaster's mic.
  */
 export function writeMicAudio(slug: string, data: Buffer): boolean {
-  const session = activeSessions.get(slug);
-  if (!session?.ffmpegProc?.stdin || session.ffmpegProc.stdin.destroyed) return false;
-  try {
-    session.ffmpegProc.stdin.write(data);
-    return true;
-  } catch {
-    return false;
+  const session = mixers.get(slug);
+  if (!session) return false;
+
+  session.micActive = true;
+
+  if (!session.musicConnected) {
+    // Voice-only mode: convert mono to stereo and write directly to output
+    const stereo = monoToStereo(data);
+    const output = session.outputProc.stdin;
+    if (!output || output.destroyed) return false;
+    try {
+      output.write(stereo);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // Music is flowing — buffer mic data, it gets mixed on the next music chunk
+  session.micPending.push(data);
+  session.micPendingBytes += data.length;
+
+  // Cap buffer at ~2 seconds of mono audio (2 * 44100 * 2 bytes = 176400)
+  while (session.micPendingBytes > 176400) {
+    const removed = session.micPending.shift();
+    if (removed) session.micPendingBytes -= removed.length;
+  }
+
+  return true;
+}
+
+/**
+ * Stop mic input but keep the mixer running for music.
+ */
+export function stopMicInput(slug: string): void {
+  const session = mixers.get(slug);
+  if (session) {
+    session.micActive = false;
+    session.micPending = [];
+    session.micPendingBytes = 0;
   }
 }
 
 /**
- * Check if a mic session is active for a channel
+ * Stop the mixer entirely (on channel stop).
  */
-export function hasMicSession(slug: string): boolean {
-  return activeSessions.has(slug);
+export function stopMixer(slug: string): void {
+  const session = mixers.get(slug);
+  if (!session) return;
+
+  if (session.outputProc.stdin && !session.outputProc.stdin.destroyed) {
+    session.outputProc.stdin.end();
+  }
+  session.outputProc.kill("SIGTERM");
+  mixers.delete(slug);
 }
 
 /**
- * Stop a mic session
+ * Check if a mixer exists for a channel.
  */
-export function stopMicSession(slug: string) {
-  const session = activeSessions.get(slug);
-  if (session?.ffmpegProc) {
-    session.ffmpegProc.kill("SIGTERM");
+export function hasMixer(slug: string): boolean {
+  return mixers.has(slug);
+}
+
+// ── Internal helpers ──
+
+/** Convert mono s16le PCM to stereo by duplicating each sample. */
+function monoToStereo(mono: Buffer): Buffer {
+  const samples = mono.length / 2;
+  const stereo = Buffer.alloc(samples * 4);
+  for (let i = 0; i < samples; i++) {
+    const sample = mono.readInt16LE(i * 2);
+    stereo.writeInt16LE(sample, i * 4);
+    stereo.writeInt16LE(sample, i * 4 + 2);
   }
-  activeSessions.delete(slug);
+  return stereo;
+}
+
+/**
+ * Mix a music chunk (stereo s16le) with pending mic data (mono s16le).
+ * Music is ducked to 70% when mic is active so the voice cuts through.
+ */
+function mixMusicAndMic(musicChunk: Buffer, session: MixerSession): Buffer {
+  // For N bytes of stereo music we need N/2 bytes of mono mic
+  const neededMicBytes = musicChunk.length / 2;
+  const micData = drainMicBuffer(session, neededMicBytes);
+
+  if (micData.length === 0) return musicChunk;
+
+  const stereoMic = monoToStereo(micData);
+  const mixed = Buffer.alloc(musicChunk.length);
+  const sampleCount = musicChunk.length / 2; // total s16 samples (L+R interleaved)
+  const micSampleCount = stereoMic.length / 2;
+
+  for (let i = 0; i < sampleCount; i++) {
+    const music = musicChunk.readInt16LE(i * 2);
+    const mic = i < micSampleCount ? stereoMic.readInt16LE(i * 2) : 0;
+    // Duck music, keep mic at full volume
+    const val = Math.round(music * 0.7 + mic * 1.0);
+    mixed.writeInt16LE(Math.max(-32768, Math.min(32767, val)), i * 2);
+  }
+
+  return mixed;
+}
+
+/** Drain up to `bytes` from the pending mic buffer. */
+function drainMicBuffer(session: MixerSession, bytes: number): Buffer {
+  if (session.micPendingBytes === 0) return Buffer.alloc(0);
+
+  const chunks: Buffer[] = [];
+  let collected = 0;
+
+  while (session.micPending.length > 0 && collected < bytes) {
+    const chunk = session.micPending[0];
+    const needed = bytes - collected;
+
+    if (chunk.length <= needed) {
+      chunks.push(chunk);
+      collected += chunk.length;
+      session.micPending.shift();
+      session.micPendingBytes -= chunk.length;
+    } else {
+      chunks.push(chunk.subarray(0, needed));
+      session.micPending[0] = chunk.subarray(needed);
+      session.micPendingBytes -= needed;
+      collected += needed;
+    }
+  }
+
+  return Buffer.concat(chunks);
 }

@@ -1,11 +1,7 @@
-import express from "express";
-import cors from "cors";
 import path from "path";
 import fs from "fs";
-import { spawn, execSync } from "child_process";
+import { spawn, execSync, type ChildProcess } from "child_process";
 import { EventEmitter } from "events";
-
-const BASE_OUTPUT_DIR = path.join(process.cwd(), "stream-output");
 
 export interface ChannelConfig {
   slug: string;
@@ -19,10 +15,15 @@ export interface TrackFile {
   duration: number;
 }
 
+export interface PipelineResult {
+  tracks: TrackFile[];
+  process: ChildProcess;
+}
+
 export const streamEvents = new EventEmitter();
 
-// Per-channel ffmpeg processes
-const channelProcesses = new Map<string, ReturnType<typeof spawn>>();
+// Per-channel music decoder processes
+const channelProcesses = new Map<string, ChildProcess>();
 
 /**
  * Normalize a single track to WAV s16le stereo 44100Hz.
@@ -89,21 +90,14 @@ export function getChannelTracks(musicDir: string): TrackFile[] {
   return getTrackFiles(musicDir);
 }
 
-export function startChannelPipelineFromTracks(config: ChannelConfig, tracks: TrackFile[]): TrackFile[] {
+export function startChannelPipelineFromTracks(config: ChannelConfig, tracks: TrackFile[]): PipelineResult | null {
   const { slug, musicDir, outputDir } = config;
 
-  // Clean old segments
-  if (fs.existsSync(outputDir)) {
-    for (const f of fs.readdirSync(outputDir)) {
-      if (f.endsWith(".ts") || f.endsWith(".m3u8") || f.endsWith(".m4s") || f === "init.mp4") {
-        fs.unlinkSync(path.join(outputDir, f));
-      }
-    }
-  }
+  fs.mkdirSync(outputDir, { recursive: true });
 
   if (tracks.length === 0) {
     console.log(`⚠️  No tracks for channel ${slug}`);
-    return [];
+    return null;
   }
 
   // Ensure all tracks are normalized before concat
@@ -118,54 +112,43 @@ export function startChannelPipelineFromTracks(config: ChannelConfig, tracks: Tr
 
   const concatFile = generateConcatFile(normalizedTracks, outputDir);
 
-  return launchFfmpeg(slug, outputDir, concatFile, normalizedTracks);
+  return launchMusicDecoder(slug, concatFile, normalizedTracks);
 }
 
-export function startChannelPipeline(config: ChannelConfig): TrackFile[] {
+export function startChannelPipeline(config: ChannelConfig): PipelineResult | null {
   const { slug, musicDir, outputDir } = config;
 
-  // Clean old segments
-  if (fs.existsSync(outputDir)) {
-    for (const f of fs.readdirSync(outputDir)) {
-      if (f.endsWith(".ts") || f.endsWith(".m3u8") || f.endsWith(".m4s") || f === "init.mp4") {
-        fs.unlinkSync(path.join(outputDir, f));
-      }
-    }
-  }
+  fs.mkdirSync(outputDir, { recursive: true });
 
   const tracks = getTrackFiles(musicDir);
   if (tracks.length === 0) {
     console.log(`⚠️  No tracks in ${musicDir} for channel ${slug}`);
-    return [];
+    return null;
   }
 
   const concatFile = generateConcatFile(tracks, outputDir);
 
-  return launchFfmpeg(slug, outputDir, concatFile, tracks);
+  return launchMusicDecoder(slug, concatFile, tracks);
 }
 
-function launchFfmpeg(slug: string, outputDir: string, concatFile: string, tracks: TrackFile[]): TrackFile[] {
+/**
+ * Launch FFmpeg to decode the concat playlist into raw PCM on stdout.
+ * The PCM is piped into the unified mixer which produces HLS.
+ */
+function launchMusicDecoder(slug: string, concatFile: string, tracks: TrackFile[]): PipelineResult {
   const args = [
     "-re",
     "-f", "concat",
     "-safe", "0",
     "-i", concatFile,
-    // Normalize audio: force stereo, 44.1kHz, 16-bit — fixes channel noise
-    // from WAV files with unknown channel layouts or mismatched bit depths
+    // Normalize: stereo, 44.1kHz, 16-bit
     "-af", "aformat=channel_layouts=stereo:sample_rates=44100:sample_fmts=s16",
-    "-c:a", "aac",
-    "-b:a", "256k",
-    "-f", "hls",
-    "-hls_time", "1",
-    "-hls_list_size", "6",
-    "-hls_segment_type", "fmp4",
-    "-hls_flags", "independent_segments+delete_segments",
-    "-hls_fmp4_init_filename", "init.mp4",
-    "-hls_segment_filename", path.join(outputDir, "segment_%04d.m4s"),
-    path.join(outputDir, "stream.m3u8"),
+    "-f", "s16le",
+    "-acodec", "pcm_s16le",
+    "pipe:1",
   ];
 
-  const proc = spawn("ffmpeg", args, { stdio: "pipe" });
+  const proc = spawn("ffmpeg", args, { stdio: ["pipe", "pipe", "pipe"] });
 
   proc.stderr?.on("data", (data: Buffer) => {
     const msg = data.toString();
@@ -177,7 +160,7 @@ function launchFfmpeg(slug: string, outputDir: string, concatFile: string, track
   proc.on("close", (code) => {
     console.log(`ffmpeg [${slug}] exited with code ${code}`);
     channelProcesses.delete(slug);
-    // Auto-loop: restart the pipeline when all tracks finish
+    // Auto-loop: signal that playlist ended
     streamEvents.emit("ended", slug);
   });
 
@@ -187,12 +170,12 @@ function launchFfmpeg(slug: string, outputDir: string, concatFile: string, track
 
   channelProcesses.set(slug, proc);
 
-  console.log(`🎵 [${slug}] HLS pipeline started — FLAC lossless, ${tracks.length} tracks`);
+  console.log(`🎵 [${slug}] Music decoder started — ${tracks.length} tracks (raw PCM → mixer)`);
   for (const t of tracks) {
     console.log(`   ${t.filename} — ${Math.round(t.duration)}s`);
   }
 
-  return tracks;
+  return { tracks, process: proc };
 }
 
 export function stopChannelPipeline(slug: string) {
@@ -201,35 +184,4 @@ export function stopChannelPipeline(slug: string) {
     proc.kill("SIGTERM");
     channelProcesses.delete(slug);
   }
-}
-
-export function startStreamServer(port: number) {
-  const app = express();
-  app.use(cors());
-
-  // Serve per-channel streams: /{slug}/stream.m3u8
-  app.use("/:slug", (req, res, next) => {
-    const slug = req.params.slug;
-    const channelOutputDir = path.join(BASE_OUTPUT_DIR, slug);
-    if (!fs.existsSync(channelOutputDir)) {
-      return res.status(404).json({ error: "Channel not found" });
-    }
-
-    express.static(channelOutputDir, {
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith(".m3u8")) {
-          res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-          res.setHeader("Cache-Control", "no-cache");
-        } else if (filePath.endsWith(".m4s")) {
-          res.setHeader("Content-Type", "video/iso.segment");
-        } else if (filePath.endsWith(".mp4")) {
-          res.setHeader("Content-Type", "video/mp4");
-        }
-      },
-    })(req, res, next);
-  });
-
-  app.listen(port, "0.0.0.0", () => {
-    console.log(`📡 Stream server: http://0.0.0.0:${port}`);
-  });
 }

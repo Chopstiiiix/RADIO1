@@ -106,11 +106,12 @@ export async function startChannel(broadcasterId: string, slug: string, trackIds
   }
 
   // Start HLS pipeline with final track list (may include host segments)
-  const tracks = startChannelPipelineFromTracks(config, finalTracks);
-  if (tracks.length === 0) {
+  const result = startChannelPipelineFromTracks(config, finalTracks);
+  if (!result) {
     console.log(`No tracks for channel ${slug} — cannot go live`);
     return false;
   }
+  const tracks = result.tracks;
 
   // Start scheduler for this channel (pass isHostSegment info)
   await startChannelScheduler(config, tracks, broadcasterId);
@@ -135,10 +136,10 @@ export async function startChannel(broadcasterId: string, slug: string, trackIds
       if (!activeChannels.has(slug)) return;
       // Re-use the same tracks (including host segments if previously generated)
       const loopTracks = finalTracks.length > 0 ? finalTracks : getChannelTracks(config.musicDir);
-      const newTracks = startChannelPipelineFromTracks(config, loopTracks);
-      if (newTracks.length > 0) {
-        await startChannelScheduler(config, newTracks, broadcasterId);
-        console.log(`🔁 [${slug}] Looped — playing ${newTracks.length} items again`);
+      const loopResult = startChannelPipelineFromTracks(config, loopTracks);
+      if (loopResult) {
+        await startChannelScheduler(config, loopResult.tracks, broadcasterId);
+        console.log(`🔁 [${slug}] Looped — playing ${loopResult.tracks.length} items again`);
       }
     }, 2000);
   };
@@ -201,13 +202,13 @@ export async function addTracksToChannel(broadcasterId: string, slug: string, tr
   await new Promise((r) => setTimeout(r, 500));
 
   // Restart with combined tracks
-  const tracks = startChannelPipelineFromTracks(config, allTracks);
-  if (tracks.length > 0) {
-    await startChannelScheduler(config, tracks, broadcasterId);
-    console.log(`▶️  [${slug}] Pipeline restarted with ${tracks.length} tracks`);
+  const addResult = startChannelPipelineFromTracks(config, allTracks);
+  if (addResult) {
+    await startChannelScheduler(config, addResult.tracks, broadcasterId);
+    console.log(`▶️  [${slug}] Pipeline restarted with ${addResult.tracks.length} tracks`);
   }
 
-  return tracks.length > 0;
+  return !!addResult;
 }
 
 // ──── Queue / Cue management ────
@@ -267,13 +268,13 @@ export async function skipToTrack(slug: string, filename: string): Promise<boole
   await new Promise((r) => setTimeout(r, 500));
 
   // Restart with reordered tracks
-  const tracks = startChannelPipelineFromTracks(config, reordered);
-  if (tracks.length > 0) {
-    await startChannelScheduler(config, tracks, broadcasterId);
+  const skipResult = startChannelPipelineFromTracks(config, reordered);
+  if (skipResult) {
+    await startChannelScheduler(config, skipResult.tracks, broadcasterId);
     console.log(`▶️  [${slug}] Now playing: ${filename}`);
   }
 
-  return tracks.length > 0;
+  return !!skipResult;
 }
 
 export function getChannelQueue(slug: string): { tracks: { filename: string; duration: number }[]; cued: string | null } | null {
