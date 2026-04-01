@@ -809,8 +809,8 @@ export default function GoLivePage() {
         </div>
       </div>
 
-      {/* ──── AI HOST TOGGLE ──── */}
-      {!isLive && (
+      {/* ──── AI HOST TOGGLE (tracks mode only) ──── */}
+      {!isLive && selectedTrackIds.size > 0 && (
         <div style={{
           backgroundColor: aiHostEnabled ? "rgba(120, 179, 206, 0.06)" : "rgba(24, 24, 27, 0.3)",
           borderLeft: aiHostEnabled ? "3px solid #78B3CE" : "2px solid #27272a",
