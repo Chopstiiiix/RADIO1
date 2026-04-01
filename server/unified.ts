@@ -15,7 +15,7 @@ import { startChannelPipeline, startChannelPipelineFromTracks, stopChannelPipeli
 import { supabase } from "./supabase";
 import { syncTracksForChannel } from "./track-sync";
 import { isAiHostEnabled, getBroadcasterAgents, pregenerateHostSegments } from "./react-agent";
-import { startMixer, connectMusicSource, writeMicAudio, stopMicInput, stopMixer, setMixerVolumes } from "./mic-mixer";
+import { startMixer, connectMusicSource, writeMicAudio, stopMicInput, stopMixer, setMixerVolumes, hasMixer } from "./mic-mixer";
 import type { Response } from "express";
 
 // Suppress auto-loop when pipeline is deliberately restarted (e.g., add-tracks)
@@ -405,6 +405,12 @@ async function main() {
     const { broadcaster_id, track_ids, mode } = req.body;
     if (!broadcaster_id) return res.status(400).json({ error: "broadcaster_id required" });
 
+    // If channel is already live with an active mixer, don't restart — prevent double-call kills
+    if (activeChannels.has(slug) && hasMixer(slug)) {
+      console.log(`⚡ [${slug}] Already live — ignoring duplicate start request`);
+      return res.json({ ok: true, message: `Channel ${slug} is already live` });
+    }
+
     const { data: channel } = await supabase
       .from("broadcaster_profiles")
       .select("id, channel_slug")
@@ -422,6 +428,12 @@ async function main() {
     const { slug } = req.params;
     const { broadcaster_id } = req.body;
     if (!broadcaster_id) return res.status(400).json({ error: "broadcaster_id required" });
+
+    // If channel is already live with an active mixer, don't restart
+    if (activeChannels.has(slug) && hasMixer(slug)) {
+      console.log(`⚡ [${slug}] Already live — ignoring duplicate voice-only request`);
+      return res.json({ ok: true, message: `Channel ${slug} is already live` });
+    }
 
     // Clean up any stale state before starting fresh
     stopChannelPipeline(slug);
