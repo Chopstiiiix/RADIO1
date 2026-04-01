@@ -3,15 +3,18 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Hls from "hls.js";
 
-const STREAM_BASE =
-  process.env.NEXT_PUBLIC_STREAM_URL ||
-  (typeof window !== "undefined" ? window.location.origin : "");
-
 function getStreamUrl(slug?: string) {
-  const base = STREAM_BASE || "";
-  return slug
-    ? `${base}/stream/${slug}/stream.m3u8`
-    : `${base}/stream/default/stream.m3u8`;
+  const path = slug
+    ? `/stream/${slug}/stream.m3u8`
+    : "/stream/default/stream.m3u8";
+
+  // Prefer the app's rewrite/proxy so listeners stay on the same origin.
+  if (typeof window !== "undefined") {
+    return path;
+  }
+
+  const base = process.env.NEXT_PUBLIC_STREAM_URL?.replace(/\/$/, "") || "";
+  return `${base}${path}`;
 }
 
 export function useStream(trackStartOffset: number, trackDuration: number, slug?: string) {

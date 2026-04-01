@@ -23,6 +23,7 @@ interface MixerSession {
   musicVolume: number; // 0-1, controls broadcast music level
   micVolume: number;   // 0-1, controls broadcast mic level
   silenceInterval: ReturnType<typeof setInterval> | null;
+  lastMicWriteMs: number; // timestamp of last mic data written to output
 }
 
 const mixers = new Map<string, MixerSession>();
@@ -103,6 +104,7 @@ export function startMixer(slug: string): void {
     musicVolume: 0.8,
     micVolume: 1.0,
     silenceInterval: null,
+    lastMicWriteMs: 0,
   };
 
   mixers.set(slug, session);
@@ -117,10 +119,12 @@ export function startMixer(slug: string): void {
       try { stdin.write(STEREO_SILENCE_CHUNK); } catch { break; }
     }
     // Heartbeat: keep FFmpeg fed in voice-only mode.
-    // Even when mic is active, network latency causes gaps between chunks.
-    // This heartbeat fills gaps so FFmpeg never starves.
+    // Only writes silence when mic data hasn't arrived recently (>600ms gap),
+    // preventing silence from overwriting/interleaving with active mic audio.
     session.silenceInterval = setInterval(() => {
       if (session.musicConnected) return; // music source drives the data flow
+      const gap = Date.now() - session.lastMicWriteMs;
+      if (session.micActive && gap < 600) return; // mic is actively feeding data
       try { stdin.write(STEREO_SILENCE_CHUNK); } catch { /* ignore */ }
     }, 500);
   }
@@ -179,6 +183,7 @@ export function writeMicAudio(slug: string, data: Buffer): boolean {
     if (!output || output.destroyed) return false;
     try {
       output.write(stereo);
+      session.lastMicWriteMs = Date.now();
       return true;
     } catch {
       return false;
@@ -186,6 +191,7 @@ export function writeMicAudio(slug: string, data: Buffer): boolean {
   }
 
   // Music is flowing — buffer mic data, it gets mixed on the next music chunk
+  session.lastMicWriteMs = Date.now();
   session.micPending.push(data);
   session.micPendingBytes += data.length;
 

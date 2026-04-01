@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { Room, AudioPresets } from "livekit-client";
 import InlineLoader from "@/app/components/InlineLoader";
 import BroadcastAgreement from "@/app/components/BroadcastAgreement";
 
@@ -74,15 +75,14 @@ export default function GoLivePage() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const micGainRef = useRef<GainNode | null>(null);
   const musicGainRef = useRef<GainNode | null>(null);
-  const micWsRef = useRef<WebSocket | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const livekitRoomRef = useRef<Room | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micLevelRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
 
   useEffect(() => {
     // Fetch backend URL for direct mic streaming
-    fetch("/api/config").then(r => r.json()).then(c => { backendUrlRef.current = c.streamUrl || ""; }).catch(() => {});
+    fetch("/api/config").then(r => r.json()).then(c => { backendUrlRef.current = c.backendUrl || ""; }).catch(() => {});
 
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -307,60 +307,30 @@ export default function GoLivePage() {
 
   async function toggleMic() {
     if (micActive && micStream) {
-      // Stop mic — stop tracks, cleanup, close WebSocket
+      // Stop mic — disconnect LiveKit, stop tracks, cleanup
       micStream.getTracks().forEach((t) => t.stop());
       setMicStream(null);
       setMicActive(false);
       cancelAnimationFrame(animFrameRef.current);
       if (micLevelRef.current) micLevelRef.current.style.width = "0%";
-      if (processorRef.current) {
-        processorRef.current.disconnect();
-        processorRef.current = null;
-      }
-      if (micWsRef.current) {
-        micWsRef.current.close();
-        micWsRef.current = null;
+      if (livekitRoomRef.current) {
+        await livekitRoomRef.current.disconnect();
+        livekitRoomRef.current = null;
       }
       return;
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
+      });
       setMicStream(stream);
       setMicActive(true);
+      console.log("🎤 Mic access granted, tracks:", stream.getAudioTracks().length);
 
-      // Ensure we have the backend URL before opening WebSocket
-      if (!backendUrlRef.current) {
-        try {
-          const cfg = await fetch("/api/config").then(r => r.json());
-          backendUrlRef.current = cfg.streamUrl || "";
-        } catch { /* fallback below */ }
-      }
-
-      // Open WebSocket to backend for mic audio streaming
-      const base = backendUrlRef.current;
-      let wsUrl: string;
-      if (base) {
-        const wsProto = base.startsWith("https") ? "wss" : "ws";
-        const wsHost = base.replace(/^https?:\/\//, "");
-        wsUrl = `${wsProto}://${wsHost}/ws/mic?slug=${channelSlug}`;
-      } else {
-        // Fallback to same host (only works if backend is on same server)
-        const proto = window.location.protocol === "https:" ? "wss" : "ws";
-        wsUrl = `${proto}://${window.location.host}/ws/mic?slug=${channelSlug}`;
-      }
-
-      const ws = new WebSocket(wsUrl);
-      ws.binaryType = "arraybuffer";
-      micWsRef.current = ws;
-
-      ws.onopen = () => console.log("🎤 WebSocket mic connected");
-      ws.onclose = () => console.log("🎤 WebSocket mic disconnected");
-      ws.onerror = (e) => console.error("🎤 WebSocket mic error:", e);
-
-      // Set up Web Audio: mic → gain → analyser (for metering) + processor (for streaming)
+      // Set up analyser for mic level meter FIRST (works even if LiveKit fails)
       if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext({ sampleRate: 44100 });
+        audioContextRef.current = new AudioContext();
       }
       const ctx = audioContextRef.current;
       if (ctx.state === "suspended") await ctx.resume();
@@ -374,37 +344,44 @@ export default function GoLivePage() {
       analyser.fftSize = 256;
       analyserRef.current = analyser;
 
-      // ScriptProcessor to capture raw PCM and send via WebSocket
-      const processor = ctx.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
-
-      processor.onaudioprocess = (e) => {
-        if (!micWsRef.current || micWsRef.current.readyState !== WebSocket.OPEN) return;
-        const input = e.inputBuffer.getChannelData(0);
-        // Convert float32 to int16
-        const pcm = new Int16Array(input.length);
-        for (let i = 0; i < input.length; i++) {
-          const s = Math.max(-1, Math.min(1, input[i]));
-          pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-        // Send binary PCM frame over WebSocket — no HTTP overhead
-        micWsRef.current.send(pcm.buffer);
-      };
-
       source.connect(gainNode);
       gainNode.connect(analyser);
-      gainNode.connect(processor);
-      processor.connect(ctx.destination); // Required for onaudioprocess to fire
-      // Mute the processor output to avoid feedback
-      const muteGain = ctx.createGain();
-      muteGain.gain.value = 0;
-      processor.disconnect();
-      gainNode.connect(processor);
-      processor.connect(muteGain);
-      muteGain.connect(ctx.destination);
+
+      // Route gain-controlled audio to a new MediaStream for LiveKit
+      const dest = ctx.createMediaStreamDestination();
+      gainNode.connect(dest);
 
       animateMicLevel();
-    } catch {
+
+      // Now connect to LiveKit for WebRTC broadcast
+      try {
+        const tokenRes = await fetch("/api/livekit/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identity: channelSlug || "host", slug: channelSlug, role: "host" }),
+        });
+        const tokenData = await tokenRes.json();
+        console.log("🎤 LiveKit token response:", { room: tokenData.room, livekitUrl: tokenData.livekitUrl, hasToken: !!tokenData.token });
+
+        if (tokenData.token && tokenData.livekitUrl) {
+          const room = new Room({ adaptiveStream: true, dynacast: true });
+          livekitRoomRef.current = room;
+
+          await room.connect(tokenData.livekitUrl, tokenData.token);
+          console.log("🎤 LiveKit room connected");
+
+          // Publish the gain-processed stream so volume slider controls what listeners hear
+          const processedTrack = dest.stream.getAudioTracks()[0];
+          await room.localParticipant.publishTrack(processedTrack, { audioPreset: AudioPresets.music });
+          console.log("🎤 Mic published via LiveKit — Opus 128kbps (volume-controlled)");
+        } else {
+          console.warn("🎤 LiveKit not configured — mic level meter only, no WebRTC broadcast");
+        }
+      } catch (lkErr) {
+        console.error("🎤 LiveKit connection failed (mic level meter still works):", lkErr);
+      }
+    } catch (err) {
+      console.error("🎤 Mic access error:", err);
       setMessage("Microphone access denied");
     }
   }
@@ -416,10 +393,9 @@ export default function GoLivePage() {
     return () => {
       cancelAnimationFrame(animFrameRef.current);
       micStream?.getTracks().forEach((t) => t.stop());
-      processorRef.current?.disconnect();
-      micWsRef.current?.close();
+      livekitRoomRef.current?.disconnect();
     };
-  }, [micStream]);
+  }, []);
 
   // Derive the server-side filename from track metadata (matches track-sync.ts logic)
   function getServerFilename(track: Track): string {

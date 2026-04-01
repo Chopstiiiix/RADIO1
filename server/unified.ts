@@ -18,6 +18,7 @@ import { supabase } from "./supabase";
 import { syncTracksForChannel } from "./track-sync";
 import { isAiHostEnabled, getBroadcasterAgents, pregenerateHostSegments } from "./react-agent";
 import { startMixer, connectMusicSource, writeMicAudio, stopMicInput, stopMixer, setMixerVolumes, hasMixer } from "./mic-mixer";
+import { AccessToken } from "livekit-server-sdk";
 import type { Response } from "express";
 
 // Suppress auto-loop when pipeline is deliberately restarted (e.g., add-tracks)
@@ -615,6 +616,44 @@ async function main() {
     const ok = setMixerVolumes(slug, music_volume, mic_volume);
     if (ok) res.json({ ok: true });
     else res.status(404).json({ error: "Channel not active" });
+  });
+
+  // ── LiveKit token endpoint ──
+  app.use("/api/livekit/token", express.json());
+  app.post("/api/livekit/token", async (req, res) => {
+    const { identity, slug, role } = req.body;
+    if (!identity || !slug) return res.status(400).json({ error: "identity and slug required" });
+
+    const apiKey = process.env.LIVEKIT_API_KEY;
+    const apiSecret = process.env.LIVEKIT_API_SECRET;
+    const livekitUrl = process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
+
+    if (!apiKey || !apiSecret) {
+      return res.status(500).json({ error: "LiveKit not configured" });
+    }
+
+    const isHost = role === "host";
+    const roomName = `caster-${slug}`;
+
+    const token = new AccessToken(apiKey, apiSecret, {
+      identity,
+      ttl: "4h",
+      metadata: JSON.stringify({ role: isHost ? "host" : "listener", slug }),
+    });
+
+    token.addGrant({
+      roomJoin: true,
+      room: roomName,
+      canPublish: isHost,
+      canPublishData: isHost,
+      canSubscribe: true,
+    });
+
+    return res.json({
+      token: await token.toJwt(),
+      livekitUrl,
+      room: roomName,
+    });
   });
 
   // ── HTTP + WebSocket server ──

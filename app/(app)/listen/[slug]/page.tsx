@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Visualizer from "@/app/components/Visualizer";
 import { useStream } from "@/app/hooks/useStream";
+import { useLiveMic } from "@/app/hooks/useLiveMic";
 import Lottie from "lottie-react";
 import type { LottieRefCurrentProps } from "lottie-react";
 import heartAnimation from "@/public/heart.json";
@@ -39,6 +40,10 @@ export default function ChannelPage() {
   });
 
   const stream = useStream(metadata.trackStartOffset, metadata.duration, slug);
+
+  // LiveKit WebRTC for live mic — sub-500ms latency
+  const isLiveMic = metadata.isLive && metadata.mode === "live_mic";
+  const liveMic = useLiveMic(slug, isLiveMic);
 
   // Favorite state
   const [isFavorited, setIsFavorited] = useState(false);
@@ -229,7 +234,6 @@ export default function ChannelPage() {
   }, [metadata.ended, stream.isPlaying, stream.stop]);
 
   // Autoplay when live_mic mode — show "tap to join" if browser blocks
-  const isLiveMic = metadata.isLive && metadata.mode === "live_mic";
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const autoplayAttempted = useRef(false);
 
@@ -611,7 +615,7 @@ export default function ChannelPage() {
             marginBottom: "8px",
             letterSpacing: "0.1em",
           }}>
-            {metadata.track ? "NOW_PLAYING" : "AWAITING_SIGNAL"}
+            {metadata.track ? (metadata.type === "host_segment" ? "ON_AIR" : "NOW_PLAYING") : "AWAITING_SIGNAL"}
           </div>
           <h2 className={metadata.track ? "glow-text" : ""} style={{
             fontSize: "20px",
@@ -646,7 +650,7 @@ export default function ChannelPage() {
           maskImage: "linear-gradient(to bottom, transparent 0%, black 40%)",
           WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 40%)",
         }}>
-          <Visualizer analyserNode={stream.analyserNode} isPlaying={stream.isPlaying} />
+          <Visualizer analyserNode={isLiveMic ? liveMic.analyserNode : stream.analyserNode} isPlaying={isLiveMic ? liveMic.connected : stream.isPlaying} />
         </div>
       </main>
 

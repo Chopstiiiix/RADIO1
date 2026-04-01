@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import NotificationButton from "@/app/components/NotificationButton";
 import AvatarMenu from "@/app/components/AvatarMenu";
+import NavLink from "@/app/components/NavLink";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient();
@@ -125,18 +126,3 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   );
 }
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <a href={href} style={{
-      fontSize: "13px",
-      color: "var(--text-secondary)",
-      textDecoration: "none",
-      padding: "4px 8px",
-      borderRadius: "4px",
-      transition: "color 0.15s",
-      whiteSpace: "nowrap",
-    }}>
-      {children}
-    </a>
-  );
-}

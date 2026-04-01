@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 interface Channel {
@@ -27,7 +28,7 @@ export default function ChannelList({
   const supabase = createClient();
   const [tab, setTab] = useState<"all" | "following">("all");
   const [channels, setChannels] = useState<Channel[]>(allChannels);
-  const [nowPlayingMap, setNowPlayingMap] = useState<Record<string, string>>({});
+  const [nowPlayingMap, setNowPlayingMap] = useState<Record<string, { title: string; type?: string }>>({});
 
   // Poll channel live status every 5 seconds
   useEffect(() => {
@@ -78,7 +79,7 @@ export default function ChannelList({
           if (res.ok) {
             const data = await res.json();
             if (data.track && !data.ended) {
-              setNowPlayingMap((prev) => ({ ...prev, [slug]: data.track.title }));
+              setNowPlayingMap((prev) => ({ ...prev, [slug]: { title: data.track.title, type: data.type } }));
             } else {
               setNowPlayingMap((prev) => {
                 const next = { ...prev };
@@ -386,7 +387,8 @@ export default function ChannelList({
   );
 }
 
-function ChannelCard({ channel, index, likes, followers, nowPlaying }: { channel: any; index: number; likes: number; followers: number; nowPlaying: string | null }) {
+function ChannelCard({ channel, index, likes, followers, nowPlaying }: { channel: any; index: number; likes: number; followers: number; nowPlaying: { title: string; type?: string } | null }) {
+  const router = useRouter();
   const isLive = channel.is_live;
   const profile = channel.profile as any;
   const chNum = String(index + 1).padStart(2, "0");
@@ -396,9 +398,18 @@ function ChannelCard({ channel, index, likes, followers, nowPlaying }: { channel
   const signalBars = listeners > 100 ? 4 : listeners > 50 ? 3 : listeners > 10 ? 2 : 1;
 
   return (
-    <a
-      href={`/listen/${channel.channel_slug}`}
-      style={{ textDecoration: "none", color: "inherit" }}
+    <div
+      role="link"
+      tabIndex={0}
+      aria-label={`Open ${channel.channel_name}`}
+      onClick={() => router.push(`/listen/${channel.channel_slug}`)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          router.push(`/listen/${channel.channel_slug}`);
+        }
+      }}
+      style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
     >
       <div
         className={isLive ? "live-card" : "channel-card"}
@@ -492,6 +503,7 @@ function ChannelCard({ channel, index, likes, followers, nowPlaying }: { channel
             <a
               href={`/listen/profile/${channel.channel_slug}`}
               onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
               style={{
                 fontSize: "10px",
                 color: "#f59e0b",
@@ -536,22 +548,25 @@ function ChannelCard({ channel, index, likes, followers, nowPlaying }: { channel
                 flexShrink: 0,
                 animation: "live-dot-pulse 1.5s ease-in-out infinite",
               }} />
-              <span style={{
-                fontSize: "10px",
-                color: "#52525b",
-                letterSpacing: "0.05em",
-                flexShrink: 0,
-              }}>
-                NOW:
-              </span>
+              {nowPlaying.type !== "host_segment" && (
+                <span style={{
+                  fontSize: "10px",
+                  color: "#52525b",
+                  letterSpacing: "0.05em",
+                  flexShrink: 0,
+                }}>
+                  NOW:
+                </span>
+              )}
               <span style={{
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
                 fontWeight: 600,
                 letterSpacing: "-0.02em",
+                color: nowPlaying.type === "host_segment" ? "#d4d4d8" : "#fbbf24",
               }}>
-                {nowPlaying.replace(/\s+/g, "_").toUpperCase()}
+                {nowPlaying.type === "host_segment" ? nowPlaying.title : nowPlaying.title.replace(/\s+/g, "_").toUpperCase()}
               </span>
             </div>
           )}
@@ -631,6 +646,6 @@ function ChannelCard({ channel, index, likes, followers, nowPlaying }: { channel
           </div>
         </div>
       </div>
-    </a>
+    </div>
   );
 }
