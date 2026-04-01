@@ -21,7 +21,7 @@ import type { Response } from "express";
 // Suppress auto-loop when pipeline is deliberately restarted (e.g., add-tracks)
 const suppressAutoLoop = new Set<string>();
 
-const PORT = parseInt(process.env.BACKEND_PORT || "5001");
+const PORT = parseInt(process.env.PORT || process.env.BACKEND_PORT || "5001");
 const BASE_OUTPUT_DIR = path.join(process.cwd(), "stream-output");
 const BASE_MUSIC_DIR = path.join(process.cwd(), "music");
 
@@ -346,6 +346,9 @@ async function main() {
 
   const app = express();
   app.use(cors());
+
+  // ── Health check (Railway uses this) ──
+  app.get("/", (_req, res) => res.json({ status: "ok", service: "caster-backend" }));
 
   // ── Stream routes: /stream/:slug/* (single mixed HLS output) ──
   app.use("/stream/:slug", (req, res, next) => {
