@@ -22,6 +22,7 @@ interface MixerSession {
   micPendingBytes: number;
   musicVolume: number; // 0-1, controls broadcast music level
   micVolume: number;   // 0-1, controls broadcast mic level
+  silenceInterval: ReturnType<typeof setInterval> | null;
 }
 
 const mixers = new Map<string, MixerSession>();
@@ -101,9 +102,30 @@ export function startMixer(slug: string): void {
     micPendingBytes: 0,
     musicVolume: 0.8,
     micVolume: 1.0,
+    silenceInterval: null,
   };
 
   mixers.set(slug, session);
+
+  // Prime FFmpeg with ~2 seconds of silence so it generates init.mp4 + first HLS segments.
+  // Then keep a heartbeat every 500ms to prevent stdin starvation in voice-only mode.
+  const STEREO_SILENCE_CHUNK = Buffer.alloc(44100 * 2 * 2); // 0.5s stereo s16le silence
+  const stdin = outputProc.stdin;
+  if (stdin && !stdin.destroyed) {
+    // Initial prime: 2 seconds of silence
+    for (let i = 0; i < 4; i++) {
+      try { stdin.write(STEREO_SILENCE_CHUNK); } catch { break; }
+    }
+    // Heartbeat: write silence every 500ms if no music is connected (voice-only mode)
+    session.silenceInterval = setInterval(() => {
+      if (session.musicConnected) return; // music source drives the data flow
+      if (!session.micActive) {
+        // No mic data flowing — keep FFmpeg alive with silence
+        try { stdin.write(STEREO_SILENCE_CHUNK); } catch { /* ignore */ }
+      }
+    }, 500);
+  }
+
   console.log(`🔊 [${slug}] Mixer started — single HLS output`);
 }
 
@@ -208,6 +230,7 @@ export function stopMixer(slug: string): void {
   const session = mixers.get(slug);
   if (!session) return;
 
+  if (session.silenceInterval) clearInterval(session.silenceInterval);
   if (session.outputProc.stdin && !session.outputProc.stdin.destroyed) {
     session.outputProc.stdin.end();
   }
