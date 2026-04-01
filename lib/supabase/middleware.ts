@@ -31,8 +31,8 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Skip auth logic for API routes, stream, and metadata endpoints
-  if (pathname.startsWith("/api/") || pathname.startsWith("/stream/") || pathname.startsWith("/metadata/")) {
+  // Skip auth logic for API routes, stream, metadata, and mic-stream endpoints
+  if (pathname.startsWith("/api/") || pathname.startsWith("/stream/") || pathname.startsWith("/metadata/") || pathname.startsWith("/mic-stream/")) {
     return supabaseResponse;
   }
 
