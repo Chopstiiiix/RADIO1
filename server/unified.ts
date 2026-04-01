@@ -582,12 +582,16 @@ async function main() {
   });
 
   // ── Mic audio endpoint (writes into the unified mixer) ──
+  const micChunkCount = new Map<string, number>();
   app.post("/api/mic/:slug", (req, res) => {
     const { slug } = req.params;
     const chunks: Buffer[] = [];
     req.on("data", (chunk: Buffer) => chunks.push(chunk));
     req.on("end", () => {
       const data = Buffer.concat(chunks);
+      const count = (micChunkCount.get(slug) || 0) + 1;
+      micChunkCount.set(slug, count);
+      if (count % 50 === 1) console.log(`🎤 [${slug}] Mic chunk #${count} — ${data.length} bytes`);
       if (writeMicAudio(slug, data)) {
         res.json({ ok: true });
       } else {

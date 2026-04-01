@@ -116,13 +116,12 @@ export function startMixer(slug: string): void {
     for (let i = 0; i < 4; i++) {
       try { stdin.write(STEREO_SILENCE_CHUNK); } catch { break; }
     }
-    // Heartbeat: write silence every 500ms if no music is connected (voice-only mode)
+    // Heartbeat: keep FFmpeg fed in voice-only mode.
+    // Even when mic is active, network latency causes gaps between chunks.
+    // This heartbeat fills gaps so FFmpeg never starves.
     session.silenceInterval = setInterval(() => {
       if (session.musicConnected) return; // music source drives the data flow
-      if (!session.micActive) {
-        // No mic data flowing — keep FFmpeg alive with silence
-        try { stdin.write(STEREO_SILENCE_CHUNK); } catch { /* ignore */ }
-      }
+      try { stdin.write(STEREO_SILENCE_CHUNK); } catch { /* ignore */ }
     }, 500);
   }
 
