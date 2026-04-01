@@ -50,10 +50,20 @@ function parseTrackFromFile(tf: TrackFile, startOffset: number): Track {
   const name = tf.filename.replace(/\.(mp3|flac|wav|m4a|ogg)$/i, "");
   const base = { file: tf.filename, duration: tf.duration, startOffset };
 
-  // Detect host segments (files from _host_segments directory)
-  const isHostSegment = tf.path.includes("_host_segments");
+  // Detect host segments (files from _host_segments directory or tagged filenames)
+  const isHostSegment = tf.path.includes("_host_segments") || tf.filename.startsWith("HOST__");
   if (isHostSegment) {
-    return { ...base, artist: "AI Host", title: "Host Segment", type: "host_segment" };
+    // Extract speaker names from tagged filename: HOST__Adam__Eve__1234_track_intro.mp3
+    let hostNames = "AI Host";
+    if (tf.filename.startsWith("HOST__")) {
+      const parts = tf.filename.replace(/^HOST__/, "").split("__");
+      // Last part is the original filename (timestamp_type.mp3), everything before is speaker names
+      const speakers = parts.slice(0, -1);
+      if (speakers.length > 0) {
+        hostNames = speakers.length === 1 ? speakers[0] : speakers.slice(0, -1).join(", ") + " & " + speakers[speakers.length - 1];
+      }
+    }
+    return { ...base, artist: hostNames, title: hostNames, type: "host_segment" };
   }
 
   // Try DB metadata first

@@ -623,7 +623,7 @@ export default function ChannelPage() {
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
           }}>
-            {metadata.track?.title.replace(/\s+/g, "_") || "—"}
+            {metadata.track ? (metadata.type === "host_segment" ? metadata.track.title : metadata.track.title.replace(/\s+/g, "_")) : "—"}
           </h2>
           <h3 style={{
             fontSize: "13px",

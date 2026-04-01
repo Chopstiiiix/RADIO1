@@ -38,6 +38,19 @@ const activeChannels = new Map<string, ChannelState>();
 
 /** Parse "Artist - Title.ext" filename into metadata. */
 function parseTrackMeta(filename: string): { title: string; artist: string } {
+  // Host segment tagged filenames: HOST__Adam__Eve__1234_track_intro.mp3
+  if (filename.startsWith("HOST__")) {
+    const parts = filename.replace(/^HOST__/, "").split("__");
+    const speakers = parts.slice(0, -1); // last part is original filename
+    if (speakers.length > 0) {
+      const hostNames = speakers.length === 1
+        ? speakers[0]
+        : speakers.slice(0, -1).join(", ") + " & " + speakers[speakers.length - 1];
+      return { artist: hostNames, title: hostNames };
+    }
+    return { artist: "AI Host", title: "AI Host" };
+  }
+
   const name = filename.replace(/\.[^.]+$/, ""); // strip extension
   const sep = name.indexOf(" - ");
   if (sep !== -1) {
@@ -46,12 +59,14 @@ function parseTrackMeta(filename: string): { title: string; artist: string } {
   return { artist: "Unknown", title: name.trim() };
 }
 
-/** Build upcoming list from tracks array starting at index. */
+/** Build upcoming list from tracks array starting at index (skip host segments). */
 function buildUpcoming(tracks: TrackFile[], fromIndex: number, count = 3) {
   const upcoming = [];
-  for (let i = 1; i <= count; i++) {
+  for (let i = 1; upcoming.length < count && i < tracks.length; i++) {
     const idx = (fromIndex + i) % tracks.length;
-    upcoming.push(parseTrackMeta(tracks[idx].filename));
+    const fn = tracks[idx].filename;
+    if (fn.includes("_host_segments") || fn.startsWith("HOST__")) continue;
+    upcoming.push(parseTrackMeta(fn));
   }
   return upcoming;
 }
@@ -106,9 +121,14 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
           for (let i = 0; i < baseTracks.length; i++) {
             const segment = hostSegments.get(i);
             if (segment) {
+              // Encode speaker names into filename so scheduler can display them
+              // Format: HOST__Adam__Eve__1234_track_intro.mp3
+              const speakerTag = segment.speakers.join("__");
+              const originalName = path.basename(segment.audioPath);
+              const taggedFilename = `HOST__${speakerTag}__${originalName}`;
               interleaved.push({
                 path: segment.audioPath,
-                filename: path.basename(segment.audioPath),
+                filename: taggedFilename,
                 duration: segment.duration,
               });
             }
@@ -141,13 +161,14 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
 
   await supabase.from("broadcaster_profiles").update({ is_live: true }).eq("channel_slug", slug);
 
+  const firstIsHost = tracks[0].filename.includes("_host_segments") || tracks[0].filename.startsWith("HOST__");
   updateNowPlaying(slug, {
     track: parseTrackMeta(tracks[0].filename),
     upcoming: buildUpcoming(tracks, 0),
     duration: tracks[0].duration,
     trackStartOffset: 0,
     ended: false,
-    type: "track",
+    type: firstIsHost ? "host_segment" : "track",
     mode,
   });
 
@@ -198,7 +219,7 @@ function startTrackTimer(slug: string) {
       cumulativeOffset += current.tracks[i].duration;
     }
 
-    const isHostSeg = next.filename.includes("_host_segments");
+    const isHostSeg = next.filename.includes("_host_segments") || next.filename.startsWith("HOST__");
     updateNowPlaying(slug, {
       track: parseTrackMeta(next.filename),
       upcoming: buildUpcoming(current.tracks, current.currentIndex),
