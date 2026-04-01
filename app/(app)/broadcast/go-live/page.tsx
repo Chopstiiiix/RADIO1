@@ -314,7 +314,10 @@ export default function GoLivePage() {
         processorRef.current = null;
       }
       // Stop mic session on server
-      fetch(`/mic-stream/${channelSlug}/stop`, { method: "POST" }).catch(() => {});
+      const stopUrl = process.env.NEXT_PUBLIC_STREAM_URL
+        ? `${process.env.NEXT_PUBLIC_STREAM_URL}/api/mic/${channelSlug}/stop`
+        : `/mic-stream/${channelSlug}/stop`;
+      fetch(stopUrl, { method: "POST" }).catch(() => {});
       return;
     }
 
@@ -353,8 +356,11 @@ export default function GoLivePage() {
           const s = Math.max(-1, Math.min(1, input[i]));
           pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
-        // Send via HTTP POST (non-blocking) — uses Next.js rewrite to bypass serverless
-        fetch(`/mic-stream/${channelSlug}`, {
+        // Send mic audio directly to backend (bypasses Vercel serverless limits)
+        const micUrl = process.env.NEXT_PUBLIC_STREAM_URL
+          ? `${process.env.NEXT_PUBLIC_STREAM_URL}/api/mic/${channelSlug}`
+          : `/mic-stream/${channelSlug}`;
+        fetch(micUrl, {
           method: "POST",
           headers: { "Content-Type": "application/octet-stream" },
           body: pcm.buffer,
