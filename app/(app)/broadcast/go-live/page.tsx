@@ -31,6 +31,7 @@ export default function GoLivePage() {
   const [message, setMessage] = useState("");
   const [channelName, setChannelName] = useState("");
   const [channelSlug, setChannelSlug] = useState("");
+  const backendUrlRef = useRef<string>("");
   const [trackCount, setTrackCount] = useState(0);
   const [nowPlaying, setNowPlaying] = useState<string | null>(null);
   const [nowPlayingArtist, setNowPlayingArtist] = useState<string | null>(null);
@@ -80,6 +81,9 @@ export default function GoLivePage() {
   const animFrameRef = useRef<number>(0);
 
   useEffect(() => {
+    // Fetch backend URL for direct mic streaming
+    fetch("/api/config").then(r => r.json()).then(c => { backendUrlRef.current = c.streamUrl || ""; }).catch(() => {});
+
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -314,9 +318,8 @@ export default function GoLivePage() {
         processorRef.current = null;
       }
       // Stop mic session on server
-      const stopUrl = process.env.NEXT_PUBLIC_STREAM_URL
-        ? `${process.env.NEXT_PUBLIC_STREAM_URL}/api/mic/${channelSlug}/stop`
-        : `/mic-stream/${channelSlug}/stop`;
+      const base = backendUrlRef.current;
+      const stopUrl = base ? `${base}/api/mic/${channelSlug}/stop` : `/mic-stream/${channelSlug}/stop`;
       fetch(stopUrl, { method: "POST" }).catch(() => {});
       return;
     }
@@ -357,9 +360,8 @@ export default function GoLivePage() {
           pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
         // Send mic audio directly to backend (bypasses Vercel serverless limits)
-        const micUrl = process.env.NEXT_PUBLIC_STREAM_URL
-          ? `${process.env.NEXT_PUBLIC_STREAM_URL}/api/mic/${channelSlug}`
-          : `/mic-stream/${channelSlug}`;
+        const base = backendUrlRef.current;
+        const micUrl = base ? `${base}/api/mic/${channelSlug}` : `/mic-stream/${channelSlug}`;
         fetch(micUrl, {
           method: "POST",
           headers: { "Content-Type": "application/octet-stream" },
