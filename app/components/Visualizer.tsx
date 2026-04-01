@@ -8,32 +8,40 @@ interface VisualizerProps {
 }
 
 export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const bgCanvasRef = useRef<HTMLCanvasElement>(null);
+  const fgCanvasRef = useRef<HTMLCanvasElement>(null);
   const timeRef = useRef(0);
   const animFrameRef = useRef<number>(0);
+  const smoothedRef = useRef<Float32Array | null>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const bgCanvas = bgCanvasRef.current;
+    const fgCanvas = fgCanvasRef.current;
+    if (!bgCanvas || !fgCanvas) return;
+    const bgCtx = bgCanvas.getContext("2d");
+    const fgCtx = fgCanvas.getContext("2d");
+    if (!bgCtx || !fgCtx) return;
 
     let currentDpr = window.devicePixelRatio || 1;
     const resize = () => {
       currentDpr = window.devicePixelRatio || 1;
-      const rect = canvas.parentElement!.getBoundingClientRect();
-      canvas.width = rect.width * currentDpr;
-      canvas.height = rect.height * currentDpr;
-      ctx.setTransform(currentDpr, 0, 0, currentDpr, 0, 0);
+      const rect = bgCanvas.parentElement!.getBoundingClientRect();
+      bgCanvas.width = rect.width * currentDpr;
+      bgCanvas.height = rect.height * currentDpr;
+      bgCtx.setTransform(currentDpr, 0, 0, currentDpr, 0, 0);
+      fgCanvas.width = rect.width * currentDpr;
+      fgCanvas.height = rect.height * currentDpr;
+      fgCtx.setTransform(currentDpr, 0, 0, currentDpr, 0, 0);
     };
     resize();
     window.addEventListener("resize", resize);
-    // Handle mobile orientation changes
     window.addEventListener("orientationchange", () => setTimeout(resize, 100));
 
     const waveColor = { r: 120, g: 179, b: 206 }; // #78B3CE
+    const BANDS = 48;
 
     const drawWave = (
+      ctx: CanvasRenderingContext2D,
       w: number,
       h: number,
       amplitude: number,
@@ -51,7 +59,6 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
         let y = Math.sin(x * frequency + time + phaseOffset) * amplitude;
         y += Math.sin(x * (frequency * 3.5) + time * 2) * (amplitude * 0.2);
 
-        // Modulate by audio data if available
         if (freqData) {
           const dataIndex = Math.floor((x / w) * freqData.length);
           const freqValue = freqData[dataIndex] / 255;
@@ -67,20 +74,67 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
       ctx.stroke();
     };
 
+    const drawGradientSpectrum = (
+      ctx: CanvasRenderingContext2D,
+      w: number,
+      h: number,
+      freqData: Uint8Array | undefined
+    ) => {
+      if (!freqData) return;
+
+      if (!smoothedRef.current || smoothedRef.current.length !== BANDS) {
+        smoothedRef.current = new Float32Array(BANDS);
+      }
+      const smoothed = smoothedRef.current;
+      const binSize = Math.floor(freqData.length / BANDS);
+      const gap = 2;
+      const barW = (w - gap * (BANDS - 1)) / BANDS;
+
+      for (let i = 0; i < BANDS; i++) {
+        let sum = 0;
+        for (let j = 0; j < binSize; j++) {
+          sum += freqData[i * binSize + j];
+        }
+        const target = sum / binSize / 255;
+        // Smooth: rise fast, fall slow
+        smoothed[i] += (target - smoothed[i]) * (target > smoothed[i] ? 0.4 : 0.08);
+
+        const barH = smoothed[i] * h;
+        if (barH < 1) continue;
+
+        const x = i * (barW + gap);
+        const y = h - barH;
+
+        // Gradient per bar: cyan at bottom → emerald at top
+        const grad = ctx.createLinearGradient(x, h, x, y);
+        grad.addColorStop(0, `rgba(6, 182, 212, ${0.15 + smoothed[i] * 0.25})`);   // cyan
+        grad.addColorStop(0.5, `rgba(16, 185, 129, ${0.1 + smoothed[i] * 0.2})`);  // emerald
+        grad.addColorStop(1, `rgba(120, 179, 206, ${0.05 + smoothed[i] * 0.1})`);  // light blue fade
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, barW, barH);
+
+        // Soft glow at peak
+        if (smoothed[i] > 0.3) {
+          const glowGrad = ctx.createRadialGradient(
+            x + barW / 2, y, 0,
+            x + barW / 2, y, barW * 1.5
+          );
+          glowGrad.addColorStop(0, `rgba(6, 182, 212, ${smoothed[i] * 0.15})`);
+          glowGrad.addColorStop(1, "rgba(6, 182, 212, 0)");
+          ctx.fillStyle = glowGrad;
+          ctx.fillRect(x - barW, y - barW, barW * 3, barW * 2);
+        }
+      }
+    };
+
     const draw = () => {
-      const rect = canvas.parentElement!.getBoundingClientRect();
+      const rect = bgCanvas.parentElement!.getBoundingClientRect();
       const w = rect.width;
       const h = rect.height;
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Center line
-      ctx.beginPath();
-      ctx.moveTo(0, h / 2);
-      ctx.lineTo(w, h / 2);
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
+      bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+      fgCtx.clearRect(0, 0, fgCanvas.width, fgCanvas.height);
 
       let freqData: Uint8Array<ArrayBuffer> | undefined;
       if (analyserNode && isPlaying) {
@@ -88,10 +142,21 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
         analyserNode.getByteFrequencyData(freqData);
       }
 
-      // Three layered waves — matches the reference exactly
-      drawWave(w, h, h * 0.3, 0.005, 0, 0.3, 2, timeRef.current, freqData);
-      drawWave(w, h, h * 0.2, 0.01, Math.PI / 4, 0.8, 1.5, timeRef.current, freqData);
-      drawWave(w, h, h * 0.1, 0.02, Math.PI, 0.5, 1, timeRef.current, freqData);
+      // Background: gradient spectrum bars
+      drawGradientSpectrum(bgCtx, w, h, freqData);
+
+      // Foreground: center line
+      fgCtx.beginPath();
+      fgCtx.moveTo(0, h / 2);
+      fgCtx.lineTo(w, h / 2);
+      fgCtx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      fgCtx.lineWidth = 1;
+      fgCtx.stroke();
+
+      // Foreground: three layered waves
+      drawWave(fgCtx, w, h, h * 0.3, 0.005, 0, 0.3, 2, timeRef.current, freqData);
+      drawWave(fgCtx, w, h, h * 0.2, 0.01, Math.PI / 4, 0.8, 1.5, timeRef.current, freqData);
+      drawWave(fgCtx, w, h, h * 0.1, 0.02, Math.PI, 0.5, 1, timeRef.current, freqData);
 
       timeRef.current -= 0.03;
       animFrameRef.current = requestAnimationFrame(draw);
@@ -107,9 +172,15 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
   }, [analyserNode, isPlaying]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ display: "block", width: "100%", height: "100%" }}
-    />
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <canvas
+        ref={bgCanvasRef}
+        style={{ display: "block", width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}
+      />
+      <canvas
+        ref={fgCanvasRef}
+        style={{ display: "block", width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}
+      />
+    </div>
   );
 }
