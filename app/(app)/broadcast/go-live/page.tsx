@@ -329,13 +329,26 @@ export default function GoLivePage() {
       setMicStream(stream);
       setMicActive(true);
 
+      // Ensure we have the backend URL before opening WebSocket
+      if (!backendUrlRef.current) {
+        try {
+          const cfg = await fetch("/api/config").then(r => r.json());
+          backendUrlRef.current = cfg.streamUrl || "";
+        } catch { /* fallback below */ }
+      }
+
       // Open WebSocket to backend for mic audio streaming
       const base = backendUrlRef.current;
-      const wsProto = base.startsWith("https") ? "wss" : "ws";
-      const wsHost = base.replace(/^https?:\/\//, "");
-      const wsUrl = base
-        ? `${wsProto}://${wsHost}/ws/mic?slug=${channelSlug}`
-        : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws/mic?slug=${channelSlug}`;
+      let wsUrl: string;
+      if (base) {
+        const wsProto = base.startsWith("https") ? "wss" : "ws";
+        const wsHost = base.replace(/^https?:\/\//, "");
+        wsUrl = `${wsProto}://${wsHost}/ws/mic?slug=${channelSlug}`;
+      } else {
+        // Fallback to same host (only works if backend is on same server)
+        const proto = window.location.protocol === "https:" ? "wss" : "ws";
+        wsUrl = `${proto}://${window.location.host}/ws/mic?slug=${channelSlug}`;
+      }
 
       const ws = new WebSocket(wsUrl);
       ws.binaryType = "arraybuffer";
