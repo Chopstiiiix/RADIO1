@@ -93,7 +93,24 @@ export default function GoLivePage() {
       if (channel) {
         setChannelName(channel.channel_name);
         setChannelSlug(channel.channel_slug);
-        setIsLive(channel.is_live);
+
+        // Only show as "live" on this page if the broadcast is in mic mode.
+        // Tracks-mode broadcasts are independent — this page can override them.
+        if (channel.is_live && channel.channel_slug) {
+          try {
+            const metaRes = await fetch(`/metadata/api/channels/${channel.channel_slug}/now-playing`);
+            if (metaRes.ok) {
+              const meta = await metaRes.json();
+              setIsLive(meta.mode === "live_mic");
+            } else {
+              setIsLive(false);
+            }
+          } catch {
+            setIsLive(false);
+          }
+        } else {
+          setIsLive(false);
+        }
       }
 
       const { count } = await supabase
@@ -449,37 +466,43 @@ export default function GoLivePage() {
     setMessage("");
 
     try {
-      const trackIds = Array.from(selectedTrackIds);
-      const isVoiceOnly = !isLive && trackIds.length === 0;
-
-      const res = await fetch("/api/broadcast", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: isLive ? "stop" : isVoiceOnly ? "voice_only" : "start",
-          ...(isLive || isVoiceOnly ? {} : { track_ids: trackIds }),
-          ...(!isLive ? { mode: "live_mic" } : {}),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setMessage(data.error || "Failed");
-        setToggling(false);
-        return;
-      }
-
-      setIsLive(!isLive);
-      setMessage(isLive ? "Channel is now offline" : "Channel is now live!");
       if (isLive) {
+        // Stopping mic-live broadcast
+        const res = await fetch("/api/broadcast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "stop" }),
+        });
+        const data = await res.json();
+        if (!res.ok) { setMessage(data.error || "Failed"); setToggling(false); return; }
+
+        setIsLive(false);
+        setMessage("Channel is now offline");
         setNowPlaying(null);
-        // Stop mic when going offline
         if (micStream) {
           micStream.getTracks().forEach((t) => t.stop());
           setMicStream(null);
           setMicActive(false);
         }
+      } else {
+        // Starting mic-live — backend will stop any existing tracks broadcast
+        const trackIds = Array.from(selectedTrackIds);
+        const hasTracksSelected = trackIds.length > 0;
+
+        const res = await fetch("/api/broadcast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            hasTracksSelected
+              ? { action: "start", track_ids: trackIds, mode: "live_mic" }
+              : { action: "voice_only" }
+          ),
+        });
+        const data = await res.json();
+        if (!res.ok) { setMessage(data.error || "Failed"); setToggling(false); return; }
+
+        setIsLive(true);
+        setMessage("Channel is now live!");
       }
     } catch {
       setMessage("Broadcast server unavailable");

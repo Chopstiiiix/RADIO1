@@ -405,9 +405,10 @@ async function main() {
     const { broadcaster_id, track_ids, mode } = req.body;
     if (!broadcaster_id) return res.status(400).json({ error: "broadcaster_id required" });
 
-    // If channel is already live with an active mixer, don't restart — prevent double-call kills
-    if (activeChannels.has(slug) && hasMixer(slug)) {
-      console.log(`⚡ [${slug}] Already live — ignoring duplicate start request`);
+    // If channel is already live in tracks mode with an active mixer, don't restart
+    const existingState = channelStates.get(slug);
+    if (activeChannels.has(slug) && hasMixer(slug) && existingState?.mode === "tracks") {
+      console.log(`⚡ [${slug}] Already live in tracks mode — ignoring duplicate start`);
       return res.json({ ok: true, message: `Channel ${slug} is already live` });
     }
 
@@ -429,13 +430,20 @@ async function main() {
     const { broadcaster_id } = req.body;
     if (!broadcaster_id) return res.status(400).json({ error: "broadcaster_id required" });
 
-    // If channel is already live with an active mixer, don't restart
-    if (activeChannels.has(slug) && hasMixer(slug)) {
-      console.log(`⚡ [${slug}] Already live — ignoring duplicate voice-only request`);
+    // If already live in mic mode, don't restart
+    const existingState = channelStates.get(slug);
+    if (activeChannels.has(slug) && hasMixer(slug) && existingState?.mode === "live_mic") {
+      console.log(`⚡ [${slug}] Already live in mic mode — ignoring duplicate`);
       return res.json({ ok: true, message: `Channel ${slug} is already live` });
     }
 
-    // Clean up any stale state before starting fresh
+    // Stop any existing broadcast (e.g., tracks mode) before starting mic-live
+    if (activeChannels.has(slug)) {
+      console.log(`🔄 [${slug}] Stopping tracks broadcast to start mic-live`);
+      await stopChannel(slug);
+    }
+
+    // Clean up any remaining stale state
     stopChannelPipeline(slug);
     stopMixer(slug);
 

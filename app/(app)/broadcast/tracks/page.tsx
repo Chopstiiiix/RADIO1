@@ -51,8 +51,25 @@ export default function TracksPage() {
       .select("channel_slug, is_live")
       .eq("id", user.id)
       .single();
-    if (ch?.channel_slug) setChannelSlug(ch.channel_slug);
-    setIsChannelLive(ch?.is_live ?? false);
+    if (ch?.channel_slug) {
+      setChannelSlug(ch.channel_slug);
+      // Only show as live if broadcast is in tracks mode (not mic-live)
+      if (ch.is_live) {
+        try {
+          const metaRes = await fetch(`/metadata/api/channels/${ch.channel_slug}/now-playing`);
+          if (metaRes.ok) {
+            const meta = await metaRes.json();
+            setIsChannelLive(meta.mode !== "live_mic" && !meta.ended);
+          } else {
+            setIsChannelLive(false);
+          }
+        } catch {
+          setIsChannelLive(ch.is_live);
+        }
+      } else {
+        setIsChannelLive(false);
+      }
+    }
   }
 
   useEffect(() => { loadTracks(); }, []);
@@ -90,8 +107,16 @@ export default function TracksPage() {
       try {
         const data = JSON.parse(event.data);
         if (data.track && !data.ended) {
-          setNowPlayingTitle(data.track.title);
-          if (!isChannelLive) setIsChannelLive(true);
+          // Only show as live on tracks page if broadcast is in tracks mode
+          // (mic-live from go-live page is independent)
+          if (data.mode === "live_mic") {
+            setNowPlayingTitle(null);
+            setBroadcastingTitles(new Set());
+            setIsChannelLive(false);
+          } else {
+            setNowPlayingTitle(data.track.title);
+            if (!isChannelLive) setIsChannelLive(true);
+          }
         } else if (data.ended) {
           setNowPlayingTitle(null);
           setBroadcastingTitles(new Set());
