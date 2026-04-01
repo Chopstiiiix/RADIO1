@@ -11,6 +11,8 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
+import http from "http";
+import { WebSocketServer } from "ws";
 import { startChannelPipeline, startChannelPipelineFromTracks, stopChannelPipeline, getChannelTracks, streamEvents, type TrackFile } from "./stream";
 import { supabase } from "./supabase";
 import { syncTracksForChannel } from "./track-sync";
@@ -615,10 +617,48 @@ async function main() {
     else res.status(404).json({ error: "Channel not active" });
   });
 
-  app.listen(PORT, "0.0.0.0", () => {
+  // ── HTTP + WebSocket server ──
+  const server = http.createServer(app);
+  const wss = new WebSocketServer({ server, path: "/ws/mic" });
+
+  wss.on("connection", (ws, req) => {
+    // Extract slug from query: /ws/mic?slug=broadcaster
+    const url = new URL(req.url || "", `http://${req.headers.host}`);
+    const slug = url.searchParams.get("slug");
+
+    if (!slug) {
+      ws.close(1008, "slug required");
+      return;
+    }
+
+    console.log(`🎤 [${slug}] WebSocket mic connected`);
+    let chunks = 0;
+
+    ws.on("message", (data: Buffer) => {
+      // Binary PCM frames from browser
+      if (Buffer.isBuffer(data)) {
+        writeMicAudio(slug, data);
+        chunks++;
+        if (chunks % 100 === 1) {
+          console.log(`🎤 [${slug}] WS mic chunk #${chunks} — ${data.length} bytes`);
+        }
+      }
+    });
+
+    ws.on("close", () => {
+      console.log(`🎤 [${slug}] WebSocket mic disconnected (${chunks} chunks sent)`);
+      stopMicInput(slug);
+    });
+
+    ws.on("error", (err) => {
+      console.error(`🎤 [${slug}] WebSocket mic error:`, err.message);
+    });
+  });
+
+  server.listen(PORT, "0.0.0.0", () => {
     console.log(`\n🔥 Caster backend live on port ${PORT}`);
     console.log(`   📡 Stream:   /stream/{slug}/stream.m3u8`);
-    console.log(`   🎤 Mic:      POST /api/mic/{slug}`);
+    console.log(`   🎤 Mic:      ws://host:${PORT}/ws/mic?slug={slug}`);
     console.log(`   📊 Metadata: /metadata/channels/{slug}/now-playing`);
     console.log(`   🔧 API:      /api/channels/*\n`);
   });

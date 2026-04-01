@@ -307,7 +307,7 @@ export default function GoLivePage() {
 
   async function toggleMic() {
     if (micActive && micStream) {
-      // Stop mic — stop tracks, cleanup, notify server
+      // Stop mic — stop tracks, cleanup, close WebSocket
       micStream.getTracks().forEach((t) => t.stop());
       setMicStream(null);
       setMicActive(false);
@@ -317,10 +317,10 @@ export default function GoLivePage() {
         processorRef.current.disconnect();
         processorRef.current = null;
       }
-      // Stop mic session on server
-      const base = backendUrlRef.current;
-      const stopUrl = base ? `${base}/api/mic/${channelSlug}/stop` : `/mic-stream/${channelSlug}/stop`;
-      fetch(stopUrl, { method: "POST" }).catch(() => {});
+      if (micWsRef.current) {
+        micWsRef.current.close();
+        micWsRef.current = null;
+      }
       return;
     }
 
@@ -329,7 +329,21 @@ export default function GoLivePage() {
       setMicStream(stream);
       setMicActive(true);
 
-      // Mic audio will be sent via HTTP POST (WebSocket not available through Railway proxy)
+      // Open WebSocket to backend for mic audio streaming
+      const base = backendUrlRef.current;
+      const wsProto = base.startsWith("https") ? "wss" : "ws";
+      const wsHost = base.replace(/^https?:\/\//, "");
+      const wsUrl = base
+        ? `${wsProto}://${wsHost}/ws/mic?slug=${channelSlug}`
+        : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws/mic?slug=${channelSlug}`;
+
+      const ws = new WebSocket(wsUrl);
+      ws.binaryType = "arraybuffer";
+      micWsRef.current = ws;
+
+      ws.onopen = () => console.log("🎤 WebSocket mic connected");
+      ws.onclose = () => console.log("🎤 WebSocket mic disconnected");
+      ws.onerror = (e) => console.error("🎤 WebSocket mic error:", e);
 
       // Set up Web Audio: mic → gain → analyser (for metering) + processor (for streaming)
       if (!audioContextRef.current) {
@@ -352,6 +366,7 @@ export default function GoLivePage() {
       processorRef.current = processor;
 
       processor.onaudioprocess = (e) => {
+        if (!micWsRef.current || micWsRef.current.readyState !== WebSocket.OPEN) return;
         const input = e.inputBuffer.getChannelData(0);
         // Convert float32 to int16
         const pcm = new Int16Array(input.length);
@@ -359,14 +374,8 @@ export default function GoLivePage() {
           const s = Math.max(-1, Math.min(1, input[i]));
           pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
-        // Send mic audio directly to backend (bypasses Vercel serverless limits)
-        const base = backendUrlRef.current;
-        const micUrl = base ? `${base}/api/mic/${channelSlug}` : `/mic-stream/${channelSlug}`;
-        fetch(micUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/octet-stream" },
-          body: pcm.buffer,
-        }).catch(() => {});
+        // Send binary PCM frame over WebSocket — no HTTP overhead
+        micWsRef.current.send(pcm.buffer);
       };
 
       source.connect(gainNode);
@@ -395,6 +404,7 @@ export default function GoLivePage() {
       cancelAnimationFrame(animFrameRef.current);
       micStream?.getTracks().forEach((t) => t.stop());
       processorRef.current?.disconnect();
+      micWsRef.current?.close();
     };
   }, [micStream]);
 
