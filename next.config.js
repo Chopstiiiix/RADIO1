@@ -8,8 +8,7 @@ const nextConfig = {
       { source: "/stream/:path*", destination: `${backend}/stream/:path*` },
       { source: "/metadata/:path*", destination: `${backend}/metadata/:path*` },
       { source: "/api/channels/:path*", destination: `${backend}/api/channels/:path*` },
-      { source: "/api/mic/:slug", destination: `${backend}/api/mic/:slug` },
-      { source: "/api/mic/:slug/:action", destination: `${backend}/api/mic/:slug/:action` },
+      { source: "/mic-stream/:path*", destination: `${backend}/api/mic/:path*` },
     ];
   },
 };

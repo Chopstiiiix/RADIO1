@@ -314,7 +314,7 @@ export default function GoLivePage() {
         processorRef.current = null;
       }
       // Stop mic session on server
-      fetch(`/api/mic/${channelSlug}/stop`, { method: "POST" }).catch(() => {});
+      fetch(`/mic-stream/${channelSlug}/stop`, { method: "POST" }).catch(() => {});
       return;
     }
 
@@ -354,7 +354,7 @@ export default function GoLivePage() {
           pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
         // Send via HTTP POST (non-blocking) — uses Next.js rewrite to bypass serverless
-        fetch(`/api/mic/${channelSlug}`, {
+        fetch(`/mic-stream/${channelSlug}`, {
           method: "POST",
           headers: { "Content-Type": "application/octet-stream" },
           body: pcm.buffer,
