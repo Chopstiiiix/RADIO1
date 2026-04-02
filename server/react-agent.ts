@@ -40,7 +40,7 @@ export interface GeneratedSegment {
   audioPath: string;
   duration: number;
   speakers: string[];
-  type: "track_intro" | "track_outro" | "ad_intro" | "ad_outro";
+  type: "track_intro" | "track_outro" | "ad_intro" | "ad_outro" | "show_open" | "show_close" | "recap";
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ export async function generateHostAudio(
     adTitle?: string;
     segmentDir?: string;
     maxDurationSeconds?: number;
-    segmentStyle?: "show_open" | "recap" | "transition";
+    segmentStyle?: "show_open" | "recap" | "transition" | "show_close";
     recentTracks?: string;
   }
 ): Promise<GeneratedSegment | null> {
@@ -252,12 +252,20 @@ export async function generateHostAudio(
   const isAdIntro = options?.isAdIntro ?? false;
   const adTitle = options?.adTitle;
 
-  // Determine segment type
-  const segmentType: GeneratedSegment["type"] = isAdIntro
-    ? "ad_intro"
-    : outgoing
-      ? "track_intro"
-      : "track_intro";
+  // Determine segment type from the style hint
+  const segmentStyle = options?.segmentStyle as string | undefined;
+  let segmentType: GeneratedSegment["type"];
+  if (isAdIntro) {
+    segmentType = "ad_intro";
+  } else if (segmentStyle === "show_open") {
+    segmentType = "show_open";
+  } else if (segmentStyle === "show_close") {
+    segmentType = "show_close";
+  } else if (segmentStyle === "recap") {
+    segmentType = "recap";
+  } else {
+    segmentType = "track_intro";
+  }
 
   const isSolo = agents.length === 1;
   const primary = agents[0];
@@ -297,9 +305,6 @@ export async function generateHostAudio(
   const hour = new Date().getHours();
   const timeGreeting = hour < 12 ? "good morning" : hour < 17 ? "good afternoon" : hour < 21 ? "good evening" : "good night";
   const timeContext = hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 21 ? "evening" : "late night";
-
-  // Segment style hint (passed via options)
-  const segmentStyle = options?.segmentStyle as string | undefined;
 
   const formatInstruction = isSolo
     ? `Format each line as: ${primary.name}: <text>`
@@ -356,6 +361,26 @@ Write a ${isSolo ? "monologue (3-4 sentences)" : "natural, reflective 4-6 line c
 
 ${formatInstruction}
 ${toneInstruction}`;
+  } else if (segmentStyle === "show_close") {
+    // Show closing — thank listeners, sign off
+    const recentTracks = options?.recentTracks as string | undefined;
+    prompt = `You are writing a SHOW CLOSING for an AI radio station broadcast.
+
+${agentDescriptions}
+
+The hosts are wrapping up the show. Here are some of the tracks they played today:
+${recentTracks || `"${outgoing?.title}" by ${outgoing?.artist}`}
+
+Write a ${isSolo ? "monologue (3-4 sentences)" : "natural, warm 4-6 line conversation"} where the hosts:
+1. Signal that the show is wrapping up — "That's all we've got for you today" or similar
+2. Briefly reflect on the session — the vibes, the music, what stood out
+3. Thank the listeners for tuning in
+4. Sign off with personality — use catchphrases, leave listeners wanting more
+5. Tease that they'll be back — "catch us next time" energy
+
+${formatInstruction}
+${toneInstruction}
+Keep the energy warm and grateful, not rushed. This is the last thing listeners hear.`;
   } else if (outgoing) {
     // Standard transition between tracks
     prompt = `You are writing a short radio host ${isSolo ? "monologue" : "conversation"} for an AI radio station.
@@ -470,10 +495,14 @@ ${toneInstruction}`;
 // ---------------------------------------------------------------------------
 
 /**
- * Pre-generate host audio segments for a playlist using smart patterns:
- * - Track 0: Show opening (greet by time of day, introduce hosts + first track)
- * - Short playlists (≤4 tracks): intro on every track
- * - Longer playlists: let 2-3 tracks play, then do a recap segment
+ * Pre-generate host audio segments for a playlist with randomized timing:
+ * - Track 0: Show opening (greet listeners, introduce hosts, tease first track)
+ * - Mid-show: Random mix of transitions (after 1 track) and recaps (after 2-3 tracks)
+ * - Last track: Show closing (thank listeners, sign off)
+ *
+ * The randomization makes each broadcast feel natural — hosts don't speak at
+ * predictable intervals. Sometimes they intro every track, sometimes they let
+ * 2-3 tracks play back-to-back then come in with a recap.
  *
  * Returns a map of trackIndex -> GeneratedSegment that plays BEFORE that track.
  */
@@ -511,29 +540,64 @@ export async function pregenerateHostSegments(
     fs.mkdirSync(segmentDir, { recursive: true });
   }
 
-  const isShortPlaylist = tracks.length <= 4;
-  // For longer playlists, decide recap interval (every 2-3 tracks, randomized)
-  const recapInterval = isShortPlaylist ? 1 : (2 + Math.floor(Math.random() * 2)); // 2 or 3
+  // ── Randomized segment planning ──
+  // Goal: feel like real radio — sometimes hosts talk between every track,
+  // sometimes they let 2-3 tracks play back-to-back then recap.
+  const segmentPlan: { index: number; style: "show_open" | "recap" | "transition" | "show_close"; recentTracks?: string }[] = [];
 
-  // Track which indices get segments and what style
-  const segmentPlan: { index: number; style: "show_open" | "recap" | "transition"; recentTracks?: string }[] = [];
+  // Always open the show
+  segmentPlan.push({ index: 0, style: "show_open" });
 
-  for (let i = 0; i < tracks.length; i++) {
-    if (i === 0) {
-      // Always open the show
-      segmentPlan.push({ index: 0, style: "show_open" });
-    } else if (isShortPlaylist) {
-      // Short playlist: intro every track
-      segmentPlan.push({ index: i, style: "transition" });
-    } else if (i % recapInterval === 0) {
-      // Longer playlist: recap every N tracks
-      const recentStart = Math.max(0, i - recapInterval);
-      const recentList = tracks.slice(recentStart, i)
-        .map(t => `"${enrichTrackContext(t, metadataMap).title}" by ${enrichTrackContext(t, metadataMap).artist}`)
-        .join("\n");
-      segmentPlan.push({ index: i, style: "recap", recentTracks: recentList });
+  // Walk through the playlist deciding when hosts speak next
+  let lastHostIndex = 0; // track index where hosts last spoke
+  let i = 1;
+  const lastTrackIndex = tracks.length - 1;
+
+  while (i < tracks.length) {
+    // Reserve the last track for show_close (handled below)
+    if (i === lastTrackIndex) break;
+
+    const tracksSinceLastHost = i - lastHostIndex;
+
+    // Random decision: speak now or let music breathe?
+    // After 1 track: 40% chance hosts come in (transition style)
+    // After 2 tracks: 60% chance hosts come in (could be transition or recap)
+    // After 3+ tracks: always come in (recap style — too long without hosts)
+    let shouldSpeak = false;
+    if (tracksSinceLastHost >= 3) {
+      shouldSpeak = true;
+    } else if (tracksSinceLastHost === 2) {
+      shouldSpeak = Math.random() < 0.6;
+    } else if (tracksSinceLastHost === 1) {
+      shouldSpeak = Math.random() < 0.4;
     }
-    // Otherwise: no host segment, let the music play
+
+    if (shouldSpeak) {
+      if (tracksSinceLastHost >= 2) {
+        // Multiple tracks played — recap them then intro the next
+        const recentStart = lastHostIndex;
+        const recentList = tracks.slice(recentStart, i)
+          .map(t => `"${enrichTrackContext(t, metadataMap).title}" by ${enrichTrackContext(t, metadataMap).artist}`)
+          .join("\n");
+        segmentPlan.push({ index: i, style: "recap", recentTracks: recentList });
+      } else {
+        // Just one track played — simple transition
+        segmentPlan.push({ index: i, style: "transition" });
+      }
+      lastHostIndex = i;
+    }
+
+    i++;
+  }
+
+  // Always close the show before (or at) the last track
+  if (tracks.length > 1) {
+    // Build a recap of recent tracks for the outro
+    const recapStart = Math.max(0, tracks.length - 4);
+    const recentList = tracks.slice(recapStart, tracks.length)
+      .map(t => `"${enrichTrackContext(t, metadataMap).title}" by ${enrichTrackContext(t, metadataMap).artist}`)
+      .join("\n");
+    segmentPlan.push({ index: lastTrackIndex, style: "show_close", recentTracks: recentList });
   }
 
   console.log(
