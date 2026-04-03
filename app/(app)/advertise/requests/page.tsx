@@ -47,7 +47,15 @@ export default function RequestsPage() {
   }
 
   return (
-    <div>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      height: "calc(100dvh - 65px)",
+      marginTop: "-24px",
+      marginLeft: "-20px",
+      marginRight: "-20px",
+      overflow: "hidden",
+    }}>
       <style>{`
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
@@ -57,30 +65,45 @@ export default function RequestsPage() {
           animation: pulse-opacity 1s step-end infinite;
         }
       `}</style>
+
+      {/* ── Fixed top zone ── */}
       <div style={{
-        fontFamily: "var(--font-mono)",
-        fontSize: "13px",
-        color: "#f59e0b",
-        marginBottom: "8px",
+        flexShrink: 0,
+        padding: "24px 20px 16px",
+        backgroundColor: "var(--bg-base)",
+        borderBottom: "1px solid #27272a",
       }}>
-        {">"} request_status --mine<span className="cursor-blink" style={{
-          width: "8px",
-          height: "12px",
-          backgroundColor: "#f59e0b",
-          display: "inline-block",
-        }} />
-      </div>
+        <div style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: "13px",
+          color: "#f59e0b",
+          marginBottom: "8px",
+        }}>
+          {">"} request_status --mine<span className="cursor-blink" style={{
+            width: "8px",
+            height: "12px",
+            backgroundColor: "#f59e0b",
+            display: "inline-block",
+          }} />
+        </div>
 
-      <h1 style={{
-        fontSize: "24px",
-        fontWeight: 700,
-        marginBottom: "24px",
-        textTransform: "uppercase",
-        letterSpacing: "-0.05em",
+        <h1 style={{
+          fontSize: "24px",
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "-0.05em",
+        }}>
+          My Requests<span style={{ color: "#f59e0b" }}>_</span>
+        </h1>
+      </div>{/* end fixed top zone */}
+
+      {/* ── Scrollable content zone ── */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "16px 20px",
       }}>
-        My Requests<span style={{ color: "#f59e0b" }}>_</span>
-      </h1>
-
       {loading ? (
         <InlineLoader />
       ) : requests.length === 0 ? (
@@ -150,6 +173,7 @@ export default function RequestsPage() {
           ))}
         </div>
       )}
+      </div>{/* end scrollable zone */}
     </div>
   );
 }
