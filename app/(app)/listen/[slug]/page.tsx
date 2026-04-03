@@ -319,6 +319,11 @@ export default function ChannelPage() {
       color: "var(--text-primary)",
       fontFamily: "'JetBrains Mono', monospace",
       overflow: "hidden",
+      position: "fixed",
+      top: "calc(65px + env(safe-area-inset-top, 0px))",
+      left: 0,
+      right: 0,
+      bottom: 0,
       WebkitFontSmoothing: "antialiased",
     }}>
 
