@@ -212,7 +212,8 @@ function startTrackTimer(slug: string) {
     }
 
     if (current.currentIndex >= current.tracks.length) {
-      current.currentIndex = 0;
+      // All tracks finished — don't loop, let FFmpeg "ended" event handle cleanup
+      return;
     }
 
     const next = current.tracks[current.currentIndex];
@@ -368,20 +369,32 @@ setInterval(async () => {
 }, 30000);
 
 // ── Auto-end handler (broadcast ends when all tracks finish) ──
+const stoppingChannels = new Set<string>();
+
 streamEvents.on("ended", async (slug: string) => {
   // Skip if pipeline was deliberately restarted (e.g., add-tracks)
   if (suppressAutoLoop.has(slug)) {
     suppressAutoLoop.delete(slug);
     return;
   }
+  // Guard against double-stop from concurrent listeners
+  if (stoppingChannels.has(slug)) return;
   const ch = activeChannels.get(slug);
   if (!ch) return;
+
+  stoppingChannels.add(slug);
   console.log(`⏹️  [${slug}] Playlist finished — ending broadcast.`);
+
   // Small delay to let ffmpeg fully exit before cleanup
   setTimeout(async () => {
-    if (!activeChannels.has(slug)) return;
-    await stopChannel(slug);
-    console.log(`⏹️  [${slug}] Broadcast stopped.`);
+    try {
+      if (activeChannels.has(slug)) {
+        await stopChannel(slug);
+        console.log(`⏹️  [${slug}] Broadcast stopped.`);
+      }
+    } finally {
+      stoppingChannels.delete(slug);
+    }
   }, 2000);
 });
 
@@ -570,12 +583,12 @@ async function main() {
 
       console.log(`➕ [${slug}] Adding ${track_ids.length} tracks — restarting pipeline with ${allTracks.length} total`);
 
-      // Suppress auto-loop before stopping — we're restarting deliberately
+      // Suppress auto-end before stopping — we're restarting deliberately
       suppressAutoLoop.add(slug);
       stopChannelPipeline(slug);
 
-      // Brief delay for ffmpeg to exit
-      await new Promise((r) => setTimeout(r, 500));
+      // Wait for ffmpeg to fully exit before restarting
+      await new Promise((r) => setTimeout(r, 1500));
 
       // Restart music decoder with combined tracks (mixer stays running)
       const result = startChannelPipelineFromTracks({ slug, musicDir, outputDir }, allTracks);
