@@ -6,6 +6,7 @@ import TrashButton from "@/app/components/TrashButton";
 import BroadcastAgreement from "@/app/components/BroadcastAgreement";
 import ScheduleModal from "@/app/components/ScheduleModal";
 import InlineLoader from "@/app/components/InlineLoader";
+import { useDominantColor } from "@/app/hooks/useDominantColor";
 
 interface Track {
   id: string;
@@ -17,6 +18,7 @@ interface Track {
   duration_seconds: number | null;
   is_active: boolean;
   uploaded_at: string;
+  artwork_url: string | null;
 }
 
 export default function TracksPage() {
@@ -64,7 +66,7 @@ export default function TracksPage() {
 
     const { data } = await supabase
       .from("tracks")
-      .select("id, title, primary_artist, featured_artists, producer, genre, duration_seconds, is_active, uploaded_at")
+      .select("id, title, primary_artist, featured_artists, producer, genre, duration_seconds, is_active, uploaded_at, artwork_url")
       .eq("broadcaster_id", user.id)
       .order("uploaded_at", { ascending: false });
 
@@ -606,164 +608,19 @@ export default function TracksPage() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {tracks.map((track) => {
-            const isSelected = selectedTracks.has(track.id);
-            const isNowPlaying = nowPlayingTitle !== null &&
-              normalize(nowPlayingTitle).includes(normalize(track.title));
-            const isBroadcasting = isTrackBroadcasting(track);
-            const isSelectable = track.is_active && !isBroadcasting;
-
-            return (
-              <div
-                key={track.id}
-                onClick={() => isSelectable && toggleTrackSelection(track.id)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "16px",
-                  backgroundColor: isNowPlaying
-                    ? "rgba(245, 158, 11, 0.06)"
-                    : isSelected
-                      ? "rgba(74, 222, 128, 0.05)"
-                      : "rgba(24, 24, 27, 0.3)",
-                  borderLeft: isNowPlaying
-                    ? "3px solid #f59e0b"
-                    : isSelected
-                      ? "3px solid #4ADE80"
-                      : "2px solid #27272a",
-                  borderRadius: "0px",
-                  opacity: track.is_active ? 1 : 0.4,
-                  cursor: isSelectable ? "pointer" : "default",
-                  transition: "background-color 0.15s, border-color 0.15s",
-                }}
-              >
-                {/* Checkbox / On-Air indicator */}
-                {isBroadcasting ? (
-                  <div style={{
-                    width: "14px",
-                    height: "14px",
-                    backgroundColor: "#f59e0b",
-                    flexShrink: 0,
-                    animation: "orange-blink 1.2s ease-in-out infinite",
-                  }} />
-                ) : !track.is_active ? null : (
-                  <div style={{
-                    width: "18px",
-                    height: "18px",
-                    border: isSelected
-                      ? "2px solid #4ADE80"
-                      : "2px solid #3f3f46",
-                    backgroundColor: isSelected ? "#4ADE80" : "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    transition: "all 0.15s",
-                  }}>
-                    {isSelected && (
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
-                        stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </div>
-                )}
-
-                {/* Track info — two-row layout for mobile */}
-                <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-                  {/* Row 1: Title */}
-                  <div style={{
-                    fontWeight: 600,
-                    fontSize: "14px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    textTransform: "uppercase",
-                    color: isNowPlaying ? "#fbbf24" : undefined,
-                  }}>
-                    {track.title}
-                  </div>
-                  {/* Row 2: Artist + duration */}
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    marginTop: "2px",
-                  }}>
-                    <span style={{
-                      color: isNowPlaying ? "#f59e0b" : "var(--text-secondary)",
-                      fontSize: "12px",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      flex: 1,
-                      minWidth: 0,
-                    }}>
-                      {isNowPlaying && (
-                        <span style={{
-                          fontSize: "10px",
-                          letterSpacing: "0.1em",
-                          marginRight: "6px",
-                        }}>
-                          ON AIR
-                        </span>
-                      )}
-                      {track.primary_artist}
-                      {track.featured_artists?.length ? ` ft. ${track.featured_artists.join(", ")}` : ""}
-                    </span>
-                    <span style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "11px",
-                      color: "var(--text-tertiary)",
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                    }}>
-                      {formatDuration(track.duration_seconds)}
-                    </span>
-                  </div>
-                  {/* Row 3: Genre tags */}
-                  {track.genre?.length ? (
-                    <div style={{ display: "flex", gap: "4px", marginTop: "6px", flexWrap: "wrap" }}>
-                      {track.genre.slice(0, 2).map((g) => (
-                        <span key={g} style={{
-                          fontSize: "9px",
-                          padding: "1px 6px",
-                          backgroundColor: "var(--bg-well)",
-                          borderRadius: "0px",
-                          border: "1px solid #27272a",
-                          color: "var(--text-secondary)",
-                          fontFamily: "var(--font-mono)",
-                        }}>{g}</span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                {/* Right side: Status + Delete stacked */}
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px", flexShrink: 0 }}>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); if (!isBroadcasting) toggleActive(track.id, track.is_active); }}
-                    style={{
-                      background: "none",
-                      border: "1px solid var(--border-subtle)",
-                      color: isBroadcasting ? "#4ADE80" : track.is_active ? "#f59e0b" : "var(--text-tertiary)",
-                      padding: "3px 8px",
-                      borderRadius: "0px",
-                      fontSize: "10px",
-                      cursor: isBroadcasting ? "default" : "pointer",
-                      fontFamily: "var(--font-mono)",
-                      animation: isBroadcasting ? "active-pulse 2s ease-in-out infinite" : "none",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {isBroadcasting ? "ACTIVE" : track.is_active ? "READY" : "OFF"}
-                  </button>
-                  <TrashButton onClick={() => deleteTrack(track.id)} />
-                </div>
-              </div>
-            );
-          })}
+          {tracks.map((track) => (
+            <TrackCard
+              key={track.id}
+              track={track}
+              isSelected={selectedTracks.has(track.id)}
+              isNowPlaying={nowPlayingTitle !== null && normalize(nowPlayingTitle).includes(normalize(track.title))}
+              isBroadcasting={isTrackBroadcasting(track)}
+              onToggleSelection={() => toggleTrackSelection(track.id)}
+              onToggleActive={() => toggleActive(track.id, track.is_active)}
+              onDelete={() => deleteTrack(track.id)}
+              formatDuration={formatDuration}
+            />
+          ))}
         </div>
       )}
 
@@ -786,6 +643,208 @@ export default function TracksPage() {
           onCancel={() => setShowSchedule(false)}
         />
       )}
+    </div>
+  );
+}
+
+function TrackCard({ track, isSelected, isNowPlaying, isBroadcasting, onToggleSelection, onToggleActive, onDelete, formatDuration }: {
+  track: Track;
+  isSelected: boolean;
+  isNowPlaying: boolean;
+  isBroadcasting: boolean;
+  onToggleSelection: () => void;
+  onToggleActive: () => void;
+  onDelete: () => void;
+  formatDuration: (s: number | null) => string;
+}) {
+  const isSelectable = track.is_active && !isBroadcasting;
+  const dominantColor = useDominantColor(track.artwork_url);
+  const hasArt = !!track.artwork_url;
+
+  return (
+    <div
+      onClick={() => isSelectable && onToggleSelection()}
+      style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        padding: "12px",
+        backgroundColor: hasArt && dominantColor
+          ? dominantColor
+          : isNowPlaying
+            ? "rgba(245, 158, 11, 0.06)"
+            : isSelected
+              ? "rgba(74, 222, 128, 0.05)"
+              : "rgba(24, 24, 27, 0.3)",
+        borderLeft: isNowPlaying
+          ? "3px solid #f59e0b"
+          : isSelected
+            ? "3px solid #4ADE80"
+            : "2px solid #27272a",
+        borderRadius: "0px",
+        opacity: track.is_active ? 1 : 0.4,
+        cursor: isSelectable ? "pointer" : "default",
+        transition: "background-color 0.15s, border-color 0.15s",
+        overflow: "hidden",
+        minHeight: hasArt ? "80px" : undefined,
+      }}
+    >
+      {/* Artwork centered background */}
+      {hasArt && (
+        <>
+          {/* Dark overlay for text readability */}
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.55)",
+            zIndex: 1,
+          }} />
+          {/* Centered artwork */}
+          <div style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: "64px",
+            height: "64px",
+            zIndex: 0,
+          }}>
+            <img
+              src={track.artwork_url!}
+              alt=""
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                borderRadius: "4px",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+              }}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Checkbox / On-Air indicator */}
+      <div style={{ zIndex: 2 }}>
+        {isBroadcasting ? (
+          <div style={{
+            width: "14px",
+            height: "14px",
+            backgroundColor: "#f59e0b",
+            flexShrink: 0,
+            animation: "orange-blink 1.2s ease-in-out infinite",
+          }} />
+        ) : !track.is_active ? null : (
+          <div style={{
+            width: "18px",
+            height: "18px",
+            border: isSelected
+              ? "2px solid #4ADE80"
+              : "2px solid rgba(255,255,255,0.3)",
+            backgroundColor: isSelected ? "#4ADE80" : "transparent",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            transition: "all 0.15s",
+          }}>
+            {isSelected && (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
+                stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Track info */}
+      <div style={{ flex: 1, minWidth: 0, overflow: "hidden", zIndex: 2 }}>
+        <div style={{
+          fontWeight: 600,
+          fontSize: "14px",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          textTransform: "uppercase",
+          color: isNowPlaying ? "#fbbf24" : hasArt ? "#fff" : undefined,
+          textShadow: hasArt ? "0 1px 3px rgba(0,0,0,0.5)" : undefined,
+        }}>
+          {track.title}
+        </div>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginTop: "2px",
+        }}>
+          <span style={{
+            color: isNowPlaying ? "#f59e0b" : hasArt ? "rgba(255,255,255,0.7)" : "var(--text-secondary)",
+            fontSize: "12px",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            flex: 1,
+            minWidth: 0,
+            textShadow: hasArt ? "0 1px 2px rgba(0,0,0,0.5)" : undefined,
+          }}>
+            {isNowPlaying && (
+              <span style={{ fontSize: "10px", letterSpacing: "0.1em", marginRight: "6px" }}>
+                ON AIR
+              </span>
+            )}
+            {track.primary_artist}
+            {track.featured_artists?.length ? ` ft. ${track.featured_artists.join(", ")}` : ""}
+          </span>
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "11px",
+            color: hasArt ? "rgba(255,255,255,0.5)" : "var(--text-tertiary)",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}>
+            {formatDuration(track.duration_seconds)}
+          </span>
+        </div>
+        {track.genre?.length ? (
+          <div style={{ display: "flex", gap: "4px", marginTop: "6px", flexWrap: "wrap" }}>
+            {track.genre.slice(0, 2).map((g) => (
+              <span key={g} style={{
+                fontSize: "9px",
+                padding: "1px 6px",
+                backgroundColor: hasArt ? "rgba(0,0,0,0.4)" : "var(--bg-well)",
+                borderRadius: "0px",
+                border: hasArt ? "1px solid rgba(255,255,255,0.15)" : "1px solid #27272a",
+                color: hasArt ? "rgba(255,255,255,0.7)" : "var(--text-secondary)",
+                fontFamily: "var(--font-mono)",
+              }}>{g}</span>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Right side: Status + Delete */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px", flexShrink: 0, zIndex: 2 }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); if (!isBroadcasting) onToggleActive(); }}
+          style={{
+            background: "none",
+            border: hasArt ? "1px solid rgba(255,255,255,0.2)" : "1px solid var(--border-subtle)",
+            color: isBroadcasting ? "#4ADE80" : track.is_active ? "#f59e0b" : hasArt ? "rgba(255,255,255,0.4)" : "var(--text-tertiary)",
+            padding: "3px 8px",
+            borderRadius: "0px",
+            fontSize: "10px",
+            cursor: isBroadcasting ? "default" : "pointer",
+            fontFamily: "var(--font-mono)",
+            animation: isBroadcasting ? "active-pulse 2s ease-in-out infinite" : "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {isBroadcasting ? "ACTIVE" : track.is_active ? "READY" : "OFF"}
+        </button>
+        <TrashButton onClick={() => { onDelete(); }} />
+      </div>
     </div>
   );
 }
