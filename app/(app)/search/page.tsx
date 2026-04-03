@@ -115,7 +115,15 @@ export default function SearchPage() {
   }
 
   return (
-    <div style={{ maxWidth: "460px", margin: "0 auto" }}>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      height: "calc(100dvh - 65px)",
+      marginTop: "-24px",
+      marginLeft: "-20px",
+      marginRight: "-20px",
+      overflow: "hidden",
+    }}>
       <style>{`
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
@@ -129,40 +137,46 @@ export default function SearchPage() {
         }
       `}</style>
 
-      {/* Terminal prompt */}
+      {/* ── Fixed top zone ── */}
       <div style={{
-        fontSize: "12px",
-        color: "#f59e0b",
-        letterSpacing: "0.05em",
-        marginBottom: "16px",
-        fontFamily: "'JetBrains Mono', monospace",
+        flexShrink: 0,
+        padding: "24px 20px 16px",
+        backgroundColor: "var(--bg-base)",
+        borderBottom: "1px solid #27272a",
       }}>
-        {">"} search --broadcasters
-        <span className="cursor-blink" style={{
-          width: "8px",
-          height: "12px",
-          backgroundColor: "#f59e0b",
-          display: "inline-block",
-        }} />
-      </div>
+        {/* Terminal prompt */}
+        <div style={{
+          fontSize: "12px",
+          color: "#f59e0b",
+          letterSpacing: "0.05em",
+          marginBottom: "16px",
+          fontFamily: "'JetBrains Mono', monospace",
+        }}>
+          {">"} search --broadcasters
+          <span className="cursor-blink" style={{
+            width: "8px",
+            height: "12px",
+            backgroundColor: "#f59e0b",
+            display: "inline-block",
+          }} />
+        </div>
 
-      <h1 style={{
-        fontSize: "24px",
-        fontWeight: 700,
-        marginBottom: "20px",
-        textTransform: "uppercase",
-        letterSpacing: "-0.05em",
-        color: "var(--text-primary)",
-        fontFamily: "'JetBrains Mono', monospace",
-      }}>
-        Find Broadcasters<span style={{ color: "#f59e0b" }}>_</span>
-      </h1>
+        <h1 style={{
+          fontSize: "24px",
+          fontWeight: 700,
+          marginBottom: "20px",
+          textTransform: "uppercase",
+          letterSpacing: "-0.05em",
+          color: "var(--text-primary)",
+          fontFamily: "'JetBrains Mono', monospace",
+        }}>
+          Find Broadcasters<span style={{ color: "#f59e0b" }}>_</span>
+        </h1>
 
-      {/* Search input */}
-      <div style={{
-        position: "relative",
-        marginBottom: "24px",
-      }}>
+        {/* Search input */}
+        <div style={{
+          position: "relative",
+        }}>
         <svg
           width="16" height="16" viewBox="0 0 24 24"
           fill="none" stroke="#52525b" strokeWidth="2"
@@ -199,8 +213,16 @@ export default function SearchPage() {
           onFocus={(e) => (e.target.style.borderColor = "#f59e0b")}
           onBlur={(e) => (e.target.style.borderColor = "#27272a")}
         />
-      </div>
+        </div>
+      </div>{/* end fixed top zone */}
 
+      {/* ── Scrollable content zone ── */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "16px 20px",
+      }}>
       {/* Results */}
       {searching && (
         <div style={{
@@ -382,6 +404,7 @@ export default function SearchPage() {
           <div>Search by channel name or @handle</div>
         </div>
       )}
+      </div>{/* end scrollable zone */}
     </div>
   );
 }
