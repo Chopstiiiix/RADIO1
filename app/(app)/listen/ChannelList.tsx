@@ -104,11 +104,14 @@ export default function ChannelList({
 
   return (
     <div style={{
-      maxWidth: "460px",
-      margin: "0 auto",
-      padding: "0",
+      display: "flex",
+      flexDirection: "column",
+      height: "calc(100dvh - 65px)",
+      marginTop: "-24px",
+      marginLeft: "-20px",
+      marginRight: "-20px",
       fontFamily: "'JetBrains Mono', monospace",
-      position: "relative",
+      overflow: "hidden",
     }}>
       <style>{`
         .scanlines {
@@ -186,8 +189,13 @@ export default function ChannelList({
         opacity: 0.5,
       }} />
 
-      {/* Header */}
-      <header style={{ marginBottom: "24px" }}>
+      {/* ── Fixed top zone ── */}
+      <div style={{
+        flexShrink: 0,
+        padding: "24px 20px 0",
+        backgroundColor: "var(--bg-base)",
+      }}>
+      <header>
         <div style={{
           color: "#f59e0b",
           fontSize: "12px",
@@ -314,7 +322,15 @@ export default function ChannelList({
           </button>
         </div>
       </header>
+      </div>{/* end fixed top zone */}
 
+      {/* ── Scrollable content zone ── */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "16px 20px",
+      }}>
       {/* Channel List */}
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         {displayChannels.length === 0 ? (
@@ -383,6 +399,7 @@ export default function ChannelList({
           }}>VER: 2.4.1-STABLE</span>
         </div>
       </footer>
+      </div>{/* end scrollable zone */}
     </div>
   );
 }
