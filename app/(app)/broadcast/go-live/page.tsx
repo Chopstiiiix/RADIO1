@@ -534,7 +534,15 @@ export default function GoLivePage() {
   }
 
   return (
-    <div>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      height: "calc(100dvh - 65px)",
+      marginTop: "-24px",
+      marginLeft: "-20px",
+      marginRight: "-20px",
+      overflow: "hidden",
+    }}>
       <style>{`
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
@@ -616,36 +624,49 @@ export default function GoLivePage() {
         }
       `}</style>
 
-      {/* Terminal header */}
-      <div style={{ marginBottom: "8px" }}>
-        <span style={{ color: "#f59e0b", fontSize: "13px" }}>{"> "}broadcast --go-live</span>
-        <span className="cursor-blink" style={{
-          width: "8px",
-          height: "12px",
-          backgroundColor: "#f59e0b",
-          display: "inline-block",
-        }} />
-      </div>
-
-      <h1 style={{
-        fontSize: "clamp(20px, 5vw, 28px)",
-        fontWeight: 700,
-        letterSpacing: "-0.05em",
-        textTransform: "uppercase",
-        marginBottom: "8px",
+      {/* ── Fixed top zone ── */}
+      <div style={{
+        flexShrink: 0,
+        padding: "24px 20px 16px",
+        backgroundColor: "var(--bg-base)",
+        borderBottom: "1px solid #27272a",
       }}>
-        Go Live<span style={{ color: "#f59e0b" }}>_</span>
-      </h1>
-      <p style={{
-        color: "#52525b",
-        fontSize: "11px",
-        textTransform: "uppercase",
-        letterSpacing: "0.1em",
-        marginBottom: "24px",
-      }}>
-        /{channelSlug} — {channelName}
-      </p>
+        <div style={{ marginBottom: "8px" }}>
+          <span style={{ color: "#f59e0b", fontSize: "13px" }}>{"> "}broadcast --go-live</span>
+          <span className="cursor-blink" style={{
+            width: "8px",
+            height: "12px",
+            backgroundColor: "#f59e0b",
+            display: "inline-block",
+          }} />
+        </div>
 
+        <h1 style={{
+          fontSize: "clamp(20px, 5vw, 28px)",
+          fontWeight: 700,
+          letterSpacing: "-0.05em",
+          textTransform: "uppercase",
+          marginBottom: "8px",
+        }}>
+          Go Live<span style={{ color: "#f59e0b" }}>_</span>
+        </h1>
+        <p style={{
+          color: "#52525b",
+          fontSize: "11px",
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+        }}>
+          /{channelSlug} — {channelName}
+        </p>
+      </div>{/* end fixed top zone */}
+
+      {/* ── Scrollable content zone ── */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "20px",
+      }}>
       {/* Status card */}
       <div className={isLive ? "live-glow" : ""} style={{
         padding: "24px",
@@ -1381,6 +1402,8 @@ export default function GoLivePage() {
           )}
         </>
       )}
+
+      </div>{/* end scrollable zone */}
 
       {/* Broadcast Agreement Modal */}
       {showAgreement && (
