@@ -259,7 +259,6 @@ export default function ChannelList({
               backgroundColor: tab === "all" ? "rgba(245, 158, 11, 0.1)" : "transparent",
               border: "1px solid",
               borderColor: tab === "all" ? "#f59e0b" : "#27272a",
-              borderRight: "none",
               color: tab === "all" ? "#f59e0b" : "#52525b",
               fontSize: "10px",
               fontWeight: 700,
