@@ -61,6 +61,7 @@ export default function GoLivePage() {
 
   // Live queue filenames (tracks currently in broadcast rotation)
   const [liveQueueFilenames, setLiveQueueFilenames] = useState<Set<string>>(new Set());
+  const [broadcasterId, setBroadcasterId] = useState<string | null>(null);
 
   // Live listener count
   const [liveListeners, setLiveListeners] = useState(0);
@@ -88,6 +89,7 @@ export default function GoLivePage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      setBroadcasterId(user.id);
 
       const { data: channel } = await supabase
         .from("broadcaster_profiles")
@@ -420,7 +422,7 @@ export default function GoLivePage() {
       const res = await fetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "cue", filename }),
+        body: JSON.stringify({ action: "cue", filename, broadcaster_id: broadcasterId }),
       });
       if (res.ok) {
         setCuedFilename(filename);
@@ -435,7 +437,7 @@ export default function GoLivePage() {
       const res = await fetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "skip", filename }),
+        body: JSON.stringify({ action: "skip", filename, broadcaster_id: broadcasterId }),
       });
       if (res.ok) {
         setCuedFilename(null);
@@ -482,7 +484,7 @@ export default function GoLivePage() {
         const res = await fetch("/api/broadcast", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "stop" }),
+          body: JSON.stringify({ action: "stop", broadcaster_id: broadcasterId }),
         });
         const data = await res.json();
         if (!res.ok) { setMessage(data.error || "Failed"); setToggling(false); return; }
@@ -505,8 +507,8 @@ export default function GoLivePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
             hasTracksSelected
-              ? { action: "start", track_ids: trackIds, mode: "live_mic" }
-              : { action: "voice_only" }
+              ? { action: "start", track_ids: trackIds, mode: "live_mic", broadcaster_id: broadcasterId }
+              : { action: "voice_only", broadcaster_id: broadcasterId }
           ),
         });
         const data = await res.json();
@@ -1285,7 +1287,7 @@ export default function GoLivePage() {
                       try {
                         const res = await fetch("/api/broadcast", {
                           method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "add_tracks", track_ids: Array.from(selectedTrackIds) }),
+                          body: JSON.stringify({ action: "add_tracks", track_ids: Array.from(selectedTrackIds), broadcaster_id: broadcasterId }),
                         });
                         const data = await res.json();
                         if (res.ok) {

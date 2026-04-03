@@ -1,38 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
 const BROADCAST_API = process.env.BROADCAST_API_URL || "http://localhost:5001";
 
+// Service role client for reliable DB access (server-side auth cookies can expire)
+const serviceSupabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+async function getAuthenticatedBroadcaster(req: NextRequest) {
+  // Try server-side cookie auth first
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (user && !error) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      if (profile?.role === "broadcaster") {
+        const { data: channel } = await supabase
+          .from("broadcaster_profiles")
+          .select("channel_slug, is_live")
+          .eq("id", user.id)
+          .single();
+        if (channel?.channel_slug) {
+          return { userId: user.id, channel };
+        }
+      }
+    }
+  } catch {
+    // Cookie auth failed — fall through to body-based auth
+  }
+
+  // Fallback: use broadcaster_id from request body + service role to verify
+  try {
+    const body = await req.clone().json();
+    const { broadcaster_id } = body;
+    if (!broadcaster_id) return null;
+
+    const { data: profile } = await serviceSupabase
+      .from("profiles")
+      .select("role")
+      .eq("id", broadcaster_id)
+      .single();
+    if (profile?.role !== "broadcaster") return null;
+
+    const { data: channel } = await serviceSupabase
+      .from("broadcaster_profiles")
+      .select("channel_slug, is_live")
+      .eq("id", broadcaster_id)
+      .single();
+    if (!channel?.channel_slug) return null;
+
+    return { userId: broadcaster_id, channel };
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: NextRequest) {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthenticatedBroadcaster(req);
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized or not a broadcaster" }, { status: 401 });
   }
 
-  // Verify broadcaster role
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "broadcaster") {
-    return NextResponse.json({ error: "Not a broadcaster" }, { status: 403 });
-  }
-
-  // Get channel slug
-  const { data: channel } = await supabase
-    .from("broadcaster_profiles")
-    .select("channel_slug, is_live")
-    .eq("id", user.id)
-    .single();
-
-  if (!channel?.channel_slug) {
-    return NextResponse.json({ error: "No channel configured" }, { status: 400 });
-  }
-
+  const { userId, channel } = auth;
   const body = await req.json();
   const { action, filename, track_ids, use_ai_host, mode } = body;
 
@@ -41,7 +78,7 @@ export async function POST(req: NextRequest) {
       const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/voice-only`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broadcaster_id: user.id }),
+        body: JSON.stringify({ broadcaster_id: userId }),
       });
 
       const data = await res.json();
@@ -60,7 +97,7 @@ export async function POST(req: NextRequest) {
       const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broadcaster_id: user.id, track_ids, use_ai_host: use_ai_host ?? false, mode: mode || "tracks" }),
+        body: JSON.stringify({ broadcaster_id: userId, track_ids, use_ai_host: use_ai_host ?? false, mode: mode || "tracks" }),
       });
 
       const data = await res.json();
@@ -145,7 +182,7 @@ export async function POST(req: NextRequest) {
       const res = await fetch(`${BROADCAST_API}/api/channels/${channel.channel_slug}/add-tracks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broadcaster_id: user.id, track_ids }),
+        body: JSON.stringify({ broadcaster_id: userId, track_ids }),
       });
       const data = await res.json();
       if (!res.ok) {

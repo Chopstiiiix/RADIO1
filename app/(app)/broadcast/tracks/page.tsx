@@ -37,6 +37,7 @@ export default function TracksPage() {
   const [showSchedule, setShowSchedule] = useState(false);
   const [schedulingMessage, setSchedulingMessage] = useState("");
   const [broadcastStartedAt, setBroadcastStartedAt] = useState(0);
+  const [broadcasterId, setBroadcasterId] = useState<string | null>(null);
 
   async function handleSchedule(scheduledAt: string) {
     if (selectedTracks.size === 0) return;
@@ -64,6 +65,7 @@ export default function TracksPage() {
   async function loadTracks() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    setBroadcasterId(user.id);
 
     const { data } = await supabase
       .from("tracks")
@@ -169,7 +171,7 @@ export default function TracksPage() {
       const res = await fetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "stop" }),
+        body: JSON.stringify({ action: "stop", broadcaster_id: broadcasterId }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -268,7 +270,7 @@ export default function TracksPage() {
       const res = await fetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, track_ids: Array.from(selectedTracks) }),
+        body: JSON.stringify({ action, track_ids: Array.from(selectedTracks), broadcaster_id: broadcasterId }),
       });
 
       const data = await res.json();
