@@ -7,6 +7,7 @@ interface NowPlayingState {
     title: string;
     artist: string;
     album?: string;
+    artwork_url?: string;
   } | null;
   upcoming: { title: string; artist: string }[];
   duration: number;

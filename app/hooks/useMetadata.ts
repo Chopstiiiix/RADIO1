@@ -42,7 +42,12 @@ export function useMetadata(): MetadataState {
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          const track = data.track ?? null;
+          const rawTrack = data.track;
+          const track = rawTrack ? {
+            title: rawTrack.title,
+            artist: rawTrack.artist,
+            artwork: rawTrack.artwork_url || rawTrack.artwork,
+          } : null;
           setState((prev) => ({
             ...prev,
             isLive: !data.ended,
@@ -59,7 +64,7 @@ export function useMetadata(): MetadataState {
             updateMediaSession({
               title: track.title ?? "Caster Radio",
               artist: track.artist ?? "Live",
-              artwork: track.artwork_url,
+              artwork: track.artwork,
             });
           }
         } catch {

@@ -29,7 +29,7 @@ export default function ChannelPage() {
   const [channel, setChannel] = useState<ChannelInfo | null>(null);
   const [allSlugs, setAllSlugs] = useState<string[]>([]);
   const [metadata, setMetadata] = useState({
-    track: null as { title: string; artist: string } | null,
+    track: null as { title: string; artist: string; artwork?: string } | null,
     upcoming: [] as { title: string; artist: string; duration?: number }[],
     duration: 0,
     trackStartOffset: 0,
@@ -207,8 +207,9 @@ export default function ChannelPage() {
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
+          const rawTrack = data.track;
           setMetadata({
-            track: data.track ?? null,
+            track: rawTrack ? { title: rawTrack.title, artist: rawTrack.artist, artwork: rawTrack.artwork_url || rawTrack.artwork } : null,
             upcoming: data.upcoming ?? [],
             duration: data.duration ?? 0,
             trackStartOffset: data.trackStartOffset ?? 0,
@@ -648,7 +649,7 @@ export default function ChannelPage() {
           maskImage: "linear-gradient(to bottom, transparent 0%, black 40%)",
           WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 40%)",
         }}>
-          <Visualizer analyserNode={isLiveMic ? liveMic.analyserNode : stream.analyserNode} isPlaying={isLiveMic ? liveMic.connected : stream.isPlaying} />
+          <Visualizer analyserNode={isLiveMic ? liveMic.analyserNode : stream.analyserNode} isPlaying={isLiveMic ? liveMic.connected : stream.isPlaying} artworkUrl={metadata.track?.artwork} />
         </div>
       </main>
 

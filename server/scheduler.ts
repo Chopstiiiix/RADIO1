@@ -8,6 +8,7 @@ import { supabase } from "./supabase";
 interface Track {
   title: string;
   artist: string;
+  artwork_url?: string;
   file: string;
   duration: number;
   startOffset: number;
@@ -23,24 +24,25 @@ interface ChannelSchedulerState {
 const channelSchedulers = new Map<string, ChannelSchedulerState>();
 
 // DB metadata cache: filename -> { title, artist }
-const dbMetadataCache = new Map<string, { title: string; artist: string }>();
+const dbMetadataCache = new Map<string, { title: string; artist: string; artwork_url?: string }>();
 
 async function loadDbMetadata(broadcasterId?: string) {
   if (!broadcasterId) return;
   const { data } = await supabase
     .from("tracks")
-    .select("title, primary_artist, file_url")
+    .select("title, primary_artist, file_url, artwork_url")
     .eq("broadcaster_id", broadcasterId)
     .eq("is_active", true);
 
   if (data) {
     for (const t of data) {
+      const meta = { title: t.title, artist: t.primary_artist, artwork_url: t.artwork_url || undefined };
       // Match by title (case-insensitive) since local filenames may differ
-      dbMetadataCache.set(t.title.toUpperCase(), { title: t.title, artist: t.primary_artist });
+      dbMetadataCache.set(t.title.toUpperCase(), meta);
       // Also try to extract filename from file_url
       if (t.file_url) {
         const urlName = t.file_url.split("/").pop()?.replace(/\.(mp3|flac|wav|m4a|ogg)$/i, "") || "";
-        dbMetadataCache.set(urlName.toUpperCase(), { title: t.title, artist: t.primary_artist });
+        dbMetadataCache.set(urlName.toUpperCase(), meta);
       }
     }
   }
@@ -69,7 +71,7 @@ function parseTrackFromFile(tf: TrackFile, startOffset: number): Track {
   // Try DB metadata first
   const dbMatch = dbMetadataCache.get(name.toUpperCase());
   if (dbMatch) {
-    return { ...base, artist: dbMatch.artist, title: dbMatch.title, type: "track" };
+    return { ...base, artist: dbMatch.artist, title: dbMatch.title, artwork_url: dbMatch.artwork_url, type: "track" };
   }
 
   // Fallback: parse "Artist - Title" from filename
@@ -129,7 +131,7 @@ function broadcastTrack(slug: string, playlist: Track[], index: number) {
   console.log(`${typeEmoji} [${slug}] Now playing: ${current.title} — ${current.artist} (${Math.round(current.duration)}s)`);
 
   updateChannelNowPlaying(slug, {
-    track: { title: current.title, artist: current.artist },
+    track: { title: current.title, artist: current.artist, artwork_url: current.artwork_url },
     upcoming,
     duration: Math.round(current.duration),
     trackStartOffset: current.startOffset,

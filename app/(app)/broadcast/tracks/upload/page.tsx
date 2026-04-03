@@ -23,6 +23,8 @@ export default function UploadTrackPage() {
   const [sampledMusic, setSampledMusic] = useState("");
   const [genre, setGenre] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [artworkFile, setArtworkFile] = useState<File | null>(null);
+  const [artworkPreview, setArtworkPreview] = useState<string | null>(null);
 
   const MAX_FILE_SIZE_MB = 50;
   const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -65,6 +67,19 @@ export default function UploadTrackPage() {
       });
     } catch { /* ignore */ }
 
+    // Upload artwork if provided
+    let artworkUrl: string | null = null;
+    if (artworkFile) {
+      const artPath = `${user.id}/${Date.now()}_${artworkFile.name}`;
+      const { error: artError } = await supabase.storage
+        .from("artwork")
+        .upload(artPath, artworkFile);
+      if (!artError) {
+        const { data: artUrlData } = supabase.storage.from("artwork").getPublicUrl(artPath);
+        artworkUrl = artUrlData.publicUrl;
+      }
+    }
+
     const featArtists = featuredArtists.split(",").map((a) => a.trim()).filter(Boolean);
     const genreArr = genre.split(",").map((g) => g.trim()).filter(Boolean);
 
@@ -80,6 +95,7 @@ export default function UploadTrackPage() {
       genre: genreArr.length ? genreArr : null,
       duration_seconds: duration,
       file_url: urlData.publicUrl,
+      artwork_url: artworkUrl,
     });
 
     if (insertError) {
@@ -146,6 +162,55 @@ export default function UploadTrackPage() {
             required
             style={{ fontSize: "13px", color: "#a1a1aa" }}
           />
+        </div>
+
+        {/* Artwork */}
+        <div>
+          <label style={labelStyle}>Artwork (Optional)</label>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {artworkPreview ? (
+              <img
+                src={artworkPreview}
+                alt="Artwork preview"
+                style={{
+                  width: "64px",
+                  height: "64px",
+                  objectFit: "cover",
+                  border: "1px solid #27272a",
+                }}
+              />
+            ) : (
+              <div style={{
+                width: "64px",
+                height: "64px",
+                backgroundColor: "rgba(24, 24, 27, 0.5)",
+                border: "1px solid #27272a",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#52525b" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                </svg>
+              </div>
+            )}
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null;
+                setArtworkFile(f);
+                if (f) {
+                  setArtworkPreview(URL.createObjectURL(f));
+                } else {
+                  setArtworkPreview(null);
+                }
+              }}
+              style={{ fontSize: "13px", color: "#a1a1aa" }}
+            />
+          </div>
         </div>
 
         <Field label="Title" value={title} onChange={setTitle} required />
