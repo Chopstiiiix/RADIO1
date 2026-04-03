@@ -8,11 +8,11 @@ export default async function Home() {
     const { data } = await supabase.auth.getUser();
     user = data.user;
   } catch {
-    redirect("/login");
+    redirect("/intro");
   }
 
   if (!user) {
-    redirect("/login");
+    redirect("/intro");
   }
 
   try {

@@ -9,8 +9,8 @@ const config: CapacitorConfig = {
   webDir: "out",
   server: {
     url: isSimulator
-      ? "http://localhost:3000/login"    // Simulator: local dev server
-      : "https://cstr.inspire-edge.net/login",  // Real device: production
+      ? "http://localhost:3000/intro"    // Simulator: local dev server
+      : "https://cstr.inspire-edge.net/intro",  // Real device: production
     cleartext: isSimulator, // Allow HTTP for localhost
     allowNavigation: [
       "cstr.inspire-edge.net",

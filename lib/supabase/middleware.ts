@@ -41,7 +41,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Public routes
-  const isPublicRoute = pathname === "/login" || pathname === "/signup" || pathname.startsWith("/callback");
+  const isPublicRoute = pathname === "/login" || pathname === "/signup" || pathname === "/intro" || pathname.startsWith("/callback");
 
   // Not logged in + trying to access protected route → login with redirect
   if (!user && !isPublicRoute && pathname !== "/") {
