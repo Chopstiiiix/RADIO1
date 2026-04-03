@@ -150,7 +150,15 @@ export default function BrowseChannelsPage() {
   const selectableCount = channels.filter((ch) => !sentChannels.has(ch.id)).length;
 
   return (
-    <div>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      height: "calc(100dvh - 65px)",
+      marginTop: "-24px",
+      marginLeft: "-20px",
+      marginRight: "-20px",
+      overflow: "hidden",
+    }}>
       <style>{`
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
@@ -159,156 +167,185 @@ export default function BrowseChannelsPage() {
         .cursor-blink {
           animation: pulse-opacity 1s step-end infinite;
         }
+        @keyframes request-pulse {
+          0%, 100% { box-shadow: 0 0 8px rgba(74, 222, 128, 0.3); }
+          50% { box-shadow: 0 0 16px rgba(74, 222, 128, 0.6); }
+        }
+        .request-glow {
+          animation: request-pulse 1.5s ease-in-out infinite;
+        }
       `}</style>
-      {/* Terminal prompt */}
+
+      {/* ── Fixed top zone ── */}
       <div style={{
-        fontFamily: "var(--font-mono)",
-        fontSize: "12px",
-        color: "#f59e0b",
-        letterSpacing: "0.05em",
-        marginBottom: "8px",
+        flexShrink: 0,
+        padding: "24px 20px 16px",
+        backgroundColor: "var(--bg-base)",
+        borderBottom: "1px solid #27272a",
       }}>
-        {">"} browse_channels --advertise<span className="cursor-blink" style={{
-          width: "8px",
-          height: "12px",
-          backgroundColor: "#f59e0b",
-          display: "inline-block",
-        }} />
-      </div>
-
-      <h1 style={{
-        fontSize: "24px",
-        fontWeight: 700,
-        marginBottom: "24px",
-        textTransform: "uppercase",
-        letterSpacing: "-0.05em",
-      }}>
-        Browse Channels<span style={{ color: "#f59e0b" }}>_</span>
-      </h1>
-
-      {/* Ad selector */}
-      {adverts.length > 0 && (
-        <div style={{ marginBottom: "24px", display: "flex", alignItems: "center", gap: "12px" }}>
-          <span style={{
-            fontSize: "13px",
-            color: "var(--text-secondary)",
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-          }}>
-            Ad to place:
-          </span>
-          <select
-            value={selectedAd}
-            onChange={(e) => handleAdChange(e.target.value)}
-            style={{
-              padding: "8px 12px",
-              backgroundColor: "rgba(24, 24, 27, 0.5)",
-              border: "1px solid #27272a",
-              borderRadius: "0px",
-              color: "var(--text-primary)",
-              fontSize: "13px",
-            }}
-          >
-            {adverts.map((ad) => (
-              <option key={ad.id} value={ad.id}>{ad.title}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* No adverts prompt */}
-      {adverts.length === 0 && userId && (
+        {/* Terminal prompt */}
         <div style={{
-          marginBottom: "24px",
-          padding: "16px",
-          backgroundColor: "rgba(24, 24, 27, 0.3)",
-          border: "1px solid #27272a",
-          borderRadius: "0px",
-          fontSize: "13px",
-          color: "var(--text-secondary)",
-        }}>
-          You need to <a href="/advertise/adverts/upload" style={{ color: "#f59e0b", textDecoration: "none" }}>upload an advert</a> before requesting ad placement.
-        </div>
-      )}
-
-      {/* Status message */}
-      {message && (
-        <p style={{
-          fontSize: "13px",
-          color: message.includes("sent") ? "#4ADE80" : "#E24A4A",
-          marginBottom: "16px",
           fontFamily: "var(--font-mono)",
+          fontSize: "12px",
+          color: "#f59e0b",
           letterSpacing: "0.05em",
+          marginBottom: "8px",
         }}>
-          {message}
-        </p>
-      )}
+          {">"} browse_channels --advertise<span className="cursor-blink" style={{
+            width: "8px",
+            height: "12px",
+            backgroundColor: "#f59e0b",
+            display: "inline-block",
+          }} />
+        </div>
 
-      {/* Select all + Send button bar */}
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "12px",
-      }}>
-        <button
-          type="button"
-          onClick={toggleAll}
-          disabled={selectableCount === 0}
-          style={{
-            background: "none",
+        <h1 style={{
+          fontSize: "24px",
+          fontWeight: 700,
+          marginBottom: "16px",
+          textTransform: "uppercase",
+          letterSpacing: "-0.05em",
+        }}>
+          Browse Channels<span style={{ color: "#f59e0b" }}>_</span>
+        </h1>
+
+        {/* Ad selector */}
+        {adverts.length > 0 && (
+          <div style={{ marginBottom: "16px", display: "flex", alignItems: "center", gap: "12px" }}>
+            <span style={{
+              fontSize: "13px",
+              color: "var(--text-secondary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}>
+              Ad to place:
+            </span>
+            <select
+              value={selectedAd}
+              onChange={(e) => handleAdChange(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                backgroundColor: "rgba(24, 24, 27, 0.5)",
+                border: "1px solid #27272a",
+                borderRadius: "0px",
+                color: "var(--text-primary)",
+                fontSize: "13px",
+              }}
+            >
+              {adverts.map((ad) => (
+                <option key={ad.id} value={ad.id}>{ad.title}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* No adverts prompt */}
+        {adverts.length === 0 && userId && (
+          <div style={{
+            marginBottom: "16px",
+            padding: "16px",
+            backgroundColor: "rgba(24, 24, 27, 0.3)",
             border: "1px solid #27272a",
             borderRadius: "0px",
-            padding: "6px 12px",
-            color: selectableCount === 0 ? "var(--text-tertiary)" : "var(--text-secondary)",
-            fontSize: "12px",
-            fontFamily: "var(--font-mono)",
-            cursor: selectableCount === 0 ? "default" : "pointer",
-            letterSpacing: "0.05em",
-            textTransform: "uppercase",
-          }}
-        >
-          {selectedChannels.size === selectableCount && selectableCount > 0 ? "DESELECT ALL" : "SELECT ALL"}
-        </button>
+            fontSize: "13px",
+            color: "var(--text-secondary)",
+          }}>
+            You need to <a href="/advertise/adverts/upload" style={{ color: "#f59e0b", textDecoration: "none" }}>upload an advert</a> before requesting ad placement.
+          </div>
+        )}
 
-        <button
-          type="button"
-          onClick={sendRequests}
-          disabled={sending}
-          style={{
-            padding: "8px 20px",
-            backgroundColor: justSent
-              ? "transparent"
-              : selectedChannels.size > 0 && selectedAd
-                ? "#f59e0b"
-                : "var(--border-subtle)",
-            color: justSent
-              ? "#4ADE80"
-              : selectedChannels.size > 0 && selectedAd
-                ? "#0a0a0a"
-                : "var(--text-tertiary)",
-            border: justSent ? "1px solid #4ADE80" : selectedChannels.size > 0 && selectedAd ? "1px solid #f59e0b" : "none",
-            borderRadius: "0px",
-            fontSize: justSent ? "11px" : "12px",
-            fontWeight: 600,
-            cursor: sending || justSent ? "default" : "pointer",
-            opacity: sending ? 0.6 : 1,
+        {/* Status message */}
+        {message && (
+          <p style={{
+            fontSize: "13px",
+            color: message.includes("sent") ? "#4ADE80" : "#E24A4A",
+            marginBottom: "12px",
             fontFamily: "var(--font-mono)",
             letterSpacing: "0.05em",
-            textTransform: "uppercase",
-          }}
-        >
-          {sending
-            ? "SENDING..."
-            : justSent
-              ? <><span style={{ color: "#4ADE80" }}>REQUEST SENT</span><span style={{ color: "#f59e0b" }}>, AWAITING APPROVAL</span></>
-              : selectedChannels.size > 0
-                ? `REQUEST AD (${selectedChannels.size})`
-                : "REQUEST AD"
-          }
-        </button>
-      </div>
+          }}>
+            {message}
+          </p>
+        )}
 
+        {/* Select all + Send button bar */}
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingBottom: "12px",
+          borderBottom: "1px solid #27272a",
+        }}>
+          <button
+            type="button"
+            onClick={toggleAll}
+            disabled={selectableCount === 0}
+            style={{
+              background: "none",
+              border: "1px solid #27272a",
+              borderRadius: "0px",
+              padding: "6px 12px",
+              color: selectableCount === 0 ? "var(--text-tertiary)" : "var(--text-secondary)",
+              fontSize: "12px",
+              fontFamily: "var(--font-mono)",
+              cursor: selectableCount === 0 ? "default" : "pointer",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+            }}
+          >
+            {selectedChannels.size === selectableCount && selectableCount > 0 ? "DESELECT ALL" : "SELECT ALL"}
+          </button>
+
+          <button
+            type="button"
+            onClick={sendRequests}
+            disabled={sending}
+            className={selectedChannels.size > 0 && selectedAd && !justSent ? "request-glow" : ""}
+            style={{
+              padding: "8px 20px",
+              backgroundColor: justSent
+                ? "transparent"
+                : selectedChannels.size > 0 && selectedAd
+                  ? "#4ADE80"
+                  : "rgba(24, 24, 27, 0.5)",
+              color: justSent
+                ? "#4ADE80"
+                : selectedChannels.size > 0 && selectedAd
+                  ? "#0a0a0a"
+                  : "var(--text-tertiary)",
+              border: justSent
+                ? "1px solid #4ADE80"
+                : selectedChannels.size > 0 && selectedAd
+                  ? "1px solid #4ADE80"
+                  : "1px solid #27272a",
+              borderRadius: "0px",
+              fontSize: justSent ? "11px" : "12px",
+              fontWeight: 700,
+              cursor: sending || justSent ? "default" : "pointer",
+              opacity: sending ? 0.6 : 1,
+              fontFamily: "var(--font-mono)",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+            }}
+          >
+            {sending
+              ? "SENDING..."
+              : justSent
+                ? <><span style={{ color: "#4ADE80" }}>REQUEST SENT</span><span style={{ color: "#f59e0b" }}>, AWAITING APPROVAL</span></>
+                : selectedChannels.size > 0
+                  ? `REQUEST AD (${selectedChannels.size})`
+                  : "REQUEST AD"
+            }
+          </button>
+        </div>
+      </div>{/* end fixed top zone */}
+
+      {/* ── Scrollable content zone ── */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "16px 20px",
+      }}>
       {/* Channel list */}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         {channels.map((ch) => {
@@ -449,6 +486,7 @@ export default function BrowseChannelsPage() {
           );
         })}
       </div>
+      </div>{/* end scrollable zone */}
     </div>
   );
 }
