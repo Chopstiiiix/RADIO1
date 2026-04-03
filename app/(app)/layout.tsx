@@ -37,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <nav style={{
         maxWidth: "min(460px, 100vw)",
         margin: "0 auto",
-        padding: "calc(16px + env(safe-area-inset-top, 0px)) 20px 16px",
+        padding: "16px 20px",
         borderBottom: "2px solid #27272a",
         backgroundColor: "var(--bg-base)",
       }}>

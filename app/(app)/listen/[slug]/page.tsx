@@ -652,7 +652,7 @@ export default function ChannelPage() {
       <footer style={{
         backgroundColor: "#2B2B2B",
         borderTop: "2px solid #27272a",
-        paddingBottom: "env(safe-area-inset-bottom, 20px)",
+        paddingBottom: "20px",
         flexShrink: 0,
       }}>
         {/* Timeline section */}
@@ -691,7 +691,7 @@ export default function ChannelPage() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "16px 20px calc(24px + env(safe-area-inset-bottom, 0px))",
+          padding: "16px 20px 24px",
         }}>
           {/* Left: Volume */}
           <button
