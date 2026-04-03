@@ -13,7 +13,7 @@ interface AdRequest {
   advertiser: { display_name: string };
 }
 
-const MIN_TRACKS_FOR_ADS = 7;
+const MIN_TRACKS_FOR_ADS = 15;
 
 export default function AdRequestsPage() {
   const supabase = createClient();
