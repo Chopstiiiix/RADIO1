@@ -36,6 +36,7 @@ export default function TracksPage() {
   const [showAgreement, setShowAgreement] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [schedulingMessage, setSchedulingMessage] = useState("");
+  const [broadcastStartedAt, setBroadcastStartedAt] = useState(0);
 
   async function handleSchedule(scheduledAt: string) {
     if (selectedTracks.size === 0) return;
@@ -146,14 +147,20 @@ export default function TracksPage() {
             if (!isChannelLive) setIsChannelLive(true);
           }
         } else if (data.ended) {
-          setNowPlayingTitle(null);
-          setBroadcastingTitles(new Set());
-          setIsChannelLive(false);
+          // Ignore stale ended events within 10 seconds of starting a broadcast
+          const timeSinceStart = Date.now() - broadcastStartedAt;
+          if (broadcastStartedAt > 0 && timeSinceStart < 10000) {
+            // Stale event — ignore
+          } else {
+            setNowPlayingTitle(null);
+            setBroadcastingTitles(new Set());
+            setIsChannelLive(false);
+          }
         }
       } catch { /* ignore */ }
     };
     return () => es.close();
-  }, [channelSlug]);
+  }, [channelSlug, broadcastStartedAt]);
 
   async function endBroadcast() {
     setEndingBroadcast(true);
@@ -280,6 +287,7 @@ export default function TracksPage() {
       );
       setSelectedTracks(new Set());
       setIsChannelLive(true);
+      setBroadcastStartedAt(Date.now());
 
       // Set channel slug so SSE connects for live indicators
       if (data.slug) {

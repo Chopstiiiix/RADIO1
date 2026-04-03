@@ -79,6 +79,10 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
   stopChannelPipeline(slug);
   stopMixer(slug);
   activeChannels.delete(slug);
+  stoppingChannels.delete(slug);
+
+  // Clear stale metadata immediately so SSE listeners don't see old ended:true
+  updateNowPlaying(slug, { track: null, upcoming: [], ended: false, type: "track", mode });
 
   const musicDir = path.join(BASE_MUSIC_DIR, slug);
   const outputDir = path.join(BASE_OUTPUT_DIR, slug);
