@@ -402,7 +402,7 @@ export default function TracksPage() {
                 border: "1px solid #27272a",
                 borderRadius: "0px",
                 padding: "6px 12px",
-                color: selectableCount === 0 ? "#3f3f46" : "#a1a1aa",
+                color: selectableCount === 0 ? "#3f3f46" : "#f59e0b",
                 fontSize: "11px",
                 fontFamily: "var(--font-mono)",
                 cursor: selectableCount === 0 ? "default" : "pointer",
