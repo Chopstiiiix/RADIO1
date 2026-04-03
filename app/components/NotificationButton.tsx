@@ -81,7 +81,8 @@ export default function NotificationButton({ role }: { role: string }) {
         .select(`
           id, status, frequency, responded_at,
           advert:adverts(title),
-          broadcaster:profiles!ad_requests_broadcaster_id_fkey(display_name)
+          broadcaster:profiles!ad_requests_broadcaster_id_fkey(display_name),
+          broadcaster_channel:broadcaster_profiles!ad_requests_broadcaster_id_fkey(channel_name)
         `)
         .eq("advertiser_id", user.id)
         .in("status", ["approved", "declined"])
@@ -91,11 +92,13 @@ export default function NotificationButton({ role }: { role: string }) {
 
       if (responded) {
         for (const req of responded as any[]) {
+          const chName = req.broadcaster_channel?.channel_name || req.broadcaster?.display_name || "Unknown";
+          const action = req.status === "approved" ? "approved" : "declined";
           items.push({
             id: req.id,
             type: "ad_response",
-            title: `${req.advert?.title ?? "Ad"} — ${req.status.toUpperCase()}`,
-            subtitle: `By ${req.broadcaster?.display_name ?? "Unknown"}`,
+            title: `${chName} ${action} your ad`,
+            subtitle: `"${req.advert?.title ?? "Ad"}" — ${req.frequency}`,
             href: "/advertise/requests",
             time: formatTime(req.responded_at),
           });

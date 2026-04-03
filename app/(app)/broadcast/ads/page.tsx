@@ -13,31 +13,51 @@ interface AdRequest {
   advertiser: { display_name: string };
 }
 
+const MIN_TRACKS_FOR_ADS = 7;
+
 export default function AdRequestsPage() {
   const supabase = createClient();
   const [requests, setRequests] = useState<AdRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [trackCount, setTrackCount] = useState(0);
+  const [channelName, setChannelName] = useState("");
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data } = await supabase
-      .from("ad_requests")
-      .select(`
-        id, status, frequency, requested_at,
-        advert:adverts(title, description, file_url, duration_seconds),
-        advertiser:profiles!ad_requests_advertiser_id_fkey(display_name)
-      `)
-      .eq("broadcaster_id", user.id)
-      .order("requested_at", { ascending: false });
+    const [reqRes, trackRes, channelRes] = await Promise.all([
+      supabase
+        .from("ad_requests")
+        .select(`
+          id, status, frequency, requested_at,
+          advert:adverts(title, description, file_url, duration_seconds),
+          advertiser:profiles!ad_requests_advertiser_id_fkey(display_name)
+        `)
+        .eq("broadcaster_id", user.id)
+        .order("requested_at", { ascending: false }),
+      supabase
+        .from("tracks")
+        .select("*", { count: "exact", head: true })
+        .eq("broadcaster_id", user.id)
+        .eq("is_active", true),
+      supabase
+        .from("broadcaster_profiles")
+        .select("channel_name")
+        .eq("id", user.id)
+        .single(),
+    ]);
 
-    setRequests((data as any) || []);
+    setRequests((reqRes.data as any) || []);
+    setTrackCount(trackRes.count ?? 0);
+    setChannelName((channelRes.data as any)?.channel_name || "Your Channel");
     setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
+
+  const isEligible = trackCount >= MIN_TRACKS_FOR_ADS;
 
   async function respond(id: string, status: "approved" | "declined") {
     await supabase.from("ad_requests").update({
@@ -105,6 +125,39 @@ export default function AdRequestsPage() {
         }}>
           Ad Requests<span style={{ color: "#f59e0b" }}>_</span>
         </h1>
+
+        {/* Eligibility status */}
+        {!loading && !isEligible && (
+          <div style={{
+            marginTop: "12px",
+            padding: "12px 16px",
+            backgroundColor: "rgba(226, 74, 74, 0.08)",
+            borderLeft: "3px solid #E24A4A",
+            fontSize: "11px",
+            fontFamily: "var(--font-mono)",
+            color: "#E24A4A",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            lineHeight: 1.6,
+          }}>
+            Ineligible for ads — you need at least {MIN_TRACKS_FOR_ADS} active tracks to broadcast ads.
+            <br />
+            <span style={{ color: "#71717a" }}>Currently: {trackCount} track{trackCount !== 1 ? "s" : ""}</span>
+          </div>
+        )}
+        {!loading && isEligible && (
+          <div style={{
+            marginTop: "12px",
+            padding: "8px 16px",
+            fontSize: "10px",
+            fontFamily: "var(--font-mono)",
+            color: "#52525b",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+          }}>
+            Ads play every {MIN_TRACKS_FOR_ADS} songs — {trackCount} active tracks
+          </div>
+        )}
       </div>
 
       {/* ── Scrollable content zone ── */}
@@ -212,6 +265,8 @@ export default function AdRequestsPage() {
                     onApprove={() => respond(req.id, "approved")}
                     onDecline={() => respond(req.id, "declined")}
                     formatDuration={formatDuration}
+                    isEligible={isEligible}
+                    channelName={channelName}
                   />
                 )}
               </div>
@@ -224,11 +279,13 @@ export default function AdRequestsPage() {
   );
 }
 
-function ReviewPanel({ req, onApprove, onDecline, formatDuration }: {
+function ReviewPanel({ req, onApprove, onDecline, formatDuration, isEligible, channelName }: {
   req: AdRequest;
   onApprove: () => void;
   onDecline: () => void;
   formatDuration: (s: number | null) => string;
+  isEligible: boolean;
+  channelName: string;
 }) {
   const advert = req.advert as any;
   const advertiser = req.advertiser as any;
@@ -397,20 +454,36 @@ function ReviewPanel({ req, onApprove, onDecline, formatDuration }: {
       )}
 
       {/* Approve / Decline buttons */}
+      {!isEligible && (
+        <div style={{
+          padding: "10px 14px",
+          backgroundColor: "rgba(226, 74, 74, 0.08)",
+          borderLeft: "3px solid #E24A4A",
+          marginBottom: "12px",
+          fontSize: "10px",
+          fontFamily: "var(--font-mono)",
+          color: "#E24A4A",
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+        }}>
+          You need at least {MIN_TRACKS_FOR_ADS} active tracks to approve ads
+        </div>
+      )}
       <div style={{ display: "flex", gap: "8px" }}>
-        <button onClick={onApprove} style={{
+        <button onClick={onApprove} disabled={!isEligible} style={{
           flex: 1,
           padding: "12px",
-          backgroundColor: "rgba(74, 222, 128, 0.1)",
-          border: "1px solid #4ADE80",
-          color: "#4ADE80",
+          backgroundColor: isEligible ? "rgba(74, 222, 128, 0.1)" : "rgba(24, 24, 27, 0.3)",
+          border: isEligible ? "1px solid #4ADE80" : "1px solid #27272a",
+          color: isEligible ? "#4ADE80" : "#3f3f46",
           borderRadius: "0px",
-          cursor: "pointer",
+          cursor: isEligible ? "pointer" : "not-allowed",
           fontSize: "11px",
           fontWeight: 700,
           textTransform: "uppercase",
           letterSpacing: "0.05em",
           fontFamily: "var(--font-mono)",
+          opacity: isEligible ? 1 : 0.5,
         }}>
           Approve
         </button>
