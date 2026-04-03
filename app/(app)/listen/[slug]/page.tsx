@@ -640,7 +640,6 @@ export default function ChannelPage() {
           width: "100%",
           height: "60%",
           opacity: 0.8,
-          pointerEvents: "none",
           maskImage: "linear-gradient(to bottom, transparent 0%, black 40%)",
           WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 40%)",
         }}>
