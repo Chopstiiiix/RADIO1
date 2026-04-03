@@ -281,10 +281,10 @@ export default function BrowseChannelsPage() {
             disabled={selectableCount === 0}
             style={{
               background: "none",
-              border: "1px solid #27272a",
+              border: selectableCount === 0 ? "1px solid #27272a" : "1px solid rgba(245, 158, 11, 0.3)",
               borderRadius: "0px",
               padding: "6px 12px",
-              color: selectableCount === 0 ? "var(--text-tertiary)" : "var(--text-secondary)",
+              color: selectableCount === 0 ? "var(--text-tertiary)" : "#f59e0b",
               fontSize: "12px",
               fontFamily: "var(--font-mono)",
               cursor: selectableCount === 0 ? "default" : "pointer",
