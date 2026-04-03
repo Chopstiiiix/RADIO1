@@ -248,7 +248,7 @@ export default function ChannelList({
         {/* Tab buttons */}
         <div style={{
           display: "flex",
-          gap: "0px",
+          gap: "8px",
           marginTop: "16px",
         }}>
           <button
