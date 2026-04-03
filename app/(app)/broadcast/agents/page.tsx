@@ -196,7 +196,15 @@ export default function AgentMarketplacePage() {
   const hasSubscriptions = subscriptions.length > 0;
 
   return (
-    <div>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      height: "calc(100dvh - 65px)",
+      marginTop: "-24px",
+      marginLeft: "-20px",
+      marginRight: "-20px",
+      overflow: "hidden",
+    }}>
       <style>{`
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
@@ -207,26 +215,32 @@ export default function AgentMarketplacePage() {
         }
       `}</style>
 
-      {/* Terminal header */}
+      {/* ── Fixed top zone ── */}
       <div style={{
-        fontFamily: "var(--font-mono)",
-        fontSize: "13px",
-        color: "#f59e0b",
-        marginBottom: "8px",
+        flexShrink: 0,
+        padding: "24px 20px 16px",
+        backgroundColor: "var(--bg-base)",
+        borderBottom: "1px solid #27272a",
       }}>
-        {">"} broadcast --agents
-        <span className="cursor-blink" style={{
-          width: "8px",
-          height: "12px",
-          backgroundColor: "#f59e0b",
-          display: "inline-block",
-          marginLeft: "4px",
-        }} />
-      </div>
+        {/* Terminal header */}
+        <div style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: "13px",
+          color: "#f59e0b",
+          marginBottom: "8px",
+        }}>
+          {">"} broadcast --agents
+          <span className="cursor-blink" style={{
+            width: "8px",
+            height: "12px",
+            backgroundColor: "#f59e0b",
+            display: "inline-block",
+            marginLeft: "4px",
+          }} />
+        </div>
 
-      <div style={{ marginBottom: "32px" }}>
         <h1 style={{
-          fontSize: "28px",
+          fontSize: "clamp(20px, 5vw, 28px)",
           fontWeight: 700,
           letterSpacing: "-0.05em",
           textTransform: "uppercase",
@@ -244,38 +258,102 @@ export default function AgentMarketplacePage() {
         }}>
           /{channelSlug || "channel"} — AI Radio Hosts
         </p>
-      </div>
 
-      {/* Success message */}
-      {successMessage && (
+        {/* AI HOST TOGGLE — moved here between breadcrumb and YOUR_HOSTS */}
         <div style={{
+          marginTop: "16px",
           padding: "12px 16px",
-          backgroundColor: "rgba(74, 222, 128, 0.08)",
-          borderLeft: "3px solid #4ADE80",
-          marginBottom: "24px",
-          fontSize: "12px",
-          color: "#4ADE80",
-          fontFamily: "var(--font-mono)",
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
+          backgroundColor: "rgba(24, 24, 27, 0.3)",
+          borderLeft: `3px solid ${aiHostEnabled ? "#4ADE80" : "#27272a"}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
         }}>
-          {successMessage}
+          <div>
+            <div style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              color: aiHostEnabled ? "#4ADE80" : "var(--text-primary)",
+              fontFamily: "var(--font-mono)",
+            }}>
+              AI Radio Host — {aiHostEnabled ? "ENABLED" : "DISABLED"}
+            </div>
+          </div>
+          <button
+            onClick={handleToggleAiHost}
+            disabled={togglingHost}
+            style={{
+              width: "52px",
+              height: "28px",
+              borderRadius: "14px",
+              border: "none",
+              backgroundColor: aiHostEnabled ? "#4ADE80" : "#27272a",
+              cursor: togglingHost ? "not-allowed" : "pointer",
+              position: "relative",
+              flexShrink: 0,
+              transition: "background-color 0.2s",
+              opacity: togglingHost ? 0.6 : 1,
+            }}
+          >
+            <div style={{
+              width: "20px",
+              height: "20px",
+              borderRadius: "50%",
+              backgroundColor: aiHostEnabled ? "#0a0a0a" : "#71717a",
+              position: "absolute",
+              top: "4px",
+              left: aiHostEnabled ? "28px" : "4px",
+              transition: "left 0.2s, background-color 0.2s",
+            }} />
+          </button>
         </div>
-      )}
 
-      {/* YOUR HOSTS — only if subscribed */}
-      {hasSubscriptions && (
-        <div style={{ marginBottom: "32px" }}>
+        {/* YOUR_HOSTS label */}
+        {hasSubscriptions && (
           <div style={{
             fontSize: "10px",
             textTransform: "uppercase",
             letterSpacing: "0.1em",
             color: "#52525b",
-            marginBottom: "12px",
+            marginTop: "16px",
             fontFamily: "var(--font-mono)",
           }}>
             {"// YOUR_HOSTS"}
           </div>
+        )}
+
+        {/* Success message */}
+        {successMessage && (
+          <div style={{
+            padding: "10px 14px",
+            backgroundColor: "rgba(74, 222, 128, 0.08)",
+            borderLeft: "3px solid #4ADE80",
+            marginTop: "12px",
+            fontSize: "12px",
+            color: "#4ADE80",
+            fontFamily: "var(--font-mono)",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+          }}>
+            {successMessage}
+          </div>
+        )}
+      </div>{/* end fixed top zone */}
+
+      {/* ── Scrollable content zone ── */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "16px 20px",
+      }}>
+
+      {/* YOUR HOSTS cards — only if subscribed */}
+      {hasSubscriptions && (
+        <div style={{ marginBottom: "24px" }}>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {/* Primary Host */}
@@ -347,83 +425,6 @@ export default function AgentMarketplacePage() {
           </div>
         </div>
       )}
-
-      {/* AI HOST TOGGLE */}
-      <div style={{
-        marginBottom: "32px",
-        padding: "20px",
-        backgroundColor: "rgba(24, 24, 27, 0.3)",
-        borderLeft: `3px solid ${aiHostEnabled ? "#4ADE80" : "#27272a"}`,
-      }}>
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "16px",
-        }}>
-          <div>
-            <div style={{
-              fontSize: "13px",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              color: "var(--text-primary)",
-              marginBottom: "6px",
-              fontFamily: "var(--font-mono)",
-            }}>
-              AI Radio Host
-            </div>
-            <div style={{
-              fontSize: "11px",
-              color: "#71717a",
-              fontFamily: "var(--font-mono)",
-              lineHeight: "1.5",
-            }}>
-              AI hosts will introduce tracks and engage listeners between songs
-            </div>
-          </div>
-
-          {/* Toggle switch */}
-          <button
-            onClick={handleToggleAiHost}
-            disabled={togglingHost}
-            style={{
-              width: "52px",
-              height: "28px",
-              borderRadius: "14px",
-              border: "none",
-              backgroundColor: aiHostEnabled ? "#4ADE80" : "#27272a",
-              cursor: togglingHost ? "not-allowed" : "pointer",
-              position: "relative",
-              flexShrink: 0,
-              transition: "background-color 0.2s",
-              opacity: togglingHost ? 0.6 : 1,
-            }}
-          >
-            <div style={{
-              width: "20px",
-              height: "20px",
-              borderRadius: "50%",
-              backgroundColor: aiHostEnabled ? "#0a0a0a" : "#71717a",
-              position: "absolute",
-              top: "4px",
-              left: aiHostEnabled ? "28px" : "4px",
-              transition: "left 0.2s, background-color 0.2s",
-            }} />
-          </button>
-        </div>
-
-        <div style={{
-          marginTop: "8px",
-          fontSize: "10px",
-          fontFamily: "var(--font-mono)",
-          textTransform: "uppercase",
-          letterSpacing: "0.1em",
-          color: aiHostEnabled ? "#4ADE80" : "#52525b",
-        }}>
-          {aiHostEnabled ? "ENABLED" : "DISABLED"}
-        </div>
-      </div>
 
       {/* AVAILABLE AGENTS CATALOG */}
       <div style={{
@@ -673,6 +674,8 @@ export default function AgentMarketplacePage() {
         <br />
         You can cancel anytime from the billing portal.
       </div>
+
+      </div>{/* end scrollable zone */}
     </div>
   );
 }
