@@ -34,7 +34,15 @@ export default async function BroadcastDashboard() {
     .eq("status", "pending");
 
   return (
-    <div>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      height: "calc(100dvh - 65px)",
+      marginTop: "-24px",
+      marginLeft: "-20px",
+      marginRight: "-20px",
+      overflow: "hidden",
+    }}>
       <style>{`
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
@@ -44,20 +52,27 @@ export default async function BroadcastDashboard() {
           animation: pulse-opacity 1s step-end infinite;
         }
       `}</style>
-      {/* Terminal header */}
-      <div style={{ marginBottom: "8px" }}>
-        <span style={{ color: "#f59e0b", fontSize: "13px" }}>{"> "}broadcast_dash --status</span>
-        <span className="cursor-blink" style={{
-          width: "8px",
-          height: "12px",
-          backgroundColor: "#f59e0b",
-          display: "inline-block",
-        }} />
-      </div>
 
-      <div style={{ marginBottom: "32px" }}>
+      {/* ── Fixed top zone ── */}
+      <div style={{
+        flexShrink: 0,
+        padding: "24px 20px 16px",
+        backgroundColor: "var(--bg-base)",
+        borderBottom: "1px solid #27272a",
+      }}>
+        {/* Terminal header */}
+        <div style={{ marginBottom: "8px" }}>
+          <span style={{ color: "#f59e0b", fontSize: "13px" }}>{"> "}broadcast_dash --status</span>
+          <span className="cursor-blink" style={{
+            width: "8px",
+            height: "12px",
+            backgroundColor: "#f59e0b",
+            display: "inline-block",
+          }} />
+        </div>
+
         <h1 style={{
-          fontSize: "28px",
+          fontSize: "clamp(20px, 5vw, 28px)",
           fontWeight: 700,
           letterSpacing: "-0.05em",
           textTransform: "uppercase",
@@ -76,12 +91,20 @@ export default async function BroadcastDashboard() {
         </p>
       </div>
 
+      {/* ── Scrollable content zone ── */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "20px",
+      }}>
+
       {/* Stats Grid */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))",
         gap: "16px",
-        marginBottom: "32px",
+        marginBottom: "20px",
       }}>
         <StatCard label="Status" value={channel?.is_live ? "ON AIR" : "OFFLINE"} accent={channel?.is_live} />
         <StatCard label="Tracks" value={String(trackCount ?? 0)} />
@@ -191,6 +214,8 @@ export default async function BroadcastDashboard() {
         <a href="/broadcast/ads" className="action-btn">Review Ads</a>
         <a href="/broadcast/profile" className="action-btn">Edit Profile</a>
       </div>
+
+      </div>{/* end scrollable zone */}
     </div>
   );
 }
