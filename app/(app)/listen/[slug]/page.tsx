@@ -310,7 +310,7 @@ export default function ChannelPage() {
     <div style={{
       display: "flex",
       flexDirection: "column",
-      height: "calc(100vh - 65px)",
+      height: "calc(100dvh - 65px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))",
       marginTop: "-24px",
       marginLeft: "-20px",
       marginRight: "-20px",
@@ -358,12 +358,12 @@ export default function ChannelPage() {
 
       {/* ── Header ── */}
       <header style={{
-        padding: "24px 20px",
+        padding: "16px 20px 12px",
         borderBottom: "2px solid #27272a",
         backgroundColor: "#202020",
         display: "flex",
         flexDirection: "column",
-        gap: "12px",
+        gap: "8px",
         flexShrink: 0,
       }}>
         {/* System status bar */}
@@ -595,10 +595,10 @@ export default function ChannelPage() {
 
         {/* Track metadata */}
         <div style={{
-          padding: "20px",
+          padding: "12px 20px",
           display: "flex",
           flexDirection: "column",
-          gap: "4px",
+          gap: "2px",
           zIndex: 10,
         }}>
           <div style={{
@@ -651,12 +651,12 @@ export default function ChannelPage() {
       <footer style={{
         backgroundColor: "#2B2B2B",
         borderTop: "2px solid #27272a",
-        paddingBottom: "20px",
+        paddingBottom: "8px",
         flexShrink: 0,
       }}>
         {/* Timeline section */}
         <div style={{
-          padding: "24px 0 16px 0",
+          padding: "12px 0 8px 0",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -666,10 +666,10 @@ export default function ChannelPage() {
             display: "flex",
             alignItems: "center",
             gap: "8px",
-            fontSize: "16px",
+            fontSize: "14px",
             fontWeight: 700,
             color: "#71717a",
-            marginBottom: "24px",
+            marginBottom: "8px",
             letterSpacing: "0.05em",
           }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b">
@@ -690,7 +690,7 @@ export default function ChannelPage() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "16px 20px 24px",
+          padding: "8px 20px 12px",
         }}>
           {/* Left: Volume */}
           <button

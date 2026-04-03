@@ -2,7 +2,12 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import Hls from "hls.js";
-import { activateAudioSession } from "../../lib/capacitor-bridge";
+import {
+  activateAudioSession,
+  startNativeAnalyser,
+  stopNativeAnalyser,
+  onFrequencyData,
+} from "../../lib/capacitor-bridge";
 
 function getStreamUrl(slug?: string) {
   const path = slug
@@ -28,6 +33,7 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
   const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number>(0);
+  const nativeCleanupRef = useRef<(() => void) | null>(null);
 
   const setupAnalyser = useCallback(() => {
     const audio = audioRef.current;
@@ -46,8 +52,8 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
     analyser.fftSize = 256;
 
     // On iOS with native HLS, createMediaElementSource doesn't feed frequency
-    // data. The Visualizer component handles this gracefully with breathing
-    // waves when no real data is detected. Only wire up AudioContext on desktop.
+    // data. Use the native AudioAnalyser plugin to capture frequency data from
+    // the system audio output and inject it into the AnalyserNode's interface.
     const useNativeHls = !Hls.isSupported() && !!audio.canPlayType("application/vnd.apple.mpegurl");
 
     if (!useNativeHls) {
@@ -55,6 +61,34 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
       const source = ctx.createMediaElementSource(audio);
       source.connect(analyser);
       analyser.connect(ctx.destination);
+    } else {
+      // iOS native HLS path: use native plugin for frequency data.
+      // Create a buffer that the native plugin writes into, and override
+      // getByteFrequencyData to read from it instead of the (empty) AudioContext.
+      const nativeBins = new Uint8Array(analyser.frequencyBinCount);
+      const originalGetByteFrequencyData = analyser.getByteFrequencyData.bind(analyser);
+
+      analyser.getByteFrequencyData = (array: Uint8Array) => {
+        // Try native data first; fall back to original (empty) if no native data
+        if (nativeBins.some((v) => v > 0)) {
+          array.set(nativeBins.subarray(0, array.length));
+        } else {
+          originalGetByteFrequencyData(array as Uint8Array<ArrayBuffer>);
+        }
+      };
+
+      // Start native analysis and listen for frequency data
+      startNativeAnalyser();
+      const removeListener = onFrequencyData((bins) => {
+        // Resample native bins (128) to analyser's frequencyBinCount (128)
+        const len = Math.min(bins.length, nativeBins.length);
+        for (let i = 0; i < len; i++) nativeBins[i] = bins[i];
+      });
+
+      nativeCleanupRef.current = () => {
+        stopNativeAnalyser();
+        removeListener();
+      };
     }
 
     audioCtxRef.current = ctx;
@@ -92,6 +126,8 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
     if (audio) audio.pause();
     hlsRef.current?.destroy();
     hlsRef.current = null;
+    nativeCleanupRef.current?.();
+    nativeCleanupRef.current = null;
     setIsPlaying(false);
     setElapsed(0);
   }, []);
@@ -206,6 +242,8 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
     return () => {
       hlsRef.current?.destroy();
       audioCtxRef.current?.close();
+      nativeCleanupRef.current?.();
+      nativeCleanupRef.current = null;
       cancelAnimationFrame(rafRef.current);
     };
   }, []);
