@@ -302,7 +302,15 @@ export default function TracksPage() {
   ).length;
 
   return (
-    <div>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      height: "calc(100dvh - 65px)",
+      marginTop: "-24px",
+      marginLeft: "-20px",
+      marginRight: "-20px",
+      overflow: "hidden",
+    }}>
       <style>{`
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
@@ -333,6 +341,8 @@ export default function TracksPage() {
           animation: active-pulse 2s ease-in-out infinite;
         }
       `}</style>
+      {/* ── Fixed top zone ── */}
+      <div style={{ flexShrink: 0, padding: "24px 20px 0", backgroundColor: "var(--bg-base)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
         <div>
           <div style={{ fontSize: "12px", letterSpacing: "0.05em", color: "#f59e0b", fontFamily: "var(--font-mono)", marginBottom: "4px" }}>
@@ -480,7 +490,15 @@ export default function TracksPage() {
           </div>
         </>
       )}
+      </div>{/* end fixed top zone */}
 
+      {/* ── Scrollable content zone ── */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "16px 20px",
+      }}>
       {loading ? (
         <InlineLoader />
       ) : tracks.length === 0 ? (
@@ -658,6 +676,8 @@ export default function TracksPage() {
           })}
         </div>
       )}
+
+      </div>{/* end scrollable zone */}
 
       {/* Broadcast Agreement Modal */}
       {showAgreement && (
