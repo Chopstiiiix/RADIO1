@@ -68,7 +68,15 @@ export default function MyAdvertsPage() {
   }
 
   return (
-    <div>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      height: "calc(100dvh - 65px)",
+      marginTop: "-24px",
+      marginLeft: "-20px",
+      marginRight: "-20px",
+      overflow: "hidden",
+    }}>
       <style>{`
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
@@ -78,29 +86,45 @@ export default function MyAdvertsPage() {
           animation: pulse-opacity 1s step-end infinite;
         }
       `}</style>
-      <div style={{ marginBottom: "4px", fontFamily: "var(--font-mono)", fontSize: "11px", color: "#f59e0b" }}>
-        {"> advert_list --mine"}<span className="cursor-blink" style={{
-          width: "8px",
-          height: "12px",
-          backgroundColor: "#f59e0b",
-          display: "inline-block",
-        }} />
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-        <h1 style={{ fontSize: "24px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "-0.05em" }}>My Adverts<span style={{ color: "#f59e0b" }}>_</span></h1>
-        <a href="/advertise/adverts/upload" style={{
-          padding: "10px 20px",
-          backgroundColor: "#f59e0b",
-          color: "#0a0a0a",
-          borderRadius: "0px",
-          fontSize: "11px",
-          fontWeight: 700,
-          textDecoration: "none",
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-        }}>Upload Advert</a>
-      </div>
 
+      {/* ── Fixed top zone ── */}
+      <div style={{
+        flexShrink: 0,
+        padding: "24px 20px 16px",
+        backgroundColor: "var(--bg-base)",
+        borderBottom: "1px solid #27272a",
+      }}>
+        <div style={{ marginBottom: "4px", fontFamily: "var(--font-mono)", fontSize: "11px", color: "#f59e0b" }}>
+          {"> advert_list --mine"}<span className="cursor-blink" style={{
+            width: "8px",
+            height: "12px",
+            backgroundColor: "#f59e0b",
+            display: "inline-block",
+          }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h1 style={{ fontSize: "24px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "-0.05em" }}>My Adverts<span style={{ color: "#f59e0b" }}>_</span></h1>
+          <a href="/advertise/adverts/upload" style={{
+            padding: "10px 20px",
+            backgroundColor: "#f59e0b",
+            color: "#0a0a0a",
+            borderRadius: "0px",
+            fontSize: "11px",
+            fontWeight: 700,
+            textDecoration: "none",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+          }}>Upload Advert</a>
+        </div>
+      </div>{/* end fixed top zone */}
+
+      {/* ── Scrollable content zone ── */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "16px 20px",
+      }}>
       {loading ? (
         <InlineLoader />
       ) : adverts.length === 0 ? (
@@ -167,6 +191,7 @@ export default function MyAdvertsPage() {
           ))}
         </div>
       )}
+      </div>{/* end scrollable zone */}
     </div>
   );
 }
