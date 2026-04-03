@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import MobileEnhancements from "./components/MobileEnhancements";
 
 export const metadata: Metadata = {
   title: "Caster — 24/7 AI-Powered Radio",
@@ -24,7 +25,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <MobileEnhancements />
+        {children}
+      </body>
     </html>
   );
 }
