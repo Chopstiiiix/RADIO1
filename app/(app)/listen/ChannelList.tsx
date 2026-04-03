@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import CountdownTimer from "@/app/components/CountdownTimer";
 
 interface Channel {
   id: string;
@@ -29,6 +30,32 @@ export default function ChannelList({
   const [tab, setTab] = useState<"all" | "following">("all");
   const [channels, setChannels] = useState<Channel[]>(allChannels);
   const [nowPlayingMap, setNowPlayingMap] = useState<Record<string, { title: string; type?: string }>>({});
+  const [scheduledMap, setScheduledMap] = useState<Record<string, string>>({});
+
+  // Fetch scheduled broadcasts
+  useEffect(() => {
+    async function fetchSchedules() {
+      const ids = allChannels.map((ch) => ch.id);
+      if (ids.length === 0) return;
+      const { data } = await supabase
+        .from("scheduled_broadcasts")
+        .select("broadcaster_id, scheduled_at")
+        .in("broadcaster_id", ids)
+        .eq("status", "pending")
+        .gt("scheduled_at", new Date().toISOString())
+        .order("scheduled_at", { ascending: true });
+      const map: Record<string, string> = {};
+      if (data) {
+        for (const s of data) {
+          if (!map[s.broadcaster_id]) map[s.broadcaster_id] = s.scheduled_at;
+        }
+      }
+      setScheduledMap(map);
+    }
+    fetchSchedules();
+    const interval = setInterval(fetchSchedules, 30000);
+    return () => clearInterval(interval);
+  }, [allChannels, supabase]);
 
   // Poll channel live status every 5 seconds
   useEffect(() => {
@@ -352,7 +379,7 @@ export default function ChannelList({
           </div>
         ) : (
           displayChannels.map((ch, index) => (
-            <ChannelCard key={ch.id} channel={ch} index={index} likes={likeMap[ch.channel_slug] || 0} followers={followerMap[ch.id] || 0} nowPlaying={nowPlayingMap[ch.channel_slug] || null} />
+            <ChannelCard key={ch.id} channel={ch} index={index} likes={likeMap[ch.channel_slug] || 0} followers={followerMap[ch.id] || 0} nowPlaying={nowPlayingMap[ch.channel_slug] || null} scheduledAt={scheduledMap[ch.id] || null} />
           ))
         )}
       </div>
@@ -403,7 +430,7 @@ export default function ChannelList({
   );
 }
 
-function ChannelCard({ channel, index, likes, followers, nowPlaying }: { channel: any; index: number; likes: number; followers: number; nowPlaying: { title: string; type?: string } | null }) {
+function ChannelCard({ channel, index, likes, followers, nowPlaying, scheduledAt }: { channel: any; index: number; likes: number; followers: number; nowPlaying: { title: string; type?: string } | null; scheduledAt: string | null }) {
   const router = useRouter();
   const isLive = channel.is_live;
   const profile = channel.profile as any;
@@ -473,18 +500,33 @@ function ChannelCard({ channel, index, likes, followers, nowPlaying }: { channel
           color: isLive ? "rgba(245, 158, 11, 0.8)" : "#52525b",
         }}>
           <span className="ch-label">CH_{chNum}</span>
-          <span style={{
-            display: "flex", alignItems: "center", gap: "4px",
-            fontSize: "10px",
-            letterSpacing: "0.05em",
-            color: isLive ? "rgba(245, 158, 11, 0.7)" : "#52525b",
-          }}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-            </svg>
-            {followers.toLocaleString()}
-          </span>
+          {!isLive && scheduledAt ? (
+            <span style={{
+              display: "flex", alignItems: "center", gap: "5px",
+              fontSize: "10px",
+              letterSpacing: "0.05em",
+              color: "#f59e0b",
+            }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <CountdownTimer scheduledAt={scheduledAt} />
+            </span>
+          ) : (
+            <span style={{
+              display: "flex", alignItems: "center", gap: "4px",
+              fontSize: "10px",
+              letterSpacing: "0.05em",
+              color: isLive ? "rgba(245, 158, 11, 0.7)" : "#52525b",
+            }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+              </svg>
+              {followers.toLocaleString()}
+            </span>
+          )}
         </div>
 
         {/* Channel name + host */}

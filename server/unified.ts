@@ -321,6 +321,52 @@ setInterval(() => {
   }
 }, 15000);
 
+// ── Scheduled broadcast checker (every 30 seconds) ──
+setInterval(async () => {
+  try {
+    const { data: due } = await supabase
+      .from("scheduled_broadcasts")
+      .select("id, broadcaster_id, track_ids")
+      .eq("status", "pending")
+      .lte("scheduled_at", new Date().toISOString())
+      .limit(5);
+
+    if (!due || due.length === 0) return;
+
+    for (const schedule of due) {
+      // Get broadcaster's channel slug
+      const { data: bp } = await supabase
+        .from("broadcaster_profiles")
+        .select("channel_slug, is_live")
+        .eq("id", schedule.broadcaster_id)
+        .single();
+
+      if (!bp || bp.is_live) {
+        // Already live or no profile — mark as started to skip
+        await supabase.from("scheduled_broadcasts").update({ status: "started" }).eq("id", schedule.id);
+        continue;
+      }
+
+      console.log(`⏰ [${bp.channel_slug}] Starting scheduled broadcast with ${schedule.track_ids.length} tracks`);
+
+      const success = await startChannel(schedule.broadcaster_id, bp.channel_slug, schedule.track_ids);
+
+      await supabase
+        .from("scheduled_broadcasts")
+        .update({ status: success ? "started" : "cancelled" })
+        .eq("id", schedule.id);
+
+      if (success) {
+        console.log(`✅ [${bp.channel_slug}] Scheduled broadcast started`);
+      } else {
+        console.log(`❌ [${bp.channel_slug}] Scheduled broadcast failed to start`);
+      }
+    }
+  } catch (err) {
+    console.error("Scheduled broadcast check error:", err);
+  }
+}, 30000);
+
 // ── Auto-end handler (broadcast ends when all tracks finish) ──
 streamEvents.on("ended", async (slug: string) => {
   // Skip if pipeline was deliberately restarted (e.g., add-tracks)

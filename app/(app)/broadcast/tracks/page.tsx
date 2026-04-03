@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import TrashButton from "@/app/components/TrashButton";
 import BroadcastAgreement from "@/app/components/BroadcastAgreement";
+import ScheduleModal from "@/app/components/ScheduleModal";
 import InlineLoader from "@/app/components/InlineLoader";
 
 interface Track {
@@ -31,6 +32,31 @@ export default function TracksPage() {
   const [isChannelLive, setIsChannelLive] = useState(false);
   const [endingBroadcast, setEndingBroadcast] = useState(false);
   const [showAgreement, setShowAgreement] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [schedulingMessage, setSchedulingMessage] = useState("");
+
+  async function handleSchedule(scheduledAt: string) {
+    if (selectedTracks.size === 0) return;
+    setShowSchedule(false);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase.from("scheduled_broadcasts").insert({
+      broadcaster_id: user.id,
+      scheduled_at: scheduledAt,
+      track_ids: Array.from(selectedTracks),
+    });
+
+    if (error) {
+      setBroadcastMessage(error.message);
+    } else {
+      const d = new Date(scheduledAt);
+      setSchedulingMessage(`Broadcast scheduled for ${d.toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`);
+      setSelectedTracks(new Set());
+      setTimeout(() => setSchedulingMessage(""), 5000);
+    }
+  }
 
   async function loadTracks() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -486,8 +512,56 @@ export default function TracksPage() {
                     : (isChannelLive ? "ADD TO BROADCAST" : "BROADCAST")
                 }
               </button>
+              {!isChannelLive && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedTracks.size === 0) {
+                      setBroadcastMessage("Select tracks to schedule");
+                      return;
+                    }
+                    setShowSchedule(true);
+                  }}
+                  style={{
+                    padding: "8px 14px",
+                    backgroundColor: "transparent",
+                    color: selectedTracks.size > 0 ? "#f59e0b" : "#52525b",
+                    border: selectedTracks.size > 0 ? "1px solid #f59e0b" : "1px solid #27272a",
+                    borderRadius: "0px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: "var(--font-mono)",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  SCHEDULE
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Scheduling message */}
+          {schedulingMessage && (
+            <p style={{
+              fontSize: "11px",
+              color: "#4ADE80",
+              marginTop: "8px",
+              fontFamily: "var(--font-mono)",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+            }}>
+              {schedulingMessage}
+            </p>
+          )}
         </>
       )}
       </div>{/* end fixed top zone */}
@@ -685,6 +759,15 @@ export default function TracksPage() {
           trackCount={selectedTracks.size}
           onAccept={executeBroadcast}
           onCancel={() => setShowAgreement(false)}
+        />
+      )}
+
+      {/* Schedule Modal */}
+      {showSchedule && (
+        <ScheduleModal
+          trackCount={selectedTracks.size}
+          onSchedule={handleSchedule}
+          onCancel={() => setShowSchedule(false)}
         />
       )}
     </div>
