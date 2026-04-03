@@ -377,6 +377,12 @@ streamEvents.on("ended", async (slug: string) => {
   const ch = activeChannels.get(slug);
   if (!ch) return;
   console.log(`⏹️  [${slug}] Playlist finished — ending broadcast.`);
+  // Small delay to let ffmpeg fully exit before cleanup
+  setTimeout(async () => {
+    if (!activeChannels.has(slug)) return;
+    await stopChannel(slug);
+    console.log(`⏹️  [${slug}] Broadcast stopped.`);
+  }, 2000);
 });
 
 // ── Express App ──
