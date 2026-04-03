@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Room, AudioPresets } from "livekit-client";
 import InlineLoader from "@/app/components/InlineLoader";
 import BroadcastAgreement from "@/app/components/BroadcastAgreement";
+import { activateAudioSession } from "@/lib/capacitor-bridge";
 
 interface Track {
   id: string;
@@ -321,6 +322,9 @@ export default function GoLivePage() {
     }
 
     try {
+      // Activate native audio session before mic access (no-op on web)
+      await activateAudioSession();
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
       });
@@ -624,7 +628,7 @@ export default function GoLivePage() {
       </div>
 
       <h1 style={{
-        fontSize: "28px",
+        fontSize: "clamp(20px, 5vw, 28px)",
         fontWeight: 700,
         letterSpacing: "-0.05em",
         textTransform: "uppercase",

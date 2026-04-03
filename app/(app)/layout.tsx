@@ -35,9 +35,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }}>
       {/* Top nav */}
       <nav style={{
-        maxWidth: "460px",
+        maxWidth: "min(460px, 100vw)",
         margin: "0 auto",
-        padding: "16px 20px",
+        padding: "calc(16px + env(safe-area-inset-top, 0px)) 20px 16px",
         borderBottom: "2px solid #27272a",
         backgroundColor: "var(--bg-base)",
       }}>
@@ -119,7 +119,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </nav>
 
-      <main style={{ padding: "24px 20px", maxWidth: "460px", margin: "0 auto" }}>
+      <main style={{ padding: "24px 20px", maxWidth: "min(460px, 100vw)", margin: "0 auto", overflowX: "hidden" }}>
         {children}
       </main>
     </div>

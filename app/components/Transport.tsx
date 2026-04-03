@@ -1,15 +1,22 @@
 "use client";
 
+import { hapticTap } from "../../lib/capacitor-bridge";
+
 interface TransportProps {
   isPlaying: boolean;
   onToggle: () => void;
 }
 
 export default function Transport({ isPlaying, onToggle }: TransportProps) {
+  const handleToggle = () => {
+    hapticTap();
+    onToggle();
+  };
+
   return (
     <div className="flex items-center justify-center gap-6">
       <button
-        onClick={onToggle}
+        onClick={handleToggle}
         className="w-14 h-14 rounded-full bg-accent hover:bg-accent/80 transition-colors flex items-center justify-center"
         aria-label={isPlaying ? "Pause" : "Play"}
       >

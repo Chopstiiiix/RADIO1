@@ -36,9 +36,11 @@ function LoginForm() {
       return;
     }
 
-    // Redirect to intended page or role-based default
+    // Use router.push for client-side navigation (works in Capacitor WebView)
+    // then router.refresh to pick up fresh session cookies
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      router.refresh();
       if (redirectTo) {
         router.push(redirectTo);
         return;
@@ -248,7 +250,7 @@ const inputStyle: React.CSSProperties = {
   border: "1px solid #27272a",
   borderRadius: "0px",
   color: "var(--text-primary)",
-  fontSize: "13px",
+  fontSize: "16px", // Must be 16px+ to prevent iOS auto-zoom on focus
   outline: "none",
   fontFamily: "'JetBrains Mono', monospace",
   boxSizing: "border-box",

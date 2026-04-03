@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import Hls from "hls.js";
+import { activateAudioSession } from "../../lib/capacitor-bridge";
 
 function getStreamUrl(slug?: string) {
   const path = slug
@@ -31,6 +32,9 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
   const setupAnalyser = useCallback(() => {
     const audio = audioRef.current;
     if (!audio || audioCtxRef.current) return;
+
+    // Activate native audio session for background playback (no-op on web)
+    activateAudioSession();
 
     const ctx = new AudioContext();
     // Resume AudioContext on mobile (requires user gesture)

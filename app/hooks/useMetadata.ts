@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { TrackInfo } from "../components/NowPlaying";
 import type { UpcomingTrack } from "../components/Schedule";
+import { updateMediaSession } from "../../lib/capacitor-bridge";
 
 function getMetadataUrl() {
   if (typeof window === "undefined") return "/metadata/channels/default/now-playing";
@@ -41,16 +42,26 @@ export function useMetadata(): MetadataState {
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          const track = data.track ?? null;
           setState((prev) => ({
             ...prev,
             isLive: !data.ended,
-            track: data.track ?? null,
+            track,
             upcoming: data.upcoming ?? [],
             duration: data.duration ?? prev.duration,
             trackStartOffset: data.trackStartOffset ?? prev.trackStartOffset,
             ended: data.ended ?? false,
             type: data.type ?? "track",
           }));
+
+          // Update lock screen / Control Center metadata
+          if (track) {
+            updateMediaSession({
+              title: track.title ?? "Caster Radio",
+              artist: track.artist ?? "Live",
+              artwork: track.artwork_url,
+            });
+          }
         } catch {
           // ignore
         }

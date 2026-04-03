@@ -125,22 +125,15 @@ export async function startChannel(broadcasterId: string, slug: string, trackIds
   activeChannels.set(slug, { config, broadcasterId, useAiHost: shouldUseAiHost });
   console.log(`📡 Channel ${slug} is now LIVE with ${tracks.length} items (${baseTracks.length} tracks${shouldUseAiHost ? " + host segments" : ""})`);
 
-  // Listen for stream end to auto-loop
+  // Listen for stream end — auto-stop the broadcast (no looping)
   const onEnded = (endedSlug: string) => {
     if (endedSlug !== slug) return;
     if (!activeChannels.has(slug)) return; // was explicitly stopped
-    console.log(`🔄 [${slug}] Stream ended — auto-restarting loop...`);
-    stopChannelScheduler(slug);
-    // Small delay before restart to let ffmpeg fully exit
+    console.log(`⏹️  [${slug}] Stream ended — stopping broadcast.`);
+    // Small delay to let ffmpeg fully exit before cleanup
     setTimeout(async () => {
       if (!activeChannels.has(slug)) return;
-      // Re-use the same tracks (including host segments if previously generated)
-      const loopTracks = finalTracks.length > 0 ? finalTracks : getChannelTracks(config.musicDir);
-      const loopResult = startChannelPipelineFromTracks(config, loopTracks);
-      if (loopResult) {
-        await startChannelScheduler(config, loopResult.tracks, broadcasterId);
-        console.log(`🔁 [${slug}] Looped — playing ${loopResult.tracks.length} items again`);
-      }
+      await stopChannel(slug);
     }, 2000);
   };
   streamEvents.on("ended", onEnded);

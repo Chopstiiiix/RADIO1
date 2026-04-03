@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
+import { isNative } from "../../lib/capacitor-bridge";
 
 interface VisualizerProps {
   analyserNode: AnalyserNode | null;
@@ -13,6 +14,8 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
   const timeRef = useRef(0);
   const animFrameRef = useRef<number>(0);
   const smoothedRef = useRef<Float32Array | null>(null);
+  const frameSkipRef = useRef(0);
+  const isMobile = isNative() || (typeof window !== "undefined" && window.innerWidth < 768);
 
   useEffect(() => {
     const bgCanvas = bgCanvasRef.current;
@@ -38,7 +41,7 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
     window.addEventListener("orientationchange", () => setTimeout(resize, 100));
 
     const waveColor = { r: 120, g: 179, b: 206 }; // #78B3CE
-    const BANDS = 48;
+    const BANDS = isMobile ? 24 : 48;
 
     const drawWave = (
       ctx: CanvasRenderingContext2D,
@@ -129,6 +132,21 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
     };
 
     const draw = () => {
+      // Pause drawing when app is backgrounded (saves battery on mobile)
+      if (document.visibilityState === "hidden") {
+        animFrameRef.current = requestAnimationFrame(draw);
+        return;
+      }
+
+      // Throttle to ~30fps on mobile to save battery
+      if (isMobile) {
+        frameSkipRef.current++;
+        if (frameSkipRef.current % 2 !== 0) {
+          animFrameRef.current = requestAnimationFrame(draw);
+          return;
+        }
+      }
+
       const rect = bgCanvas.parentElement!.getBoundingClientRect();
       const w = rect.width;
       const h = rect.height;

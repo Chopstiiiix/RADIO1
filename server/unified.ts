@@ -321,26 +321,16 @@ setInterval(() => {
   }
 }, 15000);
 
-// ── Auto-loop handler ──
+// ── Auto-end handler (broadcast ends when all tracks finish) ──
 streamEvents.on("ended", async (slug: string) => {
-  // Skip auto-loop if pipeline was deliberately restarted (e.g., add-tracks)
+  // Skip if pipeline was deliberately restarted (e.g., add-tracks)
   if (suppressAutoLoop.has(slug)) {
     suppressAutoLoop.delete(slug);
     return;
   }
   const ch = activeChannels.get(slug);
   if (!ch) return;
-  console.log(`🔁 [${slug}] Playlist ended, auto-looping...`);
-  const musicDir = path.join(BASE_MUSIC_DIR, slug);
-  const outputDir = path.join(BASE_OUTPUT_DIR, slug);
-  const result = startChannelPipeline({ slug, musicDir, outputDir });
-  if (result) {
-    // Reconnect new music decoder to existing mixer
-    connectMusicSource(slug, result.process);
-    ch.currentIndex = 0;
-    ch.tracks = result.tracks;
-    startTrackTimer(slug);
-  }
+  console.log(`⏹️  [${slug}] Playlist finished — ending broadcast.`);
 });
 
 // ── Express App ──

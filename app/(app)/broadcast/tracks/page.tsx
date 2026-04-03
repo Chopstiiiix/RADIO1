@@ -562,8 +562,9 @@ export default function TracksPage() {
                   </div>
                 )}
 
-                {/* Track info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Track info — two-row layout for mobile */}
+                <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                  {/* Row 1: Title */}
                   <div style={{
                     fontWeight: 600,
                     fontSize: "14px",
@@ -575,63 +576,83 @@ export default function TracksPage() {
                   }}>
                     {track.title}
                   </div>
-                  <div style={{ color: isNowPlaying ? "#f59e0b" : "var(--text-secondary)", fontSize: "13px" }}>
-                    {isNowPlaying && (
-                      <span style={{
-                        fontSize: "10px",
-                        letterSpacing: "0.1em",
-                        marginRight: "6px",
-                      }}>
-                        ON AIR
-                      </span>
-                    )}
-                    {track.primary_artist}
-                    {track.featured_artists?.length ? ` ft. ${track.featured_artists.join(", ")}` : ""}
+                  {/* Row 2: Artist + duration */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginTop: "2px",
+                  }}>
+                    <span style={{
+                      color: isNowPlaying ? "#f59e0b" : "var(--text-secondary)",
+                      fontSize: "12px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      flex: 1,
+                      minWidth: 0,
+                    }}>
+                      {isNowPlaying && (
+                        <span style={{
+                          fontSize: "10px",
+                          letterSpacing: "0.1em",
+                          marginRight: "6px",
+                        }}>
+                          ON AIR
+                        </span>
+                      )}
+                      {track.primary_artist}
+                      {track.featured_artists?.length ? ` ft. ${track.featured_artists.join(", ")}` : ""}
+                    </span>
+                    <span style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "11px",
+                      color: "var(--text-tertiary)",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}>
+                      {formatDuration(track.duration_seconds)}
+                    </span>
                   </div>
+                  {/* Row 3: Genre tags */}
+                  {track.genre?.length ? (
+                    <div style={{ display: "flex", gap: "4px", marginTop: "6px", flexWrap: "wrap" }}>
+                      {track.genre.slice(0, 2).map((g) => (
+                        <span key={g} style={{
+                          fontSize: "9px",
+                          padding: "1px 6px",
+                          backgroundColor: "var(--bg-well)",
+                          borderRadius: "0px",
+                          border: "1px solid #27272a",
+                          color: "var(--text-secondary)",
+                          fontFamily: "var(--font-mono)",
+                        }}>{g}</span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
-                {/* Duration */}
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: "12px", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
-                  {formatDuration(track.duration_seconds)}
+                {/* Right side: Status + Delete stacked */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px", flexShrink: 0 }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); if (!isBroadcasting) toggleActive(track.id, track.is_active); }}
+                    style={{
+                      background: "none",
+                      border: "1px solid var(--border-subtle)",
+                      color: isBroadcasting ? "#4ADE80" : track.is_active ? "#f59e0b" : "var(--text-tertiary)",
+                      padding: "3px 8px",
+                      borderRadius: "0px",
+                      fontSize: "10px",
+                      cursor: isBroadcasting ? "default" : "pointer",
+                      fontFamily: "var(--font-mono)",
+                      animation: isBroadcasting ? "active-pulse 2s ease-in-out infinite" : "none",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {isBroadcasting ? "ACTIVE" : track.is_active ? "READY" : "OFF"}
+                  </button>
+                  <TrashButton onClick={() => deleteTrack(track.id)} />
                 </div>
-
-                {/* Genre tags — hidden on small screens to save space */}
-                {track.genre?.length ? (
-                  <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                    {track.genre.slice(0, 2).map((g) => (
-                      <span key={g} style={{
-                        fontSize: "10px",
-                        padding: "2px 8px",
-                        backgroundColor: "var(--bg-well)",
-                        borderRadius: "0px",
-                        border: "1px solid #27272a",
-                        color: "var(--text-secondary)",
-                        fontFamily: "var(--font-mono)",
-                      }}>{g}</span>
-                    ))}
-                  </div>
-                ) : null}
-
-                {/* Status toggle */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); if (!isBroadcasting) toggleActive(track.id, track.is_active); }}
-                  style={{
-                    background: "none",
-                    border: "1px solid var(--border-subtle)",
-                    color: isBroadcasting ? "#4ADE80" : track.is_active ? "#f59e0b" : "var(--text-tertiary)",
-                    padding: "4px 10px",
-                    borderRadius: "0px",
-                    fontSize: "11px",
-                    cursor: isBroadcasting ? "default" : "pointer",
-                    fontFamily: "var(--font-mono)",
-                    animation: isBroadcasting ? "active-pulse 2s ease-in-out infinite" : "none",
-                  }}
-                >
-                  {isBroadcasting ? "ACTIVE" : track.is_active ? "READY" : "INACTIVE"}
-                </button>
-
-                {/* Delete */}
-                <TrashButton onClick={() => deleteTrack(track.id)} />
               </div>
             );
           })}

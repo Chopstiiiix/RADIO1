@@ -321,6 +321,7 @@ export default function ChannelPage() {
       marginTop: "-24px",
       marginLeft: "-20px",
       marginRight: "-20px",
+      maxWidth: "100vw",
       backgroundColor: "var(--bg-base)",
       color: "var(--text-primary)",
       fontFamily: "'JetBrains Mono', monospace",
@@ -434,7 +435,7 @@ export default function ChannelPage() {
         {/* Channel title + heart + follow */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <h1 className="neon-title" style={{
-            fontSize: "30px",
+            fontSize: "clamp(20px, 6vw, 30px)",
             fontWeight: 800,
             letterSpacing: "-0.05em",
             textTransform: "uppercase",
@@ -838,7 +839,7 @@ export default function ChannelPage() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "16px 32px 24px",
+          padding: "16px 20px calc(24px + env(safe-area-inset-bottom, 0px))",
         }}>
           {/* Left: Volume */}
           <button
@@ -982,7 +983,7 @@ export default function ChannelPage() {
 
         {/* Volume slider row */}
         <div style={{
-          padding: "0 32px 8px",
+          padding: "0 20px 8px",
           display: "flex",
           alignItems: "center",
           gap: "12px",
@@ -1023,7 +1024,7 @@ export default function ChannelPage() {
 
         {/* Status footer */}
         <div style={{
-          padding: "12px 32px",
+          padding: "12px 20px",
           borderTop: "2px solid #27272a",
           display: "flex",
           justifyContent: "space-between",

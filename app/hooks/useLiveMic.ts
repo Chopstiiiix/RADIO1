@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Room, RoomEvent, Track, RemoteTrackPublication, RemoteParticipant } from "livekit-client";
+import { activateAudioSession } from "../../lib/capacitor-bridge";
 
 /**
  * Hook for listeners to receive live mic audio via LiveKit WebRTC.
@@ -34,12 +35,15 @@ export function useLiveMic(slug: string, isLiveMic: boolean) {
       const room = new Room({ adaptiveStream: true });
       roomRef.current = room;
 
-      room.on(RoomEvent.TrackSubscribed, (track, _pub: RemoteTrackPublication, _participant: RemoteParticipant) => {
+      room.on(RoomEvent.TrackSubscribed, async (track, _pub: RemoteTrackPublication, _participant: RemoteParticipant) => {
         if (track.kind === Track.Kind.Audio) {
           const el = track.attach();
           el.style.display = "none";
           document.body.appendChild(el);
           audioElRef.current = el;
+
+          // Activate native audio session for background playback (no-op on web)
+          await activateAudioSession();
 
           // Create analyser for visualizer
           if (!audioCtxRef.current) {
