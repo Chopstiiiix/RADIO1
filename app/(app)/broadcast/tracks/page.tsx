@@ -369,21 +369,24 @@ export default function TracksPage() {
       `}</style>
       {/* ── Fixed top zone ── */}
       <div style={{ flexShrink: 0, padding: "24px 20px 0", backgroundColor: "var(--bg-base)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-        <div>
-          <div style={{ fontSize: "12px", letterSpacing: "0.05em", color: "#f59e0b", fontFamily: "var(--font-mono)", marginBottom: "4px" }}>
-            {">"} track_list --all
-            <span className="cursor-blink" style={{
-              width: "8px",
-              height: "12px",
-              backgroundColor: "#f59e0b",
-              display: "inline-block",
-            }} />
-          </div>
-          <h1 style={{ fontSize: "24px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "-0.05em" }}>Tracks<span style={{ color: "#f59e0b" }}>_</span></h1>
+      <div style={{ marginBottom: "16px" }}>
+        <div style={{ fontSize: "12px", letterSpacing: "0.05em", color: "#f59e0b", fontFamily: "var(--font-mono)", marginBottom: "4px" }}>
+          {">"} track_list --all
+          <span className="cursor-blink" style={{
+            width: "8px",
+            height: "12px",
+            backgroundColor: "#f59e0b",
+            display: "inline-block",
+          }} />
         </div>
+        <h1 style={{ fontSize: "24px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "-0.05em" }}>Tracks<span style={{ color: "#f59e0b" }}>_</span></h1>
+      </div>
+
+      {/* Upload + Schedule row */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
         <a href="/broadcast/tracks/upload" style={{
-          padding: "10px 20px",
+          flex: 1,
+          padding: "10px",
           backgroundColor: "#f59e0b",
           color: "#0a0a0a",
           borderRadius: "0px",
@@ -392,7 +395,54 @@ export default function TracksPage() {
           textDecoration: "none",
           textTransform: "uppercase",
           letterSpacing: "0.05em",
-        }}>Upload Track</a>
+          fontFamily: "var(--font-mono)",
+          textAlign: "center",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "6px",
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          Upload Track
+        </a>
+        <button
+          type="button"
+          onClick={() => {
+            if (selectedTracks.size === 0) {
+              setBroadcastMessage("Select tracks to schedule");
+              return;
+            }
+            setShowSchedule(true);
+          }}
+          style={{
+            flex: 1,
+            padding: "10px",
+            backgroundColor: "transparent",
+            color: "#f59e0b",
+            border: "1px solid #f59e0b",
+            borderRadius: "0px",
+            fontSize: "11px",
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "var(--font-mono)",
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px",
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          Schedule
+        </button>
       </div>
 
       {/* Broadcast controls */}
@@ -512,40 +562,6 @@ export default function TracksPage() {
                     : (isChannelLive ? "ADD TO BROADCAST" : "BROADCAST")
                 }
               </button>
-              {!isChannelLive && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (selectedTracks.size === 0) {
-                      setBroadcastMessage("Select tracks to schedule");
-                      return;
-                    }
-                    setShowSchedule(true);
-                  }}
-                  style={{
-                    padding: "8px 14px",
-                    backgroundColor: "transparent",
-                    color: selectedTracks.size > 0 ? "#f59e0b" : "#52525b",
-                    border: selectedTracks.size > 0 ? "1px solid #f59e0b" : "1px solid #27272a",
-                    borderRadius: "0px",
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontFamily: "var(--font-mono)",
-                    letterSpacing: "0.05em",
-                    textTransform: "uppercase",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                  SCHEDULE
-                </button>
-              )}
             </div>
           </div>
 
