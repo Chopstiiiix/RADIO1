@@ -26,12 +26,6 @@ export default function GlobalError({
         <p style={{ fontSize: "12px", color: "#71717a", textTransform: "uppercase", letterSpacing: "0.1em" }}>
           {">"} error: something went wrong
         </p>
-        <p style={{ fontSize: "10px", color: "#E24A4A", maxWidth: "340px", textAlign: "center", wordBreak: "break-all", padding: "0 16px" }}>
-          {error?.message || "No error message"}
-        </p>
-        <p style={{ fontSize: "9px", color: "#52525b", maxWidth: "340px", textAlign: "center", wordBreak: "break-all", padding: "0 16px" }}>
-          {error?.digest || ""}
-        </p>
         <button
           onClick={reset}
           style={{
