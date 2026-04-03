@@ -33,11 +33,15 @@ export default function IntroPage() {
     video.addEventListener("ended", onEnded);
     video.addEventListener("error", onError);
 
-    // Auto-play with sound muted (required by mobile browsers)
-    video.muted = true;
+    // Try autoplay with sound first (Capacitor native WebView allows this),
+    // fall back to muted if browser blocks unmuted autoplay
+    video.muted = false;
     video.play().catch(() => {
-      // Autoplay blocked — skip to login
-      router.replace("/login");
+      video.muted = true;
+      video.play().catch(() => {
+        // Autoplay fully blocked — skip to login
+        router.replace("/login");
+      });
     });
 
     // Safety timeout — skip after 7 seconds regardless
@@ -77,7 +81,6 @@ export default function IntroPage() {
         ref={videoRef}
         src="/video/intro.m4v"
         playsInline
-        muted
         preload="auto"
         style={{
           width: "100%",
