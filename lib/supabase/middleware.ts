@@ -25,15 +25,19 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const { pathname } = request.nextUrl;
 
   // Skip auth logic for API routes, stream, metadata, and mic-stream endpoints
   if (pathname.startsWith("/api/") || pathname.startsWith("/stream/") || pathname.startsWith("/metadata/") || pathname.startsWith("/mic-stream/")) {
     return supabaseResponse;
+  }
+
+  let user = null;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (!error) user = data.user;
+  } catch {
+    // Auth call failed (stale token, network issue) — treat as unauthenticated
   }
 
   // Public routes
