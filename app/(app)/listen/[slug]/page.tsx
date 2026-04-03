@@ -415,13 +415,6 @@ export default function ChannelPage() {
               </svg>
               {followerCount.toLocaleString()}
             </span>
-            <span style={{
-              padding: "2px 6px", fontSize: "10px",
-              textTransform: "uppercase", borderRadius: "2px",
-              backgroundColor: "rgba(245, 158, 11, 0.1)",
-              color: "#f59e0b",
-              border: "1px solid rgba(245, 158, 11, 0.2)",
-            }}>[ FLAC ]</span>
           </div>
         </div>
 

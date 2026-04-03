@@ -132,19 +132,17 @@ function ChannelCard({ channel, index, likes }: { channel: any; index: number; l
         }}>
           <span className="ch-label">CH_{chNum}</span>
           <span style={{
-            padding: "2px 6px",
+            display: "flex", alignItems: "center", gap: "4px",
             fontSize: "10px",
-            textTransform: "uppercase",
-            borderRadius: "2px",
-            ...(isLive ? {
-              backgroundColor: "rgba(245, 158, 11, 0.1)",
-              color: "#f59e0b",
-              border: "1px solid rgba(245, 158, 11, 0.2)",
-            } : {
-              border: "1px solid #27272a",
-              color: "#71717a",
-            }),
-          }}>[ FLAC ]</span>
+            letterSpacing: "0.05em",
+            color: isLive ? "rgba(245, 158, 11, 0.7)" : "#52525b",
+          }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+            </svg>
+            {listeners.toLocaleString()}
+          </span>
         </div>
 
         {/* Channel name + host */}
