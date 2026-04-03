@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 import { isNative } from "../../lib/capacitor-bridge";
 
 interface VisualizerProps {
@@ -53,7 +53,8 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
       opacity: number,
       lineWidth: number,
       time: number,
-      freqData?: Uint8Array
+      freqData?: Uint8Array,
+      breathe?: number,
     ) => {
       ctx.beginPath();
       ctx.moveTo(0, h / 2);
@@ -66,6 +67,9 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
           const dataIndex = Math.floor((x / w) * freqData.length);
           const freqValue = freqData[dataIndex] / 255;
           y *= 0.4 + freqValue * 1.2;
+        } else if (breathe !== undefined) {
+          // No frequency data (iOS native HLS) — use breathing amplitude
+          y *= 0.5 + breathe * 0.5;
         }
 
         const envelope = Math.sin((x / w) * Math.PI);
@@ -99,7 +103,6 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
           sum += freqData[i * binSize + j];
         }
         const target = sum / binSize / 255;
-        // Smooth: rise fast, fall slow
         smoothed[i] += (target - smoothed[i]) * (target > smoothed[i] ? 0.4 : 0.08);
 
         const barH = smoothed[i] * h;
@@ -108,16 +111,14 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
         const x = i * (barW + gap);
         const y = h - barH;
 
-        // Gradient per bar: cyan at bottom → emerald at top
         const grad = ctx.createLinearGradient(x, h, x, y);
-        grad.addColorStop(0, `rgba(6, 182, 212, ${0.15 + smoothed[i] * 0.25})`);   // cyan
-        grad.addColorStop(0.5, `rgba(16, 185, 129, ${0.1 + smoothed[i] * 0.2})`);  // emerald
-        grad.addColorStop(1, `rgba(120, 179, 206, ${0.05 + smoothed[i] * 0.1})`);  // light blue fade
+        grad.addColorStop(0, `rgba(6, 182, 212, ${0.15 + smoothed[i] * 0.25})`);
+        grad.addColorStop(0.5, `rgba(16, 185, 129, ${0.1 + smoothed[i] * 0.2})`);
+        grad.addColorStop(1, `rgba(120, 179, 206, ${0.05 + smoothed[i] * 0.1})`);
 
         ctx.fillStyle = grad;
         ctx.fillRect(x, y, barW, barH);
 
-        // Soft glow at peak
         if (smoothed[i] > 0.3) {
           const glowGrad = ctx.createRadialGradient(
             x + barW / 2, y, 0,
@@ -132,13 +133,13 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
     };
 
     const draw = () => {
-      // Pause drawing when app is backgrounded (saves battery on mobile)
+      // Pause drawing when app is backgrounded
       if (document.visibilityState === "hidden") {
         animFrameRef.current = requestAnimationFrame(draw);
         return;
       }
 
-      // Throttle to ~30fps on mobile to save battery
+      // Throttle to ~30fps on mobile
       if (isMobile) {
         frameSkipRef.current++;
         if (frameSkipRef.current % 2 !== 0) {
@@ -154,14 +155,27 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
       bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
       fgCtx.clearRect(0, 0, fgCanvas.width, fgCanvas.height);
 
+      // Try to get real frequency data from the AnalyserNode
       let freqData: Uint8Array<ArrayBuffer> | undefined;
+      let hasRealData = false;
       if (analyserNode && isPlaying) {
         freqData = new Uint8Array(analyserNode.frequencyBinCount) as Uint8Array<ArrayBuffer>;
         analyserNode.getByteFrequencyData(freqData);
+        // Check if we're getting actual data (not all zeros)
+        for (let i = 0; i < freqData.length; i++) {
+          if (freqData[i] > 0) { hasRealData = true; break; }
+        }
       }
 
-      // Background: gradient spectrum bars
-      drawGradientSpectrum(bgCtx, w, h, freqData);
+      // Breathing value for waves when no freq data (0..1 oscillating)
+      const breathe = isPlaying
+        ? 0.5 + 0.5 * Math.sin(timeRef.current * 0.8)
+        : 0;
+
+      // Background: spectrum bars only when we have real frequency data
+      if (hasRealData) {
+        drawGradientSpectrum(bgCtx, w, h, freqData);
+      }
 
       // Foreground: center line
       fgCtx.beginPath();
@@ -171,10 +185,12 @@ export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps)
       fgCtx.lineWidth = 1;
       fgCtx.stroke();
 
-      // Foreground: three layered waves
-      drawWave(fgCtx, w, h, h * 0.3, 0.005, 0, 0.3, 2, timeRef.current, freqData);
-      drawWave(fgCtx, w, h, h * 0.2, 0.01, Math.PI / 4, 0.8, 1.5, timeRef.current, freqData);
-      drawWave(fgCtx, w, h, h * 0.1, 0.02, Math.PI, 0.5, 1, timeRef.current, freqData);
+      // Foreground: three layered waves (always animate when playing)
+      const fd = hasRealData ? freqData : undefined;
+      const br = hasRealData ? undefined : breathe;
+      drawWave(fgCtx, w, h, h * 0.3, 0.005, 0, 0.3, 2, timeRef.current, fd, br);
+      drawWave(fgCtx, w, h, h * 0.2, 0.01, Math.PI / 4, 0.8, 1.5, timeRef.current, fd, br);
+      drawWave(fgCtx, w, h, h * 0.1, 0.02, Math.PI, 0.5, 1, timeRef.current, fd, br);
 
       timeRef.current -= 0.03;
       animFrameRef.current = requestAnimationFrame(draw);

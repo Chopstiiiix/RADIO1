@@ -45,41 +45,12 @@ export function useStream(trackStartOffset: number, trackDuration: number, slug?
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 256;
 
-    // On iOS with native HLS, createMediaElementSource doesn't feed
-    // frequency data to the AnalyserNode. Detect this and use an ambient
-    // oscillator signal so the visualizer still pulses to life.
+    // On iOS with native HLS, createMediaElementSource doesn't feed frequency
+    // data. The Visualizer component handles this gracefully with breathing
+    // waves when no real data is detected. Only wire up AudioContext on desktop.
     const useNativeHls = !Hls.isSupported() && !!audio.canPlayType("application/vnd.apple.mpegurl");
 
-    if (useNativeHls) {
-      // iOS native HLS: generate ambient signal for visualizer
-      // Audio plays natively — this only feeds the AnalyserNode for visuals
-      const osc = ctx.createOscillator();
-      const lfo = ctx.createOscillator();
-      const lfoGain = ctx.createGain();
-      const masterGain = ctx.createGain();
-
-      // Low-frequency pulse that modulates amplitude (simulates beat)
-      lfo.type = "sine";
-      lfo.frequency.value = 2.5; // 2.5 Hz pulse (~150 BPM feel)
-      lfoGain.gain.value = 0.4;
-      lfo.connect(lfoGain);
-      lfoGain.connect(masterGain.gain);
-
-      // Base signal — mix of frequencies for fuller spectrum
-      osc.type = "sawtooth";
-      osc.frequency.value = 110; // A2 — covers low-mid spectrum
-      masterGain.gain.value = 0.3;
-      osc.connect(masterGain);
-      masterGain.connect(analyser);
-      // Route to destination at zero volume (silent but feeds analyser)
-      const silentGain = ctx.createGain();
-      silentGain.gain.value = 0;
-      masterGain.connect(silentGain);
-      silentGain.connect(ctx.destination);
-
-      osc.start();
-      lfo.start();
-    } else {
+    if (!useNativeHls) {
       // Desktop / HLS.js path: pipe audio through AudioContext
       const source = ctx.createMediaElementSource(audio);
       source.connect(analyser);
