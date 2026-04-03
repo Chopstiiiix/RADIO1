@@ -289,16 +289,9 @@ export default function ChannelPage() {
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   }
 
-  const progress = metadata.duration > 0 ? Math.min((stream.elapsed / metadata.duration) * 100, 100) : 0;
   const profile = channel?.profile as any;
   const effectiveVolume = stream.isMuted ? 0 : stream.volume;
 
-  // Ruler scaling: ensure ~20px per second so sub-second ticks stay visible
-  const rulerPxPerSec = 20;
-  const rulerContainerW = typeof window !== "undefined" ? Math.min(window.innerWidth, 460) : 460;
-  const rulerWidthPct = Math.max(200, ((metadata.duration || 1) * rulerPxPerSec / rulerContainerW) * 100);
-  // Playhead at center: translate so 0% progress = start at center
-  const rulerTranslateOrigin = (50 / rulerWidthPct) * 100; // equivalent of 50% container in ruler %
 
   if (!channel) {
     return (
@@ -691,147 +684,6 @@ export default function ChannelPage() {
             </span>
           </div>
 
-          {/* Sliding timeline with fixed center playhead */}
-          <div style={{
-            width: "100%",
-            height: "44px",
-            position: "relative",
-            overflow: "hidden",
-          }}>
-            {/* Sliding ruler — moves right-to-left as time progresses */}
-            <div style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: `${rulerWidthPct}%`,
-              height: "100%",
-              transform: `translateX(calc(${rulerTranslateOrigin}% - ${progress}%))`,
-              transition: "transform 0.3s linear",
-              willChange: "transform",
-            }}>
-              {/* Generate tick marks: minutes with second numbers, sub-ticks between seconds */}
-              {(() => {
-                const dur = metadata.duration || 1;
-                const totalWidth = rulerWidthPct;
-                const ticks: React.ReactNode[] = [];
-
-                // Reduce tick density for long tracks / mobile performance
-                const step = dur > 120 ? 1 : dur > 30 ? 0.5 : 0.25;
-                const totalSteps = Math.ceil(dur / step);
-
-                for (let i = 0; i <= totalSteps; i++) {
-                  const t = i * step;
-                  if (t > dur) break;
-
-                  const posPercent = (t / dur) * totalWidth;
-                  const isWholeSecond = Math.abs(t - Math.round(t)) < 0.01;
-                  const sec = Math.round(t);
-                  const isMinute = isWholeSecond && sec % 60 === 0;
-
-                  let height: number;
-                  let color: string;
-                  let showLabel = false;
-                  let labelText = "";
-
-                  if (isMinute) {
-                    height = 18;
-                    color = "#f59e0b";
-                    showLabel = true;
-                    const m = Math.floor(sec / 60);
-                    labelText = `${m}:00`;
-                  } else if (isWholeSecond) {
-                    height = 10;
-                    color = "#52525b";
-                    showLabel = true;
-                    const s = sec % 60;
-                    labelText = String(s);
-                  } else {
-                    // Sub-second tick (250ms intervals)
-                    height = 6;
-                    color = "#52525b";
-                  }
-
-                  ticks.push(
-                    <div key={t} style={{
-                      position: "absolute",
-                      left: `${posPercent}%`,
-                      bottom: 0,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      transform: "translateX(-50%)",
-                    }}>
-                      {showLabel && (
-                        <span style={{
-                          fontSize: isMinute ? "10px" : "7px",
-                          color: isMinute ? "#f59e0b" : "#3f3f46",
-                          marginBottom: isMinute ? "2px" : "1px",
-                          whiteSpace: "nowrap",
-                          fontFamily: "var(--font-mono)",
-                          fontWeight: isMinute ? 700 : 500,
-                        }}>{labelText}</span>
-                      )}
-                      <div style={{
-                        width: isWholeSecond ? "1px" : "1px",
-                        height: `${height}px`,
-                        backgroundColor: color,
-                        opacity: isWholeSecond ? 1 : 0.8,
-                      }} />
-                    </div>
-                  );
-                }
-                return ticks;
-              })()}
-            </div>
-
-            {/* Fixed center playhead */}
-            <div style={{
-              position: "absolute",
-              top: 0,
-              left: "50%",
-              width: "2px",
-              height: "100%",
-              backgroundColor: "#f59e0b",
-              transform: "translateX(-50%)",
-              zIndex: 20,
-              boxShadow: "0 0 8px rgba(245, 158, 11, 0.8)",
-            }}>
-              {/* Playhead triangle */}
-              <div style={{
-                position: "absolute",
-                top: 0,
-                left: "50%",
-                transform: "translateX(-50%)",
-                width: 0,
-                height: 0,
-                borderLeft: "5px solid transparent",
-                borderRight: "5px solid transparent",
-                borderTop: "6px solid #f59e0b",
-              }} />
-            </div>
-
-            {/* Fade edges */}
-            <div style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "40px",
-              height: "100%",
-              background: "linear-gradient(to right, #2B2B2B, transparent)",
-              zIndex: 10,
-              pointerEvents: "none",
-            }} />
-            <div style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              width: "40px",
-              height: "100%",
-              background: "linear-gradient(to left, #2B2B2B, transparent)",
-              zIndex: 10,
-              pointerEvents: "none",
-            }} />
-          </div>
         </div>
 
         {/* Transport controls */}
