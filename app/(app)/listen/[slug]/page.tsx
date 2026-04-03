@@ -311,7 +311,7 @@ export default function ChannelPage() {
     <div style={{
       display: "flex",
       flexDirection: "column",
-      height: "calc(100dvh - 65px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))",
+      height: "calc(100dvh - 65px)",
       marginTop: "-24px",
       marginLeft: "-20px",
       marginRight: "-20px",
@@ -358,12 +358,12 @@ export default function ChannelPage() {
 
       {/* ── Header ── */}
       <header style={{
-        padding: "16px 20px 12px",
+        padding: "10px 20px 8px",
         borderBottom: "2px solid #27272a",
         backgroundColor: "#202020",
         display: "flex",
         flexDirection: "column",
-        gap: "8px",
+        gap: "6px",
         flexShrink: 0,
       }}>
         {/* System status bar */}
@@ -508,7 +508,7 @@ export default function ChannelPage() {
         <div style={{
           fontSize: "13px",
           color: channel.is_live ? "#d4d4d8" : "#71717a",
-          marginTop: "6px",
+          marginTop: "2px",
           fontWeight: 500,
         }}>
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -651,25 +651,21 @@ export default function ChannelPage() {
       <footer style={{
         backgroundColor: "#2B2B2B",
         borderTop: "2px solid #27272a",
-        paddingBottom: "8px",
         flexShrink: 0,
       }}>
-        {/* Timeline section */}
+        {/* Timecode */}
         <div style={{
-          padding: "12px 0 8px 0",
+          padding: "8px 0 4px 0",
           display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
+          justifyContent: "center",
         }}>
-          {/* Timecode display */}
           <div style={{
             display: "flex",
             alignItems: "center",
             gap: "8px",
-            fontSize: "14px",
+            fontSize: "13px",
             fontWeight: 700,
             color: "#71717a",
-            marginBottom: "8px",
             letterSpacing: "0.05em",
           }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b">
@@ -690,13 +686,13 @@ export default function ChannelPage() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "8px 20px 12px",
+          padding: "4px 20px 4px",
         }}>
           {/* Left: Volume */}
           <button
             onClick={stream.toggleMute}
             style={{
-              background: "none", border: "none", padding: "12px",
+              background: "none", border: "none", padding: "8px",
               cursor: "pointer", color: effectiveVolume === 0 ? "#52525b" : "#71717a",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "color 0.2s",
@@ -723,7 +719,7 @@ export default function ChannelPage() {
               onClick={() => canNavigate && router.push(`/listen/${prevSlug}`)}
               disabled={!canNavigate}
               style={{
-                background: "none", border: "none", padding: "12px",
+                background: "none", border: "none", padding: "8px",
                 cursor: canNavigate ? "pointer" : "default",
                 color: canNavigate ? "#71717a" : "#3f3f46",
                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -742,7 +738,7 @@ export default function ChannelPage() {
                 onClick={stream.toggle}
                 disabled={metadata.ended}
                 style={{
-                  background: "none", border: "none", padding: "12px",
+                  background: "none", border: "none", padding: "8px",
                   cursor: metadata.ended ? "default" : "pointer",
                   color: metadata.ended ? "#3f3f46" : "#71717a",
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -768,7 +764,7 @@ export default function ChannelPage() {
               onClick={() => canNavigate && router.push(`/listen/${nextSlug}`)}
               disabled={!canNavigate}
               style={{
-                background: "none", border: "none", padding: "12px",
+                background: "none", border: "none", padding: "8px",
                 cursor: canNavigate ? "pointer" : "default",
                 color: canNavigate ? "#71717a" : "#3f3f46",
                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -800,7 +796,7 @@ export default function ChannelPage() {
               }
             }}
             style={{
-              background: "none", border: "none", padding: "12px",
+              background: "none", border: "none", padding: "8px",
               cursor: "pointer", color: "#71717a",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "color 0.2s",
@@ -834,7 +830,7 @@ export default function ChannelPage() {
 
         {/* Volume slider row */}
         <div style={{
-          padding: "0 20px 8px",
+          padding: "0 20px 4px",
           display: "flex",
           alignItems: "center",
           gap: "12px",
@@ -875,12 +871,12 @@ export default function ChannelPage() {
 
         {/* Status footer */}
         <div style={{
-          padding: "12px 20px",
-          borderTop: "2px solid #27272a",
+          padding: "6px 20px",
+          borderTop: "1px solid #27272a",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          fontSize: "12px",
+          fontSize: "11px",
           color: "#71717a",
           fontWeight: 500,
         }}>
