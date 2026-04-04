@@ -79,9 +79,49 @@ function getTrackFiles(musicDir: string): TrackFile[] {
   });
 }
 
+/**
+ * Apply a fade-out to the last N seconds of a track.
+ * Returns path to the faded version.
+ */
+function applyFadeOut(srcPath: string, fadeDir: string, duration: number, fadeDuration = 4): string {
+  const basename = "FADED_" + path.basename(srcPath);
+  const fadedPath = path.join(fadeDir, basename);
+
+  if (fs.existsSync(fadedPath)) return fadedPath;
+
+  const fadeStart = Math.max(0, duration - fadeDuration);
+  try {
+    execSync(
+      `ffmpeg -y -i "${srcPath}" -af "afade=t=out:st=${fadeStart}:d=${fadeDuration}" -c:a pcm_s16le "${fadedPath}"`,
+      { encoding: "utf-8", stdio: "pipe" }
+    );
+  } catch (err) {
+    console.error(`Failed to apply fade-out to ${srcPath}:`, err);
+    return srcPath; // Fallback to original
+  }
+
+  return fadedPath;
+}
+
 function generateConcatFile(tracks: TrackFile[], outputDir: string): string {
   const concatPath = path.join(outputDir, "playlist.txt");
-  const content = tracks.map((t) => `file '${t.path}'`).join("\n");
+  const fadeDir = path.join(outputDir, "_faded");
+  fs.mkdirSync(fadeDir, { recursive: true });
+
+  // Apply fade-out to music tracks that are followed by a host segment
+  const processedTracks = tracks.map((t, i) => {
+    const next = tracks[i + 1];
+    const isMusic = !t.filename.startsWith("HOST__") && !t.filename.startsWith("AD__");
+    const nextIsHost = next && (next.filename.startsWith("HOST__") || next.filename.startsWith("AD__"));
+
+    if (isMusic && nextIsHost && t.duration > 10) {
+      const fadedPath = applyFadeOut(t.path, fadeDir, t.duration);
+      return { ...t, path: fadedPath };
+    }
+    return t;
+  });
+
+  const content = processedTracks.map((t) => `file '${t.path}'`).join("\n");
   fs.writeFileSync(concatPath, content);
   return concatPath;
 }
