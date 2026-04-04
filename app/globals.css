@@ -120,6 +120,7 @@ body::after {
   -webkit-overflow-scrolling: touch;
   scroll-behavior: auto;
   touch-action: pan-y;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Scrollbar */
