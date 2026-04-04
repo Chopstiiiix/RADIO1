@@ -21,6 +21,9 @@ export default function NavCarousel({ items }: { items: NavItem[] }) {
         align: "start",
         dragFree: true,
         containScroll: "trimSnaps",
+        dragThreshold: 3,
+        duration: 20,
+        skipSnaps: true,
       }}
       className="w-full"
     >
@@ -42,7 +45,7 @@ export default function NavCarousel({ items }: { items: NavItem[] }) {
                   fontWeight: isActive ? 700 : 400,
                   backgroundColor: isActive ? "rgba(245, 158, 11, 0.12)" : "transparent",
                   border: isActive ? "1px solid rgba(245, 158, 11, 0.25)" : "1px solid transparent",
-                  transition: "all 0.2s ease",
+                  transition: "color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease",
                   fontFamily: "'JetBrains Mono', monospace",
                 }}
               >

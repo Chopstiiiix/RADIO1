@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { hapticTap } from "../../lib/capacitor-bridge";
 
 /**
@@ -11,25 +11,36 @@ import { hapticTap } from "../../lib/capacitor-bridge";
 export default function MobileEnhancements() {
   const startY = useRef(0);
   const pulling = useRef(false);
+  const phaseRef = useRef<"idle" | "pulling" | "releasing" | "refreshing">("idle");
+  const pullRef = useRef(0);
   const [pullDistance, setPullDistance] = useState(0);
   const [phase, setPhase] = useState<"idle" | "pulling" | "releasing" | "refreshing">("idle");
   const threshold = 90;
   const maxPull = 150;
 
+  // Keep refs in sync with state for touch handlers
+  const updatePhase = useCallback((p: typeof phase) => {
+    phaseRef.current = p;
+    setPhase(p);
+  }, []);
+
+  const updatePull = useCallback((d: number) => {
+    pullRef.current = d;
+    setPullDistance(d);
+  }, []);
+
+  // Register touch listeners ONCE — use refs to read current state
   useEffect(() => {
     hapticTap();
 
     const onTouchStart = (e: TouchEvent) => {
-      if (phase === "refreshing") return;
-      // Check if we're at the top of any scroll container
+      if (phaseRef.current === "refreshing") return;
+
+      // Only intercept if at top of scroll
       const target = e.target as HTMLElement;
       let el: HTMLElement | null = target;
       while (el && el !== document.body) {
-        if (el.scrollTop > 0) return; // inside a scrolled container — don't intercept
-        const style = getComputedStyle(el);
-        if (style.overflowY === "auto" || style.overflowY === "scroll") {
-          if (el.scrollTop > 0) return;
-        }
+        if (el.scrollTop > 0) return;
         el = el.parentElement;
       }
       if (window.scrollY > 0) return;
@@ -39,17 +50,16 @@ export default function MobileEnhancements() {
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (!pulling.current || phase === "refreshing") return;
+      if (!pulling.current || phaseRef.current === "refreshing") return;
       const diff = e.touches[0].clientY - startY.current;
 
       if (diff > 0) {
-        // Rubber-band dampening: pull harder → less movement
         const dampened = maxPull * (1 - Math.exp(-diff / 200));
-        setPullDistance(dampened);
-        setPhase("pulling");
+        updatePull(dampened);
+        updatePhase("pulling");
       } else {
-        setPullDistance(0);
-        if (phase === "pulling") setPhase("idle");
+        updatePull(0);
+        if (phaseRef.current === "pulling") updatePhase("idle");
       }
     };
 
@@ -57,19 +67,15 @@ export default function MobileEnhancements() {
       if (!pulling.current) return;
       pulling.current = false;
 
-      if (pullDistance >= threshold) {
+      if (pullRef.current >= threshold) {
         hapticTap();
-        setPhase("refreshing");
-        // Snap to loading position then reload
-        setPullDistance(60);
-        setTimeout(() => {
-          window.location.reload();
-        }, 500);
+        updatePhase("refreshing");
+        updatePull(60);
+        setTimeout(() => window.location.reload(), 500);
       } else {
-        // Spring bounce back
-        setPhase("releasing");
-        setPullDistance(0);
-        setTimeout(() => setPhase("idle"), 400);
+        updatePhase("releasing");
+        updatePull(0);
+        setTimeout(() => updatePhase("idle"), 400);
       }
     };
 
@@ -91,7 +97,7 @@ export default function MobileEnhancements() {
       document.removeEventListener("touchend", onTouchEnd);
       document.removeEventListener("click", onClick, { capture: true });
     };
-  }, [pullDistance, phase]);
+  }, []); // Empty deps — register once, read from refs
 
   // Apply transform to the entire page
   useEffect(() => {
