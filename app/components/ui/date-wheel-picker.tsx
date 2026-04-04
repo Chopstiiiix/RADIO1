@@ -172,8 +172,9 @@ function WheelColumn({
   React.useEffect(() => {
     animate(y, -value * itemHeight, {
       type: "spring",
-      stiffness: 300,
-      damping: 30,
+      stiffness: 200,
+      damping: 25,
+      mass: 0.8,
     });
   }, [value, itemHeight, y]);
 
@@ -185,7 +186,8 @@ function WheelColumn({
 
     const currentY = y.get();
     const velocity = info.velocity.y;
-    const projectedY = currentY + velocity * 0.2;
+    // Higher multiplier = more momentum carry from fast flicks
+    const projectedY = currentY + velocity * 0.5;
 
     let newIndex = Math.round(-projectedY / itemHeight);
     newIndex = Math.max(0, Math.min(items.length - 1, newIndex));
@@ -341,7 +343,8 @@ function WheelColumn({
         }}
         drag="y"
         dragConstraints={dragConstraints}
-        dragElastic={0.1}
+        dragElastic={0.15}
+        dragTransition={{ bounceStiffness: 300, bounceDamping: 25 }}
         onDragEnd={handleDragEnd}
       >
         {items.map((item, index) => (
