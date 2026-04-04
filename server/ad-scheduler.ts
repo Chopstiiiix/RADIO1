@@ -3,7 +3,7 @@ import path from "path";
 import { execSync } from "child_process";
 import { supabase } from "./supabase";
 
-const KIKA_VOICE_ID = "Ih3XRGwQe2qczi6DzW48";
+const KIKA_VOICE_ID = "zGjIP4SZlMnY9m93k97r";
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || "";
 
 interface ApprovedAd {
