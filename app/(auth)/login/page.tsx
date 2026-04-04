@@ -59,7 +59,8 @@ function LoginForm() {
 
   return (
     <div style={{
-      minHeight: "100vh",
+      height: "100dvh",
+      overflowY: "auto",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
