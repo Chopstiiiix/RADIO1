@@ -152,11 +152,14 @@ export default function TracksPage() {
           // Ignore stale ended events within 10 seconds of starting a broadcast
           const timeSinceStart = Date.now() - broadcastStartedAt;
           if (broadcastStartedAt > 0 && timeSinceStart < 10000) {
-            // Stale event — ignore
+            // Stale event from startup — ignore
           } else {
+            // Broadcast has naturally ended — clear everything
             setNowPlayingTitle(null);
             setBroadcastingTitles(new Set());
             setIsChannelLive(false);
+            setBroadcastStartedAt(0);
+            setBroadcastMessage("Broadcast ended — all tracks finished");
           }
         }
       } catch { /* ignore */ }
@@ -179,6 +182,7 @@ export default function TracksPage() {
         setIsChannelLive(false);
         setBroadcastingTitles(new Set());
         setNowPlayingTitle(null);
+        setBroadcastStartedAt(0);
       } else {
         setBroadcastMessage(data.error || "Failed to stop broadcast");
       }
