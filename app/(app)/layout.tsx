@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import NotificationButton from "@/app/components/NotificationButton";
 import AvatarMenu from "@/app/components/AvatarMenu";
-import NavLink from "@/app/components/NavLink";
+import NavCarousel from "@/app/components/NavCarousel";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient();
@@ -82,49 +82,36 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        {/* Nav links row */}
-        <div className="nav-scroll" style={{
-          display: "flex",
-          gap: "6px",
-          overflowX: "auto",
-          WebkitOverflowScrolling: "touch",
-          scrollbarWidth: "none",
-          overscrollBehaviorX: "contain",
-          scrollBehavior: "smooth",
-          paddingBottom: "2px",
-          maskImage: "linear-gradient(to right, black 90%, transparent 100%)",
-          WebkitMaskImage: "linear-gradient(to right, black 90%, transparent 100%)",
-        }}>
-          {profile.role === "listener" && (
-            <>
-              <NavLink href="/listen">Channels</NavLink>
-              <NavLink href="/search">Search</NavLink>
-            </>
-          )}
+        {/* Nav links carousel */}
+        {profile.role === "listener" && (
+          <NavCarousel items={[
+            { href: "/listen", label: "Channels" },
+            { href: "/search", label: "Search" },
+          ]} />
+        )}
 
-          {profile.role === "broadcaster" && (
-            <>
-              <NavLink href="/broadcast">Dashboard</NavLink>
-              <NavLink href="/broadcast/tracks">Tracks</NavLink>
-              <NavLink href="/broadcast/ads">Ads</NavLink>
-              <NavLink href="/broadcast/agents">Hosts</NavLink>
-              <NavLink href="/listen">Listen</NavLink>
-              <NavLink href="/search">Search</NavLink>
-              <NavLink href="/broadcast/go-live">Live</NavLink>
-            </>
-          )}
+        {profile.role === "broadcaster" && (
+          <NavCarousel items={[
+            { href: "/broadcast", label: "Dashboard" },
+            { href: "/broadcast/tracks", label: "Tracks" },
+            { href: "/broadcast/ads", label: "Ads" },
+            { href: "/broadcast/agents", label: "Hosts" },
+            { href: "/listen", label: "Listen" },
+            { href: "/search", label: "Search" },
+            { href: "/broadcast/go-live", label: "Live" },
+          ]} />
+        )}
 
-          {profile.role === "advertiser" && (
-            <>
-              <NavLink href="/advertise">Dashboard</NavLink>
-              <NavLink href="/advertise/channels">Channels</NavLink>
-              <NavLink href="/advertise/adverts">My Ads</NavLink>
-              <NavLink href="/advertise/requests">Requests</NavLink>
-              <NavLink href="/listen">Listen</NavLink>
-              <NavLink href="/search">Search</NavLink>
-            </>
-          )}
-        </div>
+        {profile.role === "advertiser" && (
+          <NavCarousel items={[
+            { href: "/advertise", label: "Dashboard" },
+            { href: "/advertise/channels", label: "Channels" },
+            { href: "/advertise/adverts", label: "My Ads" },
+            { href: "/advertise/requests", label: "Requests" },
+            { href: "/listen", label: "Listen" },
+            { href: "/search", label: "Search" },
+          ]} />
+        )}
       </nav>
 
       <main style={{ padding: "24px 20px", width: "100%", overflowX: "hidden", overflow: "hidden", flex: 1, position: "relative" }}>
