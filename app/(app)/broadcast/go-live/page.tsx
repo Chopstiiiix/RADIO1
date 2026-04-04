@@ -1076,6 +1076,46 @@ export default function GoLivePage() {
             </div>
           </div>
 
+          {/* Add to Broadcast — between volume and panel tabs */}
+          {isLive && selectedTrackIds.size > 0 && (
+            <div style={{ marginBottom: "8px" }}>
+              <button
+                onClick={async () => {
+                  setToggling(true); setMessage("");
+                  try {
+                    const res = await fetch("/api/broadcast", {
+                      method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ action: "add_tracks", track_ids: Array.from(selectedTrackIds), broadcaster_id: broadcasterId }),
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      setMessage(`${selectedTrackIds.size} track${selectedTrackIds.size > 1 ? "s" : ""} added!`);
+                      setSelectedTrackIds(new Set());
+                      if (channelSlug) {
+                        const qRes = await fetch(`/api/channels/${channelSlug}/queue`);
+                        if (qRes.ok) { const qData = await qRes.json(); if (qData.queue) setLiveQueueFilenames(new Set(qData.queue)); }
+                      }
+                    } else { setMessage(data.error || "Failed to add tracks"); }
+                  } catch { setMessage("Broadcast server unavailable"); }
+                  setToggling(false);
+                }}
+                disabled={toggling}
+                style={{
+                  width: "100%", padding: "12px", backgroundColor: "#4ADE80", color: "#0a0a0a",
+                  border: "1px solid #4ADE80", fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
+                  letterSpacing: "0.05em", cursor: toggling ? "not-allowed" : "pointer",
+                  opacity: toggling ? 0.6 : 1, fontFamily: "var(--font-mono)",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                {toggling ? "ADDING..." : `ADD TO BROADCAST (${selectedTrackIds.size})`}
+              </button>
+            </div>
+          )}
+
           {/* ──────── CTA PANELS ──────── */}
           <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
             <button
@@ -1165,7 +1205,7 @@ export default function GoLivePage() {
                   </a>
                 </div>
               ) : (
-                <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                <div style={{ maxHeight: "50vh", overflowY: "auto" }}>
                   {tracks.map((track) => {
                     const isCurrentlyPlaying = nowPlaying?.toLowerCase() === track.title.toLowerCase();
                     const serverFilename = getServerFilename(track);
@@ -1278,45 +1318,6 @@ export default function GoLivePage() {
                 </div>
               )}
 
-              {/* Add to Broadcast — shows when live and tracks are selected */}
-              {isLive && selectedTrackIds.size > 0 && (
-                <div style={{ padding: "12px 16px", borderTop: "1px solid #1a1a1e" }}>
-                  <button
-                    onClick={async () => {
-                      setToggling(true); setMessage("");
-                      try {
-                        const res = await fetch("/api/broadcast", {
-                          method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "add_tracks", track_ids: Array.from(selectedTrackIds), broadcaster_id: broadcasterId }),
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                          setMessage(`${selectedTrackIds.size} track${selectedTrackIds.size > 1 ? "s" : ""} added!`);
-                          setSelectedTrackIds(new Set());
-                          if (channelSlug) {
-                            const qRes = await fetch(`/api/channels/${channelSlug}/queue`);
-                            if (qRes.ok) { const qData = await qRes.json(); if (qData.queue) setLiveQueueFilenames(new Set(qData.queue)); }
-                          }
-                        } else { setMessage(data.error || "Failed to add tracks"); }
-                      } catch { setMessage("Broadcast server unavailable"); }
-                      setToggling(false);
-                    }}
-                    disabled={toggling}
-                    style={{
-                      width: "100%", padding: "10px", backgroundColor: "#f59e0b", color: "#0a0a0a",
-                      border: "none", fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
-                      letterSpacing: "0.05em", cursor: toggling ? "not-allowed" : "pointer",
-                      opacity: toggling ? 0.6 : 1, fontFamily: "var(--font-mono)",
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-                    }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                    {toggling ? "ADDING..." : `ADD TO BROADCAST (${selectedTrackIds.size})`}
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
