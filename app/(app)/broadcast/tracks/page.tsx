@@ -797,6 +797,7 @@ function DraggableTrackList({
     setOverIndex(null);
     setDragOffset(0);
     setIsDragging(false);
+    draggingRef.current = false;
     document.body.style.overflow = "";
     document.body.style.touchAction = "";
 
@@ -806,30 +807,43 @@ function DraggableTrackList({
     }
   }
 
+  // Native non-passive touchmove to block scroll during drag
+  const draggingRef = useRef(false);
+  const longPressTimerRef2 = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+
+    function handleTouchMove(e: TouchEvent) {
+      if (longPressTimerRef2.current && !draggingRef.current) {
+        clearTimeout(longPressTimerRef2.current);
+        longPressTimerRef2.current = null;
+        return;
+      }
+      if (!draggingRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      moveDrag(e.touches[0].clientY);
+    }
+
+    el.addEventListener("touchmove", handleTouchMove, { passive: false });
+    return () => el.removeEventListener("touchmove", handleTouchMove);
+  });
+
   // Touch handlers
   function onTouchStart(e: React.TouchEvent, index: number) {
     const y = e.touches[0].clientY;
-    longPressTimer.current = setTimeout(() => {
+    longPressTimerRef2.current = setTimeout(() => {
+      draggingRef.current = true;
       startDrag(index, y);
     }, 400);
   }
 
-  function onTouchMove(e: React.TouchEvent) {
-    if (longPressTimer.current && !isDragging) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-      return;
-    }
-    if (!isDragging) return;
-    e.preventDefault();
-    e.stopPropagation();
-    moveDrag(e.touches[0].clientY);
-  }
-
   function onTouchEnd() {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
+    if (longPressTimerRef2.current) {
+      clearTimeout(longPressTimerRef2.current);
+      longPressTimerRef2.current = null;
     }
     if (isDragging) endDrag();
   }
@@ -888,7 +902,6 @@ function DraggableTrackList({
               touchAction: isDragging ? "none" : "auto",
             }}
             onTouchStart={(e) => onTouchStart(e, index)}
-            onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
             onMouseDown={(e) => onMouseDown(e, index)}
           >

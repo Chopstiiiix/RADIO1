@@ -4,6 +4,19 @@ import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import PasswordInput from "@/app/components/PasswordInput";
+import { DateWheelPicker } from "@/app/components/ui/date-wheel-picker";
+
+const MIN_AGE = 18;
+
+function calculateAge(dob: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age--;
+  }
+  return age;
+}
 
 const ROLES = [
   { value: "listener", full: "Listener" },
@@ -46,6 +59,11 @@ function SignupForm() {
   const initialRole = searchParams.get("role") || "listener";
   const redirectTo = searchParams.get("redirectTo");
 
+  const [step, setStep] = useState<"age" | "form">("age");
+  const [dob, setDob] = useState(new Date(2000, 0, 1));
+  const [ageError, setAgeError] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -56,6 +74,20 @@ function SignupForm() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  function handleAgeVerify() {
+    const age = calculateAge(dob);
+    if (age < MIN_AGE) {
+      setAgeError(`You must be at least ${MIN_AGE} years old to create an account.`);
+      return;
+    }
+    if (!agreedToTerms) {
+      setAgeError("You must agree to the Terms & Conditions.");
+      return;
+    }
+    setAgeError("");
+    setStep("form");
+  }
 
   function slugify(text: string) {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -155,7 +187,7 @@ function SignupForm() {
           marginBottom: "16px",
           fontFamily: "'JetBrains Mono', monospace",
         }}>
-          {">"} auth --register
+          {">"} {step === "age" ? "auth --verify-age" : "auth --register"}
           <span className="cursor-blink" style={{
             width: "8px",
             height: "12px",
@@ -164,7 +196,114 @@ function SignupForm() {
           }} />
         </div>
 
-        <form onSubmit={handleSignup} style={{
+        {/* ── AGE VERIFICATION STEP ── */}
+        {step === "age" && (
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "16px",
+            borderLeft: "3px solid #f59e0b",
+            paddingLeft: "16px",
+          }}>
+            <p style={{
+              fontSize: "11px",
+              color: "#a1a1aa",
+              fontFamily: "'JetBrains Mono', monospace",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              lineHeight: 1.6,
+            }}>
+              Select your date of birth
+            </p>
+
+            <DateWheelPicker
+              value={dob}
+              onChange={setDob}
+              size="md"
+              maxYear={new Date().getFullYear()}
+              minYear={1920}
+            />
+
+            <p style={{
+              fontSize: "10px",
+              color: "#52525b",
+              fontFamily: "'JetBrains Mono', monospace",
+              textAlign: "center",
+              letterSpacing: "0.05em",
+            }}>
+              {dob.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+            </p>
+
+            {/* Terms & Conditions checkbox */}
+            <label style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "10px",
+              cursor: "pointer",
+              fontSize: "10px",
+              color: "#a1a1aa",
+              fontFamily: "'JetBrains Mono', monospace",
+              lineHeight: 1.6,
+              letterSpacing: "0.03em",
+            }}>
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                style={{
+                  marginTop: "2px",
+                  accentColor: "#f59e0b",
+                  width: "16px",
+                  height: "16px",
+                  flexShrink: 0,
+                }}
+              />
+              <span>
+                I confirm I am at least <span style={{ color: "#f59e0b" }}>{MIN_AGE} years old</span> and
+                agree to the <span style={{ color: "#f59e0b", textDecoration: "underline", cursor: "pointer" }}>Terms &amp; Conditions</span> and <span style={{ color: "#f59e0b", textDecoration: "underline", cursor: "pointer" }}>Privacy Policy</span>.
+              </span>
+            </label>
+
+            {ageError && (
+              <p style={{ color: "#E24A4A", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: "'JetBrains Mono', monospace" }}>{ageError}</p>
+            )}
+
+            <button
+              type="button"
+              onClick={handleAgeVerify}
+              style={{
+                padding: "14px",
+                backgroundColor: agreedToTerms ? "#f59e0b" : "#27272a",
+                color: agreedToTerms ? "#0a0a0a" : "#52525b",
+                border: "none",
+                borderRadius: "0px",
+                fontSize: "11px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                cursor: agreedToTerms ? "pointer" : "not-allowed",
+                fontFamily: "'JetBrains Mono', monospace",
+                marginTop: "4px",
+                transition: "all 0.15s",
+              }}
+            >
+              Continue
+            </button>
+
+            <p style={{
+              textAlign: "center",
+              fontSize: "11px",
+              color: "#52525b",
+              fontFamily: "'JetBrains Mono', monospace",
+            }}>
+              Already have an account?{" "}
+              <a href={`/login${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ""}`} style={{ color: "#f59e0b", textDecoration: "none" }}>Sign in</a>
+            </p>
+          </div>
+        )}
+
+        {/* ── REGISTRATION FORM STEP ── */}
+        {step === "form" && <form onSubmit={handleSignup} style={{
           display: "flex",
           flexDirection: "column",
           gap: "12px",
@@ -322,7 +461,7 @@ function SignupForm() {
             Already have an account?{" "}
             <a href={`/login${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ""}`} style={{ color: "#f59e0b", textDecoration: "none" }}>Sign in</a>
           </p>
-        </form>
+        </form>}
       </div>
     </div>
   );
