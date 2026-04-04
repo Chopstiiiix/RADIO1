@@ -218,10 +218,10 @@ export default function AgentMarketplacePage() {
     <div style={{
       display: "flex",
       flexDirection: "column",
-      height: "calc(100dvh - 65px)",
+      width: "100vw",
+      height: "100%",
       marginTop: "-24px",
-      marginLeft: "-20px",
-      marginRight: "-20px",
+      marginLeft: "calc(-50vw + 50%)",
       overflow: "hidden",
     }}>
       <style>{`
