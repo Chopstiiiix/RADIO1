@@ -645,11 +645,10 @@ export default function ChannelPage() {
         backgroundColor: "#2B2B2B",
         borderTop: "2px solid #27272a",
         flexShrink: 0,
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}>
         {/* Timecode */}
         <div style={{
-          padding: "8px 0 4px 0",
+          padding: "4px 0 2px 0",
           display: "flex",
           justifyContent: "center",
         }}>
@@ -680,7 +679,7 @@ export default function ChannelPage() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "4px 20px 4px",
+          padding: "2px 20px 2px",
         }}>
           {/* Left: Volume */}
           <button
@@ -824,7 +823,7 @@ export default function ChannelPage() {
 
         {/* Volume slider row */}
         <div style={{
-          padding: "0 20px 4px",
+          padding: "0 20px 2px",
           display: "flex",
           alignItems: "center",
           gap: "12px",
@@ -863,9 +862,10 @@ export default function ChannelPage() {
           </span>
         </div>
 
-        {/* Status footer */}
+        {/* Status footer — sits at bottom safe area edge */}
         <div style={{
-          padding: "6px 20px",
+          padding: "4px 20px",
+          paddingBottom: "calc(4px + env(safe-area-inset-bottom, 0px))",
           borderTop: "1px solid #27272a",
           display: "flex",
           justifyContent: "space-between",
