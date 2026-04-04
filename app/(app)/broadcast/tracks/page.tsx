@@ -296,22 +296,30 @@ export default function TracksPage() {
         setChannelSlug(data.slug);
       }
 
-      // Re-fetch queue to update broadcasting indicators
-      if (channelSlug) {
-        try {
-          const qRes = await fetch(`/api/channels/${channelSlug}/queue`);
-          if (qRes.ok) {
-            const qData = await qRes.json();
-            if (qData.queue && Array.isArray(qData.queue)) {
-              const titles = new Set<string>();
-              for (const filename of qData.queue) {
-                const name = filename.replace(/\.[^.]+$/, "");
-                titles.add(normalize(name));
+      // Poll queue with retries — broadcast starts async so queue may not be ready yet
+      const slug = data.slug || channelSlug;
+      if (slug) {
+        const pollQueue = async (retries: number) => {
+          for (let i = 0; i < retries; i++) {
+            await new Promise((r) => setTimeout(r, 3000)); // wait 3s between attempts
+            try {
+              const qRes = await fetch(`/api/channels/${slug}/queue`);
+              if (qRes.ok) {
+                const qData = await qRes.json();
+                if (qData.queue && Array.isArray(qData.queue) && qData.queue.length > 0) {
+                  const titles = new Set<string>();
+                  for (const filename of qData.queue) {
+                    const name = filename.replace(/\.[^.]+$/, "");
+                    titles.add(normalize(name));
+                  }
+                  setBroadcastingTitles(titles);
+                  return; // got queue, stop polling
+                }
               }
-              setBroadcastingTitles(titles);
-            }
+            } catch { /* retry */ }
           }
-        } catch { /* ignore */ }
+        };
+        pollQueue(20); // poll up to 20 times (60 seconds total)
       }
 
       loadTracks();
