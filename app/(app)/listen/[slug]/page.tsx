@@ -311,10 +311,10 @@ export default function ChannelPage() {
     <div style={{
       display: "flex",
       flexDirection: "column",
+      width: "100vw",
       height: "100%",
       marginTop: "-24px",
-      marginLeft: "-20px",
-      marginRight: "-20px",
+      marginLeft: "calc(-50vw + 50%)",
       backgroundColor: "var(--bg-base)",
       color: "var(--text-primary)",
       fontFamily: "'JetBrains Mono', monospace",
