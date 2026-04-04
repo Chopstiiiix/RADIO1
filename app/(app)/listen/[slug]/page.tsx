@@ -311,7 +311,7 @@ export default function ChannelPage() {
     <div style={{
       display: "flex",
       flexDirection: "column",
-      height: "calc(100dvh - 65px)",
+      height: "100%",
       marginTop: "-24px",
       marginLeft: "-20px",
       marginRight: "-20px",

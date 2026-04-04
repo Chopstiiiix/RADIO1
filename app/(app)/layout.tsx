@@ -29,9 +29,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div style={{
-      minHeight: "100vh",
+      height: "100dvh",
+      display: "flex",
+      flexDirection: "column",
       backgroundColor: "var(--bg-base)",
       fontFamily: "'JetBrains Mono', monospace",
+      overflow: "hidden",
     }}>
       {/* Top nav */}
       <nav style={{
@@ -40,6 +43,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         padding: "16px 20px",
         borderBottom: "2px solid #27272a",
         backgroundColor: "var(--bg-base)",
+        flexShrink: 0,
       }}>
         {/* Top row: brand + user */}
         <div style={{
@@ -119,7 +123,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </nav>
 
-      <main style={{ padding: "24px 20px", maxWidth: "min(460px, 100vw)", margin: "0 auto", overflowX: "hidden" }}>
+      <main style={{ padding: "24px 20px", maxWidth: "min(460px, 100vw)", margin: "0 auto", overflowX: "hidden", overflow: "hidden", flex: 1 }}>
         {children}
       </main>
     </div>
