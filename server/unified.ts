@@ -509,23 +509,31 @@ async function main() {
 
     if (!channel) return res.status(404).json({ error: "Channel not found" });
 
-    // Mark as starting immediately so frontend knows
-    await supabase.from("broadcaster_profiles").update({ is_live: true }).eq("channel_slug", slug);
+    const requestedMode = mode || "tracks";
 
-    // Return immediately — broadcast starts in background (AI host gen can take minutes)
-    res.json({ ok: true, message: `Channel ${slug} is starting...` });
-
-    // Start broadcast asynchronously
-    startChannel(broadcaster_id, slug, track_ids, mode || "tracks").then((success) => {
-      if (!success) {
-        // Revert is_live if start failed
-        supabase.from("broadcaster_profiles").update({ is_live: false }).eq("channel_slug", slug);
-        console.error(`❌ [${slug}] Broadcast failed to start`);
+    if (requestedMode === "live_mic") {
+      // Live mic mode: start synchronously — mixer must be ready before frontend sends audio
+      const success = await startChannel(broadcaster_id, slug, track_ids, "live_mic");
+      if (success) {
+        res.json({ ok: true, message: `Channel ${slug} is now live` });
+      } else {
+        res.status(400).json({ error: "Failed to start live mic broadcast" });
       }
-    }).catch((err) => {
-      supabase.from("broadcaster_profiles").update({ is_live: false }).eq("channel_slug", slug);
-      console.error(`❌ [${slug}] Broadcast error:`, err);
-    });
+    } else {
+      // Tracks mode: start async — AI host gen can take minutes, return immediately
+      await supabase.from("broadcaster_profiles").update({ is_live: true }).eq("channel_slug", slug);
+      res.json({ ok: true, message: `Channel ${slug} is starting...` });
+
+      startChannel(broadcaster_id, slug, track_ids, "tracks").then((success) => {
+        if (!success) {
+          supabase.from("broadcaster_profiles").update({ is_live: false }).eq("channel_slug", slug);
+          console.error(`❌ [${slug}] Broadcast failed to start`);
+        }
+      }).catch((err) => {
+        supabase.from("broadcaster_profiles").update({ is_live: false }).eq("channel_slug", slug);
+        console.error(`❌ [${slug}] Broadcast error:`, err);
+      });
+    }
   });
 
   app.post("/api/channels/:slug/voice-only", async (req, res) => {
