@@ -44,14 +44,20 @@ export default function MobileEnhancements() {
       pulling.current = false;
       decided.current = false;
 
-      // Check if at top of scroll — if not, bail completely
+      // Ignore touches inside drag-controlled components (date wheel, carousels)
       const target = e.target as HTMLElement;
+      if (target.closest("[data-slot='carousel'], [role='spinbutton']")) return;
+
+      // Check if at top of scroll — if not, bail completely
       let el: HTMLElement | null = target;
       while (el && el !== document.body) {
         if (el.scrollTop > 0) return;
         el = el.parentElement;
       }
       if (window.scrollY > 0) return;
+
+      // No pull-to-refresh on auth pages (no app-root)
+      if (!document.getElementById("app-root")) return;
 
       // Mark as eligible, but DON'T activate pull yet
       startY.current = e.touches[0].clientY;
