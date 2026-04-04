@@ -287,6 +287,18 @@ export default function TracksPage() {
           ? `${count} track${count > 1 ? "s" : ""} added to broadcast!`
           : `${count} track${count > 1 ? "s" : ""} broadcasting live!`
       );
+
+      // Immediately mark selected tracks as broadcasting (don't wait for queue poll)
+      const selectedTrackObjects = tracks.filter((t) => selectedTracks.has(t.id));
+      setBroadcastingTitles((prev) => {
+        const next = new Set(prev);
+        for (const t of selectedTrackObjects) {
+          next.add(normalize(`${t.primary_artist} - ${t.title}`));
+          next.add(normalize(t.title));
+        }
+        return next;
+      });
+
       setSelectedTracks(new Set());
       setIsChannelLive(true);
       setBroadcastStartedAt(Date.now());
