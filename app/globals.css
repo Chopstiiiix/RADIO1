@@ -54,7 +54,6 @@ body {
   height: 100dvh;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
-  position: fixed;
   width: 100%;
 }
 
@@ -110,10 +109,29 @@ body::after {
   background-size: 100% 4px;
 }
 
+/* Scroll areas — momentum / inertia scrolling */
+.app-content,
+.auth-page {
+  flex: 1;
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto;
+  touch-action: pan-y;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-well); }
 ::-webkit-scrollbar-thumb { background: var(--text-secondary); border-radius: 3px; }
+
+/* Hide scrollbar in scroll areas but keep scroll functional */
+.app-content::-webkit-scrollbar,
+.auth-page::-webkit-scrollbar { width: 0; background: transparent; }
+.app-content,
+.auth-page { scrollbar-width: none; }
 
 /* Hide scrollbar on horizontal nav */
 .nav-scroll::-webkit-scrollbar { display: none; }

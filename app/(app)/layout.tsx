@@ -114,7 +114,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         )}
       </nav>
 
-      <main style={{ padding: "24px 20px", width: "100%", overflowX: "hidden", overflowY: "auto", flex: 1, position: "relative", WebkitOverflowScrolling: "touch" }}>
+      <main className="app-content" style={{ padding: "24px 20px", width: "100%" }}>
         {children}
       </main>
     </div>

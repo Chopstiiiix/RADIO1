@@ -138,9 +138,8 @@ function SignupForm() {
   }
 
   return (
-    <div style={{
+    <div className="auth-page" style={{
       height: "100dvh",
-      overflowY: "auto",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
