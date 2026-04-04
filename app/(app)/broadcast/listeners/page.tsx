@@ -141,7 +141,15 @@ export default function ListenersPage() {
   if (loading) return <InlineLoader />;
 
   return (
-    <div>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      width: "100vw",
+      height: "100%",
+      marginTop: "-24px",
+      marginLeft: "calc(-50vw + 50%)",
+      overflow: "hidden",
+    }}>
       <style>{`
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
@@ -152,31 +160,37 @@ export default function ListenersPage() {
         }
       `}</style>
 
-      {/* Terminal header */}
-      <div style={{ marginBottom: "8px" }}>
-        <span style={{ color: "#f59e0b", fontSize: "13px", fontFamily: "var(--font-mono)" }}>
-          {">"} broadcast --listeners
-        </span>
-        <span className="cursor-blink" style={{
-          width: "8px", height: "12px", backgroundColor: "#f59e0b", display: "inline-block",
-        }} />
-      </div>
-
-      <h1 style={{
-        fontSize: "24px", fontWeight: 700, textTransform: "uppercase",
-        letterSpacing: "-0.05em", marginBottom: "24px",
+      {/* ── Fixed top zone ── */}
+      <div style={{
+        flexShrink: 0,
+        padding: "24px 20px 0",
+        backgroundColor: "var(--bg-base)",
+        borderBottom: "1px solid #27272a",
       }}>
-        Listeners<span style={{ color: "#f59e0b" }}>_</span>
-      </h1>
+        <div style={{ marginBottom: "8px" }}>
+          <span style={{ color: "#f59e0b", fontSize: "13px", fontFamily: "var(--font-mono)" }}>
+            {">"} broadcast --listeners
+          </span>
+          <span className="cursor-blink" style={{
+            width: "8px", height: "12px", backgroundColor: "#f59e0b", display: "inline-block",
+          }} />
+        </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: "0px", marginBottom: "16px" }}>
+        <h1 style={{
+          fontSize: "24px", fontWeight: 700, textTransform: "uppercase",
+          letterSpacing: "-0.05em", marginBottom: "16px",
+        }}>
+          Listeners<span style={{ color: "#f59e0b" }}>_</span>
+        </h1>
+
+        {/* Tabs */}
+        <div style={{ display: "flex", gap: "8px", marginBottom: "0" }}>
         <button
           onClick={() => setTab("active")}
           style={{
             flex: 1, padding: "10px",
             backgroundColor: tab === "active" ? "rgba(245, 158, 11, 0.1)" : "transparent",
-            border: "1px solid", borderRight: "none",
+            border: "1px solid",
             borderColor: tab === "active" ? "#f59e0b" : "#27272a",
             color: tab === "active" ? "#f59e0b" : "#52525b",
             fontSize: "10px", fontWeight: 700, textTransform: "uppercase",
@@ -219,8 +233,16 @@ export default function ListenersPage() {
             color: tab === "followers" ? "#f59e0b" : "#71717a",
           }}>{followers.length}</span>
         </button>
-      </div>
+        </div>
+      </div>{/* end fixed top zone */}
 
+      {/* ── Scrollable content zone ── */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "16px 20px",
+      }}>
       {/* Active Listeners */}
       {tab === "active" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -275,6 +297,7 @@ export default function ListenersPage() {
           )}
         </div>
       )}
+      </div>{/* end scrollable zone */}
     </div>
   );
 }
