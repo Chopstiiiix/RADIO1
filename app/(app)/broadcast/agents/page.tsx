@@ -523,18 +523,38 @@ export default function AgentMarketplacePage() {
                       {agent.gender}
                     </span>
                     {sub && (
-                      <span style={{
-                        fontSize: "10px",
-                        fontFamily: "var(--font-mono)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.1em",
-                        padding: "2px 8px",
-                        backgroundColor: "rgba(74, 222, 128, 0.1)",
-                        border: "1px solid #4ADE80",
-                        color: "#4ADE80",
-                      }}>
-                        Subscribed
-                      </span>
+                      <>
+                        <span style={{
+                          fontSize: "10px",
+                          fontFamily: "var(--font-mono)",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.1em",
+                          padding: "2px 8px",
+                          backgroundColor: "rgba(74, 222, 128, 0.1)",
+                          border: "1px solid #4ADE80",
+                          color: "#4ADE80",
+                        }}>
+                          Subscribed
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleUnsubscribe(agent.id); }}
+                          disabled={unsubscribingId === agent.id}
+                          style={{
+                            fontSize: "10px",
+                            fontFamily: "var(--font-mono)",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.1em",
+                            padding: "2px 8px",
+                            backgroundColor: "transparent",
+                            border: "1px solid #E24A4A",
+                            color: "#E24A4A",
+                            cursor: unsubscribingId === agent.id ? "not-allowed" : "pointer",
+                            opacity: unsubscribingId === agent.id ? 0.6 : 1,
+                          }}
+                        >
+                          {unsubscribingId === agent.id ? "..." : "Unsubscribe"}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -630,37 +650,15 @@ export default function AgentMarketplacePage() {
                   </button>
                 </div>
               ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 0" }}>
-                  <span style={{
-                    fontSize: "11px",
-                    fontFamily: "var(--font-mono)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: "#4ADE80",
-                    flex: 1,
-                  }}>
-                    Active as {sub.role === "primary" ? "Primary Host" : "Co-Host"}
-                  </span>
-                  <button
-                    onClick={() => handleUnsubscribe(agent.id)}
-                    disabled={unsubscribingId === agent.id}
-                    style={{
-                      padding: "6px 14px",
-                      backgroundColor: "transparent",
-                      border: "1px solid #E24A4A",
-                      color: "#E24A4A",
-                      borderRadius: "0px",
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      fontFamily: "var(--font-mono)",
-                      cursor: unsubscribingId === agent.id ? "not-allowed" : "pointer",
-                      opacity: unsubscribingId === agent.id ? 0.6 : 1,
-                    }}
-                  >
-                    {unsubscribingId === agent.id ? "Removing..." : "Unsubscribe"}
-                  </button>
+                <div style={{
+                  fontSize: "11px",
+                  fontFamily: "var(--font-mono)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "#4ADE80",
+                  padding: "10px 0",
+                }}>
+                  Active as {sub.role === "primary" ? "Primary Host" : "Co-Host"}
                 </div>
               )}
             </div>
