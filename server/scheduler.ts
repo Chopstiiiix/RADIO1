@@ -24,9 +24,9 @@ interface ChannelSchedulerState {
 const channelSchedulers = new Map<string, ChannelSchedulerState>();
 
 // DB metadata cache: filename -> { title, artist }
-const dbMetadataCache = new Map<string, { title: string; artist: string; artwork_url?: string }>();
+export const dbMetadataCache = new Map<string, { title: string; artist: string; artwork_url?: string }>();
 
-async function loadDbMetadata(broadcasterId?: string) {
+export async function loadDbMetadata(broadcasterId?: string) {
   if (!broadcasterId) return;
   const { data } = await supabase
     .from("tracks")

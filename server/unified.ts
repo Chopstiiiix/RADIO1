@@ -16,6 +16,7 @@ import { WebSocketServer } from "ws";
 import { startChannelPipeline, startChannelPipelineFromTracks, stopChannelPipeline, getChannelTracks, streamEvents, type TrackFile } from "./stream";
 import { supabase } from "./supabase";
 import { syncTracksForChannel } from "./track-sync";
+import { dbMetadataCache, loadDbMetadata } from "./scheduler";
 import { isAiHostEnabled, getBroadcasterAgents, pregenerateHostSegments } from "./react-agent";
 import { startMixer, connectMusicSource, writeMicAudio, stopMicInput, stopMixer, setMixerVolumes, hasMixer } from "./mic-mixer";
 import { AccessToken } from "livekit-server-sdk";
@@ -40,7 +41,7 @@ interface ChannelState {
 const activeChannels = new Map<string, ChannelState>();
 
 /** Parse "Artist - Title.ext" filename into metadata. */
-function parseTrackMeta(filename: string): { title: string; artist: string } {
+function parseTrackMeta(filename: string): { title: string; artist: string; artwork_url?: string } {
   // Host segment tagged filenames: HOST__Adam__Eve__1234_track_intro.mp3
   if (filename.startsWith("HOST__")) {
     const parts = filename.replace(/^HOST__/, "").split("__");
@@ -55,9 +56,20 @@ function parseTrackMeta(filename: string): { title: string; artist: string } {
   }
 
   const name = filename.replace(/\.[^.]+$/, ""); // strip extension
+
+  // Try DB metadata cache for artwork
+  const dbMatch = dbMetadataCache.get(name.toUpperCase());
+  if (dbMatch) {
+    return { artist: dbMatch.artist, title: dbMatch.title, artwork_url: dbMatch.artwork_url };
+  }
+
   const sep = name.indexOf(" - ");
   if (sep !== -1) {
-    return { artist: name.slice(0, sep).trim(), title: name.slice(sep + 3).trim() };
+    const artist = name.slice(0, sep).trim();
+    const title = name.slice(sep + 3).trim();
+    // Also try matching by title only
+    const titleMatch = dbMetadataCache.get(title.toUpperCase());
+    return { artist, title, artwork_url: titleMatch?.artwork_url };
   }
   return { artist: "Unknown", title: name.trim() };
 }
@@ -88,6 +100,9 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
   const outputDir = path.join(BASE_OUTPUT_DIR, slug);
   fs.mkdirSync(outputDir, { recursive: true });
   fs.mkdirSync(musicDir, { recursive: true });
+
+  // Load DB metadata (artwork, titles) into cache for track meta lookups
+  await loadDbMetadata(broadcasterId);
 
   // Sync tracks from Supabase Storage to local disk before starting
   await syncTracksForChannel(broadcasterId, slug, musicDir, trackIds);
@@ -285,7 +300,7 @@ function getChannelQueue(slug: string) {
 // ── Metadata SSE ──
 
 interface NowPlayingState {
-  track: { title: string; artist: string; album?: string } | null;
+  track: { title: string; artist: string; album?: string; artwork_url?: string } | null;
   upcoming: { title: string; artist: string }[];
   duration: number;
   startedAt: number;
