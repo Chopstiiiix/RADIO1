@@ -156,6 +156,13 @@ function SignupForm() {
         .cursor-blink {
           animation: pulse-opacity 1s step-end infinite;
         }
+        @keyframes pulse-green {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+          50% { box-shadow: 0 0 16px 4px rgba(16, 185, 129, 0.35); }
+        }
+        .cta-pulse-green {
+          animation: pulse-green 1.8s ease-in-out infinite;
+        }
       `}</style>
       <div style={{ width: "100%", maxWidth: "400px" }}>
         <h1 style={{
@@ -271,9 +278,10 @@ function SignupForm() {
             <button
               type="button"
               onClick={handleAgeVerify}
+              className={agreedToTerms ? "cta-pulse-green" : ""}
               style={{
                 padding: "14px",
-                backgroundColor: agreedToTerms ? "#f59e0b" : "#27272a",
+                backgroundColor: agreedToTerms ? "#10b981" : "#27272a",
                 color: agreedToTerms ? "#0a0a0a" : "#52525b",
                 border: "none",
                 borderRadius: "0px",
