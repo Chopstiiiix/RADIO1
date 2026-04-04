@@ -87,3 +87,76 @@ export function setMediaSessionHandlers(handlers: {
   if (handlers.onNext) navigator.mediaSession.setActionHandler("nexttrack", handlers.onNext);
   if (handlers.onPrev) navigator.mediaSession.setActionHandler("previoustrack", handlers.onPrev);
 }
+
+// ── Native Audio Analyser (iOS HLS frequency data) ──
+
+let _audioAnalyser: any = null;
+
+function getAudioAnalyser() {
+  if (_audioAnalyser) return _audioAnalyser;
+  if (!isNative()) return null;
+  try {
+    const cap = (window as any).Capacitor;
+    if (cap?.Plugins?.AudioAnalyser) {
+      _audioAnalyser = cap.Plugins.AudioAnalyser;
+      return _audioAnalyser;
+    }
+    // Capacitor 4+ registerPlugin style
+    if (cap?.registerPlugin) {
+      _audioAnalyser = cap.registerPlugin("AudioAnalyser");
+      return _audioAnalyser;
+    }
+  } catch {
+    // Plugin not available
+  }
+  return null;
+}
+
+/** Start native audio analysis — begins sending frequencyData events from iOS. */
+export async function startNativeAnalyser(): Promise<void> {
+  const plugin = getAudioAnalyser();
+  if (!plugin) return;
+  try {
+    await plugin.startAnalysis();
+  } catch {
+    // Plugin may not be registered or audio engine failed
+  }
+}
+
+/** Stop native audio analysis. */
+export async function stopNativeAnalyser(): Promise<void> {
+  const plugin = getAudioAnalyser();
+  if (!plugin) return;
+  try {
+    await plugin.stopAnalysis();
+  } catch {
+    // Graceful no-op
+  }
+}
+
+/** Listen for native frequency data events. Returns a cleanup function. */
+export function onFrequencyData(
+  callback: (bins: Uint8Array) => void
+): () => void {
+  const plugin = getAudioAnalyser();
+  if (!plugin?.addListener) return () => {};
+
+  let handle: any = null;
+  try {
+    handle = plugin.addListener("frequencyData", (data: { bins: number[] }) => {
+      if (data?.bins) {
+        callback(new Uint8Array(data.bins));
+      }
+    });
+  } catch {
+    return () => {};
+  }
+
+  return () => {
+    try {
+      if (handle?.remove) handle.remove();
+    } catch {
+      // cleanup failed silently
+    }
+  };
+}
