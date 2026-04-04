@@ -4,11 +4,17 @@ import { createClient } from "@supabase/supabase-js";
 
 const BROADCAST_API = process.env.BROADCAST_API_URL || "http://localhost:5001";
 
-// Service role client for reliable DB access (server-side auth cookies can expire)
-const serviceSupabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-init service role client (avoids crash if env vars missing at build time)
+let _serviceSupabase: ReturnType<typeof createClient> | null = null;
+function getServiceSupabase() {
+  if (!_serviceSupabase) {
+    _serviceSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _serviceSupabase;
+}
 
 async function getAuthenticatedBroadcaster(req: NextRequest) {
   // Try server-side cookie auth first
@@ -42,21 +48,23 @@ async function getAuthenticatedBroadcaster(req: NextRequest) {
     const { broadcaster_id } = body;
     if (!broadcaster_id) return null;
 
-    const { data: profile } = await serviceSupabase
+    const supa = getServiceSupabase();
+    const { data: profile } = await supa
       .from("profiles")
       .select("role")
       .eq("id", broadcaster_id)
       .single();
-    if (profile?.role !== "broadcaster") return null;
+    if ((profile as any)?.role !== "broadcaster") return null;
 
-    const { data: channel } = await serviceSupabase
+    const { data: channel } = await supa
       .from("broadcaster_profiles")
       .select("channel_slug, is_live")
       .eq("id", broadcaster_id)
       .single();
-    if (!channel?.channel_slug) return null;
+    const ch = channel as any;
+    if (!ch?.channel_slug) return null;
 
-    return { userId: broadcaster_id, channel };
+    return { userId: broadcaster_id, channel: ch as { channel_slug: string; is_live: boolean } };
   } catch {
     return null;
   }
