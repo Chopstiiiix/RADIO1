@@ -105,6 +105,27 @@ export default function TracksPage() {
 
   useEffect(() => { loadTracks(); }, []);
 
+  // Poll live status every 5 seconds to catch broadcast end if SSE misses it
+  useEffect(() => {
+    if (!channelSlug || !isChannelLive) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/metadata/api/channels/${channelSlug}/now-playing`);
+        if (res.ok) {
+          const meta = await res.json();
+          if (meta.ended) {
+            setNowPlayingTitle(null);
+            setBroadcastingTitles(new Set());
+            setIsChannelLive(false);
+            setBroadcastStartedAt(0);
+            setBroadcastMessage("Broadcast ended — all tracks finished");
+          }
+        }
+      } catch { /* ignore */ }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [channelSlug, isChannelLive]);
+
   // Fetch the full broadcast queue to know which tracks are in rotation
   useEffect(() => {
     if (!channelSlug || !isChannelLive) return;
