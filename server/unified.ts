@@ -482,9 +482,24 @@ async function main() {
       .single();
 
     if (!channel) return res.status(404).json({ error: "Channel not found" });
-    const success = await startChannel(broadcaster_id, slug, track_ids, mode || "tracks");
-    if (success) res.json({ ok: true, message: `Channel ${slug} is now live` });
-    else res.status(400).json({ error: "No tracks available — select tracks to broadcast" });
+
+    // Mark as starting immediately so frontend knows
+    await supabase.from("broadcaster_profiles").update({ is_live: true }).eq("channel_slug", slug);
+
+    // Return immediately — broadcast starts in background (AI host gen can take minutes)
+    res.json({ ok: true, message: `Channel ${slug} is starting...` });
+
+    // Start broadcast asynchronously
+    startChannel(broadcaster_id, slug, track_ids, mode || "tracks").then((success) => {
+      if (!success) {
+        // Revert is_live if start failed
+        supabase.from("broadcaster_profiles").update({ is_live: false }).eq("channel_slug", slug);
+        console.error(`❌ [${slug}] Broadcast failed to start`);
+      }
+    }).catch((err) => {
+      supabase.from("broadcaster_profiles").update({ is_live: false }).eq("channel_slug", slug);
+      console.error(`❌ [${slug}] Broadcast error:`, err);
+    });
   });
 
   app.post("/api/channels/:slug/voice-only", async (req, res) => {
