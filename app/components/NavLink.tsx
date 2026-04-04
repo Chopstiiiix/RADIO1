@@ -12,11 +12,13 @@ export default function NavLink({ href, children }: { href: string; children: Re
         fontSize: "13px",
         color: isActive ? "#ffffff" : "var(--text-secondary)",
         textDecoration: "none",
-        padding: "4px 8px",
+        padding: "6px 12px",
         borderRadius: "4px",
-        transition: "color 0.15s",
+        transition: "color 0.2s ease, background-color 0.2s ease, transform 0.15s ease",
         whiteSpace: "nowrap",
         fontWeight: isActive ? 700 : 400,
+        backgroundColor: isActive ? "rgba(245, 158, 11, 0.1)" : "transparent",
+        flexShrink: 0,
       }}>
         {children}
       </a>

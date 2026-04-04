@@ -97,6 +97,9 @@ body::after {
 ::-webkit-scrollbar-track { background: var(--bg-well); }
 ::-webkit-scrollbar-thumb { background: var(--text-secondary); border-radius: 3px; }
 
+/* Hide scrollbar on horizontal nav */
+.nav-scroll::-webkit-scrollbar { display: none; }
+
 /* Global CTA click animations */
 button,
 a[style*="padding"],

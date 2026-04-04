@@ -83,12 +83,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Nav links row */}
-        <div style={{
+        <div className="nav-scroll" style={{
           display: "flex",
           gap: "6px",
           overflowX: "auto",
           WebkitOverflowScrolling: "touch",
           scrollbarWidth: "none",
+          overscrollBehaviorX: "contain",
+          scrollBehavior: "smooth",
+          paddingBottom: "2px",
+          maskImage: "linear-gradient(to right, black 90%, transparent 100%)",
+          WebkitMaskImage: "linear-gradient(to right, black 90%, transparent 100%)",
         }}>
           {profile.role === "listener" && (
             <>
