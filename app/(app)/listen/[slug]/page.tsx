@@ -314,7 +314,7 @@ export default function ChannelPage() {
       width: "100vw",
       height: "100%",
       marginTop: "-24px",
-      marginBottom: "-4px",
+      marginBottom: "-1px",
       marginLeft: "calc(-50vw + 50%)",
       backgroundColor: "var(--bg-base)",
       color: "var(--text-primary)",
