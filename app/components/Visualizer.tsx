@@ -17,12 +17,6 @@ export default function Visualizer({ analyserNode, isPlaying, artworkUrl }: Visu
   const isMobile = isNative() || (typeof window !== "undefined" && window.innerWidth < 768);
 
   useEffect(() => {
-    // If showing artwork, don't run canvas animation
-    if (artworkUrl) {
-      cancelAnimationFrame(animFrameRef.current);
-      return;
-    }
-
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -99,16 +93,17 @@ export default function Visualizer({ analyserNode, isPlaying, artworkUrl }: Visu
       ctx.beginPath();
       ctx.moveTo(0, h / 2);
       ctx.lineTo(w, h / 2);
-      ctx.strokeStyle = "rgba(255,255,255,0.05)";
+      ctx.strokeStyle = artworkUrl ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.05)";
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Three layered waves
+      // Three layered waves — brighter when over artwork
       const fd = hasRealData ? freqData : undefined;
       const br = hasRealData ? undefined : breathe;
-      drawWave(w, h, h * 0.3, 0.005, 0, 0.3, 2, timeRef.current, fd, br);
-      drawWave(w, h, h * 0.2, 0.01, Math.PI / 4, 0.8, 1.5, timeRef.current, fd, br);
-      drawWave(w, h, h * 0.1, 0.02, Math.PI, 0.5, 1, timeRef.current, fd, br);
+      const opMul = artworkUrl ? 1.3 : 1;
+      drawWave(w, h, h * 0.3, 0.005, 0, 0.3 * opMul, 2, timeRef.current, fd, br);
+      drawWave(w, h, h * 0.2, 0.01, Math.PI / 4, 0.8 * opMul, 1.5, timeRef.current, fd, br);
+      drawWave(w, h, h * 0.1, 0.02, Math.PI, 0.5 * opMul, 1, timeRef.current, fd, br);
 
       timeRef.current -= 0.03;
       animFrameRef.current = requestAnimationFrame(draw);
@@ -121,35 +116,43 @@ export default function Visualizer({ analyserNode, isPlaying, artworkUrl }: Visu
     };
   }, [analyserNode, isPlaying, artworkUrl]);
 
-  // If artwork available, show it instead of waves
-  if (artworkUrl) {
-    return (
-      <div style={{ position: "relative", width: "100%", height: "100%" }}>
-        <img
-          src={artworkUrl}
-          alt="Track artwork"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            objectPosition: "center",
-          }}
-        />
-        {/* Subtle gradient overlay so text remains readable on top */}
-        <div style={{
-          position: "absolute",
-          inset: 0,
-          background: "linear-gradient(to bottom, rgba(32,32,32,0.3) 0%, rgba(32,32,32,0.6) 50%, rgba(32,32,32,0.85) 100%)",
-        }} />
-      </div>
-    );
-  }
-
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {/* Artwork background layer */}
+      {artworkUrl && (
+        <>
+          <img
+            src={artworkUrl}
+            alt="Track artwork"
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center",
+            }}
+          />
+          {/* Gradient overlay for readability */}
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(to bottom, rgba(32,32,32,0.3) 0%, rgba(32,32,32,0.5) 50%, rgba(32,32,32,0.8) 100%)",
+          }} />
+        </>
+      )}
+      {/* Wave canvas — always on top */}
       <canvas
         ref={canvasRef}
-        style={{ display: "block", width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}
+        style={{
+          display: "block",
+          width: "100%",
+          height: "100%",
+          position: "absolute",
+          top: 0,
+          left: 0,
+          zIndex: 1,
+        }}
       />
     </div>
   );
