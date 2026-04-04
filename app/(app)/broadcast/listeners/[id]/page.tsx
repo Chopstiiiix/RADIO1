@@ -131,7 +131,15 @@ export default function ListenerProfilePage() {
     .toUpperCase() || "?";
 
   return (
-    <div>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      width: "100vw",
+      height: "100%",
+      marginTop: "-24px",
+      marginLeft: "calc(-50vw + 50%)",
+      overflow: "hidden",
+    }}>
       <style>{`
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
@@ -142,107 +150,122 @@ export default function ListenerProfilePage() {
         }
       `}</style>
 
-      {/* Back button */}
-      <button
-        onClick={() => router.back()}
-        style={{
-          background: "none", border: "none", color: "#f59e0b",
-          cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: "12px",
-          padding: 0, marginBottom: "16px", display: "flex", alignItems: "center", gap: "6px",
-        }}
-      >
-        <span>&lt;</span> Back
-      </button>
-
-      {/* Terminal header */}
-      <div style={{ marginBottom: "8px" }}>
-        <span style={{ color: "#f59e0b", fontSize: "13px", fontFamily: "var(--font-mono)" }}>
-          {">"} view_listener --profile
-        </span>
-        <span className="cursor-blink" style={{
-          width: "8px", height: "12px", backgroundColor: "#f59e0b", display: "inline-block",
-        }} />
-      </div>
-
-      {/* Avatar + Name */}
+      {/* ── Fixed top zone ── */}
       <div style={{
-        display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px",
+        flexShrink: 0,
+        padding: "24px 20px 16px",
+        backgroundColor: "var(--bg-base)",
+        borderBottom: "1px solid #27272a",
       }}>
-        <div style={{
-          width: "72px", height: "72px", borderRadius: "50%",
-          border: "2px solid #3f3f46", backgroundColor: profile.avatar_url ? "transparent" : "#27272a",
-          overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        }}>
-          {profile.avatar_url ? (
-            <img src={profile.avatar_url} alt={profile.display_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <span style={{ fontSize: "24px", fontWeight: 700, color: "#a1a1aa", fontFamily: "var(--font-mono)" }}>
-              {initials}
-            </span>
-          )}
+        {/* Back button */}
+        <button
+          onClick={() => router.back()}
+          style={{
+            background: "none", border: "none", color: "#f59e0b",
+            cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: "12px",
+            padding: 0, marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px",
+          }}
+        >
+          <span>&lt;</span> Back
+        </button>
+
+        {/* Terminal header */}
+        <div style={{ marginBottom: "8px" }}>
+          <span style={{ color: "#f59e0b", fontSize: "13px", fontFamily: "var(--font-mono)" }}>
+            {">"} view_listener --profile
+          </span>
+          <span className="cursor-blink" style={{
+            width: "8px", height: "12px", backgroundColor: "#f59e0b", display: "inline-block",
+          }} />
         </div>
-        <div>
-          <h1 style={{
-            fontSize: "22px", fontWeight: 700, textTransform: "uppercase",
-            letterSpacing: "-0.05em", marginBottom: "4px",
+
+        {/* Avatar + Name */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: "16px", marginBottom: "16px",
+        }}>
+          <div style={{
+            width: "72px", height: "72px", borderRadius: "50%",
+            border: "2px solid #3f3f46", backgroundColor: profile.avatar_url ? "transparent" : "#27272a",
+            overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>
-            {profile.display_name}<span style={{ color: "#f59e0b" }}>_</span>
-          </h1>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{
-              fontSize: "10px", color: "#f59e0b", textTransform: "uppercase",
-              padding: "2px 6px", backgroundColor: "rgba(245, 158, 11, 0.1)",
-              border: "1px solid rgba(245, 158, 11, 0.2)", borderRadius: "2px",
-              fontWeight: 700, letterSpacing: "0.1em", fontFamily: "var(--font-mono)",
-            }}>
-              {profile.role}
-            </span>
-            {isFollower && (
-              <span style={{
-                fontSize: "10px", color: "#4ADE80", textTransform: "uppercase",
-                padding: "2px 6px", backgroundColor: "rgba(74, 222, 128, 0.1)",
-                border: "1px solid rgba(74, 222, 128, 0.2)", borderRadius: "2px",
-                fontWeight: 700, letterSpacing: "0.1em", fontFamily: "var(--font-mono)",
-              }}>
-                Follows You
+            {profile.avatar_url ? (
+              <img src={profile.avatar_url} alt={profile.display_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <span style={{ fontSize: "24px", fontWeight: 700, color: "#a1a1aa", fontFamily: "var(--font-mono)" }}>
+                {initials}
               </span>
             )}
           </div>
+          <div>
+            <h1 style={{
+              fontSize: "22px", fontWeight: 700, textTransform: "uppercase",
+              letterSpacing: "-0.05em", marginBottom: "4px",
+            }}>
+              {profile.display_name}<span style={{ color: "#f59e0b" }}>_</span>
+            </h1>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{
+                fontSize: "10px", color: "#f59e0b", textTransform: "uppercase",
+                padding: "2px 6px", backgroundColor: "rgba(245, 158, 11, 0.1)",
+                border: "1px solid rgba(245, 158, 11, 0.2)", borderRadius: "2px",
+                fontWeight: 700, letterSpacing: "0.1em", fontFamily: "var(--font-mono)",
+              }}>
+                {profile.role}
+              </span>
+              {isFollower && (
+                <span style={{
+                  fontSize: "10px", color: "#4ADE80", textTransform: "uppercase",
+                  padding: "2px 6px", backgroundColor: "rgba(74, 222, 128, 0.1)",
+                  border: "1px solid rgba(74, 222, 128, 0.2)", borderRadius: "2px",
+                  fontWeight: 700, letterSpacing: "0.1em", fontFamily: "var(--font-mono)",
+                }}>
+                  Follows You
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Stats */}
+        {/* Stats */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px",
+        }}>
+          <div style={{
+            padding: "14px", backgroundColor: "rgba(24, 24, 27, 0.3)", borderLeft: "3px solid #f59e0b",
+          }}>
+            <div style={{ fontSize: "10px", color: "#52525b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px", fontFamily: "var(--font-mono)" }}>
+              Sessions
+            </div>
+            <div style={{ fontSize: "16px", fontWeight: 700 }}>{sessionCount}</div>
+          </div>
+          <div style={{
+            padding: "14px", backgroundColor: "rgba(24, 24, 27, 0.3)", borderLeft: "3px solid #f59e0b",
+          }}>
+            <div style={{ fontSize: "10px", color: "#52525b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px", fontFamily: "var(--font-mono)" }}>
+              Total Time
+            </div>
+            <div style={{ fontSize: "16px", fontWeight: 700 }}>{formatDuration(totalListenTime)}</div>
+          </div>
+          <div style={{
+            padding: "14px", backgroundColor: "rgba(24, 24, 27, 0.3)", borderLeft: "3px solid #f59e0b",
+          }}>
+            <div style={{ fontSize: "10px", color: "#52525b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px", fontFamily: "var(--font-mono)" }}>
+              Status
+            </div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: isFollower ? "#4ADE80" : "#71717a" }}>
+              {isFollower ? "FOLLOWER" : "VISITOR"}
+            </div>
+          </div>
+        </div>
+      </div>{/* end fixed top zone */}
+
+      {/* ── Scrollable content zone ── */}
       <div style={{
-        display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "20px",
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "16px 20px",
       }}>
-        <div style={{
-          padding: "14px", backgroundColor: "rgba(24, 24, 27, 0.3)", borderLeft: "3px solid #f59e0b",
-        }}>
-          <div style={{ fontSize: "10px", color: "#52525b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px", fontFamily: "var(--font-mono)" }}>
-            Sessions
-          </div>
-          <div style={{ fontSize: "16px", fontWeight: 700 }}>{sessionCount}</div>
-        </div>
-        <div style={{
-          padding: "14px", backgroundColor: "rgba(24, 24, 27, 0.3)", borderLeft: "3px solid #f59e0b",
-        }}>
-          <div style={{ fontSize: "10px", color: "#52525b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px", fontFamily: "var(--font-mono)" }}>
-            Total Time
-          </div>
-          <div style={{ fontSize: "16px", fontWeight: 700 }}>{formatDuration(totalListenTime)}</div>
-        </div>
-        <div style={{
-          padding: "14px", backgroundColor: "rgba(24, 24, 27, 0.3)", borderLeft: "3px solid #f59e0b",
-        }}>
-          <div style={{ fontSize: "10px", color: "#52525b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px", fontFamily: "var(--font-mono)" }}>
-            Status
-          </div>
-          <div style={{ fontSize: "16px", fontWeight: 700, color: isFollower ? "#4ADE80" : "#71717a" }}>
-            {isFollower ? "FOLLOWER" : "VISITOR"}
-          </div>
-        </div>
-      </div>
-
       {/* Bio */}
       {profile.bio && (
         <div style={{
@@ -291,6 +314,7 @@ export default function ListenerProfilePage() {
           </div>
         </div>
       )}
+      </div>{/* end scrollable zone */}
     </div>
   );
 }
