@@ -716,46 +716,76 @@ function DraggableTrackList({
 }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
-  const dragStartY = useRef(0);
-  const dragNodeRef = useRef<HTMLDivElement | null>(null);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startY = useRef(0);
+  const listRef = useRef<HTMLDivElement>(null);
+  const itemRects = useRef<DOMRect[]>([]);
+  const scrollParent = useRef<HTMLElement | null>(null);
 
-  function handleDragStart(index: number, clientY: number, node: HTMLDivElement) {
-    setDragIndex(index);
-    setOverIndex(index);
-    setIsDragging(true);
-    dragStartY.current = clientY;
-    dragNodeRef.current = node;
-    node.style.zIndex = "100";
-    node.style.opacity = "0.85";
-    node.style.boxShadow = "0 8px 32px rgba(245, 158, 11, 0.3)";
-    node.style.transform = "scale(1.02)";
+  function captureRects() {
+    if (!listRef.current) return;
+    const items = Array.from(listRef.current.children) as HTMLElement[];
+    itemRects.current = items.map((el) => el.getBoundingClientRect());
+    // Find scrollable parent
+    let parent = listRef.current.parentElement;
+    while (parent) {
+      const style = getComputedStyle(parent);
+      if (style.overflowY === "auto" || style.overflowY === "scroll") {
+        scrollParent.current = parent;
+        break;
+      }
+      parent = parent.parentElement;
+    }
   }
 
-  function handleDragMove(clientY: number) {
-    if (dragIndex === null || !dragNodeRef.current) return;
-    const parent = dragNodeRef.current.parentElement;
-    if (!parent) return;
-
-    const children = Array.from(parent.children) as HTMLDivElement[];
-    const dragRect = dragNodeRef.current.getBoundingClientRect();
-
-    // Find which item we're hovering over
-    for (let i = 0; i < children.length; i++) {
-      if (i === dragIndex) continue;
-      const rect = children[i].getBoundingClientRect();
+  function getOverIndex(clientY: number): number {
+    for (let i = 0; i < itemRects.current.length; i++) {
+      const rect = itemRects.current[i];
       const midY = rect.top + rect.height / 2;
-      if (clientY > rect.top && clientY < rect.bottom) {
-        if (overIndex !== i) {
-          setOverIndex(i);
-        }
-        break;
+      if (clientY < midY) return i;
+    }
+    return itemRects.current.length - 1;
+  }
+
+  function startDrag(index: number, clientY: number) {
+    captureRects();
+    setDragIndex(index);
+    setOverIndex(index);
+    setDragOffset(0);
+    setIsDragging(true);
+    startY.current = clientY;
+
+    // Prevent page scroll during drag
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+  }
+
+  function moveDrag(clientY: number) {
+    if (dragIndex === null) return;
+    const offset = clientY - startY.current;
+    setDragOffset(offset);
+
+    const newOver = getOverIndex(clientY);
+    if (newOver !== overIndex) {
+      setOverIndex(newOver);
+    }
+
+    // Auto-scroll when near edges
+    if (scrollParent.current) {
+      const sp = scrollParent.current;
+      const spRect = sp.getBoundingClientRect();
+      const edgeZone = 60;
+      if (clientY < spRect.top + edgeZone) {
+        sp.scrollTop -= 8;
+      } else if (clientY > spRect.bottom - edgeZone) {
+        sp.scrollTop += 8;
       }
     }
   }
 
-  function handleDragEnd() {
+  function endDrag() {
     if (dragIndex !== null && overIndex !== null && dragIndex !== overIndex) {
       const newTracks = [...tracks];
       const [moved] = newTracks.splice(dragIndex, 1);
@@ -763,18 +793,13 @@ function DraggableTrackList({
       setTracks(newTracks);
     }
 
-    // Reset styles
-    if (dragNodeRef.current) {
-      dragNodeRef.current.style.zIndex = "";
-      dragNodeRef.current.style.opacity = "";
-      dragNodeRef.current.style.boxShadow = "";
-      dragNodeRef.current.style.transform = "";
-    }
-
     setDragIndex(null);
     setOverIndex(null);
+    setDragOffset(0);
     setIsDragging(false);
-    dragNodeRef.current = null;
+    document.body.style.overflow = "";
+    document.body.style.touchAction = "";
+
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
@@ -783,24 +808,22 @@ function DraggableTrackList({
 
   // Touch handlers
   function onTouchStart(e: React.TouchEvent, index: number) {
-    const node = e.currentTarget as HTMLDivElement;
     const y = e.touches[0].clientY;
-    // Long press to start drag (300ms)
     longPressTimer.current = setTimeout(() => {
-      handleDragStart(index, y, node);
-    }, 300);
+      startDrag(index, y);
+    }, 400);
   }
 
   function onTouchMove(e: React.TouchEvent) {
     if (longPressTimer.current && !isDragging) {
-      // Cancel long press if finger moves before drag starts
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
       return;
     }
     if (!isDragging) return;
     e.preventDefault();
-    handleDragMove(e.touches[0].clientY);
+    e.stopPropagation();
+    moveDrag(e.touches[0].clientY);
   }
 
   function onTouchEnd() {
@@ -808,20 +831,19 @@ function DraggableTrackList({
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
-    if (isDragging) handleDragEnd();
+    if (isDragging) endDrag();
   }
 
   // Mouse handlers
   function onMouseDown(e: React.MouseEvent, index: number) {
-    // Only drag from the grip handle area
     const target = e.target as HTMLElement;
     if (!target.closest("[data-drag-handle]")) return;
     e.preventDefault();
-    handleDragStart(index, e.clientY, e.currentTarget as HTMLDivElement);
+    startDrag(index, e.clientY);
 
-    const onMove = (ev: MouseEvent) => handleDragMove(ev.clientY);
+    const onMove = (ev: MouseEvent) => moveDrag(ev.clientY);
     const onUp = () => {
-      handleDragEnd();
+      endDrag();
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
     };
@@ -829,18 +851,23 @@ function DraggableTrackList({
     document.addEventListener("mouseup", onUp);
   }
 
+  // Calculate item height for animations
+  const itemH = itemRects.current[0]?.height || 88;
+  const gap = 8;
+  const step = itemH + gap;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+    <div ref={listRef} style={{ display: "flex", flexDirection: "column", gap: `${gap}px`, position: "relative" }}>
       {tracks.map((track, index) => {
-        // Calculate offset for animation
-        let translateY = 0;
+        const isBeingDragged = isDragging && index === dragIndex;
+
+        // Calculate displacement for non-dragged items
+        let slideY = 0;
         if (isDragging && dragIndex !== null && overIndex !== null && index !== dragIndex) {
           if (dragIndex < overIndex) {
-            // Dragging down: items between drag and over shift up
-            if (index > dragIndex && index <= overIndex) translateY = -1;
-          } else {
-            // Dragging up: items between over and drag shift down
-            if (index >= overIndex && index < dragIndex) translateY = 1;
+            if (index > dragIndex && index <= overIndex) slideY = -step;
+          } else if (dragIndex > overIndex) {
+            if (index >= overIndex && index < dragIndex) slideY = step;
           }
         }
 
@@ -848,9 +875,17 @@ function DraggableTrackList({
           <div
             key={track.id}
             style={{
-              transition: isDragging ? "transform 0.25s ease" : "none",
-              transform: translateY !== 0 ? `translateY(${translateY * 88}px)` : "translateY(0)",
               position: "relative",
+              zIndex: isBeingDragged ? 100 : 1,
+              transform: isBeingDragged
+                ? `translateY(${dragOffset}px) scale(1.02)`
+                : `translateY(${slideY}px)`,
+              transition: isBeingDragged
+                ? "box-shadow 0.2s, scale 0.2s"
+                : "transform 0.25s cubic-bezier(0.25, 1, 0.5, 1)",
+              opacity: isBeingDragged ? 0.9 : 1,
+              boxShadow: isBeingDragged ? "0 8px 32px rgba(245, 158, 11, 0.3)" : "none",
+              touchAction: isDragging ? "none" : "auto",
             }}
             onTouchStart={(e) => onTouchStart(e, index)}
             onTouchMove={onTouchMove}
@@ -862,7 +897,7 @@ function DraggableTrackList({
               isSelected={selectedTracks.has(track.id)}
               isNowPlaying={nowPlayingTitle !== null && normalize(nowPlayingTitle).includes(normalize(track.title))}
               isBroadcasting={isTrackBroadcasting(track)}
-              onToggleSelection={() => toggleTrackSelection(track.id)}
+              onToggleSelection={() => !isDragging && toggleTrackSelection(track.id)}
               onToggleActive={() => toggleActive(track.id, track.is_active)}
               onDelete={() => deleteTrack(track.id)}
               formatDuration={formatDuration}
