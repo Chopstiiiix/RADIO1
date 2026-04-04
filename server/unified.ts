@@ -36,6 +36,7 @@ interface ChannelState {
   tracks: TrackFile[];
   currentIndex: number;
   cuedTrack: string | null;
+  trackTimer?: ReturnType<typeof setTimeout>;
 }
 
 const activeChannels = new Map<string, ChannelState>();
@@ -199,6 +200,8 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
 }
 
 async function stopChannel(slug: string) {
+  const ch = activeChannels.get(slug);
+  if (ch?.trackTimer) clearTimeout(ch.trackTimer);
   stopChannelPipeline(slug);
   stopMicInput(slug);
   stopMixer(slug);
@@ -214,7 +217,10 @@ function startTrackTimer(slug: string) {
   const track = ch.tracks[ch.currentIndex];
   if (!track) return;
 
-  setTimeout(() => {
+  // Add 0.5s buffer to account for FFmpeg -re timing drift
+  const delay = (track.duration + 0.5) * 1000;
+
+  const timer = setTimeout(() => {
     const current = activeChannels.get(slug);
     if (!current) return;
 
@@ -231,7 +237,9 @@ function startTrackTimer(slug: string) {
     }
 
     if (current.currentIndex >= current.tracks.length) {
-      // All tracks finished — don't loop, let FFmpeg "ended" event handle cleanup
+      // All tracks finished in timer — update metadata to show last track still
+      // Don't send ended:true here — let FFmpeg "ended" event handle actual cleanup
+      console.log(`🎵 [${slug}] Track timer reached end of playlist (${current.tracks.length} tracks)`);
       return;
     }
 
@@ -253,7 +261,10 @@ function startTrackTimer(slug: string) {
     });
 
     startTrackTimer(slug);
-  }, track.duration * 1000);
+  }, delay);
+
+  // Store timer ref so it can be cleared on stopChannel
+  ch.trackTimer = timer;
 }
 
 async function skipToTrack(slug: string, filename: string): Promise<boolean> {
