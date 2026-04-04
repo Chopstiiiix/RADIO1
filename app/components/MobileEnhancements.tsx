@@ -7,10 +7,15 @@ import { hapticTap } from "../../lib/capacitor-bridge";
  * Global mobile enhancements:
  * - Pull-to-refresh: entire page moves down, spring bounce back
  * - Haptic feedback on page load and CTA clicks
+ *
+ * Key design: pull tracking only activates on confirmed downward gesture.
+ * Upward swipes are completely ignored so native scroll momentum is never stolen.
  */
 export default function MobileEnhancements() {
   const startY = useRef(0);
-  const pulling = useRef(false);
+  const canPull = useRef(false);    // eligible (at scroll top)
+  const pulling = useRef(false);    // confirmed downward pull
+  const decided = useRef(false);    // direction decided for this gesture
   const phaseRef = useRef<"idle" | "pulling" | "releasing" | "refreshing">("idle");
   const pullRef = useRef(0);
   const [pullDistance, setPullDistance] = useState(0);
@@ -18,7 +23,6 @@ export default function MobileEnhancements() {
   const threshold = 90;
   const maxPull = 150;
 
-  // Keep refs in sync with state for touch handlers
   const updatePhase = useCallback((p: typeof phase) => {
     phaseRef.current = p;
     setPhase(p);
@@ -29,14 +33,18 @@ export default function MobileEnhancements() {
     setPullDistance(d);
   }, []);
 
-  // Register touch listeners ONCE — use refs to read current state
   useEffect(() => {
     hapticTap();
 
     const onTouchStart = (e: TouchEvent) => {
       if (phaseRef.current === "refreshing") return;
 
-      // Only intercept if at top of scroll
+      // Reset gesture state
+      canPull.current = false;
+      pulling.current = false;
+      decided.current = false;
+
+      // Check if at top of scroll — if not, bail completely
       const target = e.target as HTMLElement;
       let el: HTMLElement | null = target;
       while (el && el !== document.body) {
@@ -45,13 +53,29 @@ export default function MobileEnhancements() {
       }
       if (window.scrollY > 0) return;
 
+      // Mark as eligible, but DON'T activate pull yet
       startY.current = e.touches[0].clientY;
-      pulling.current = true;
+      canPull.current = true;
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (!pulling.current || phaseRef.current === "refreshing") return;
+      if (!canPull.current || phaseRef.current === "refreshing") return;
+
       const diff = e.touches[0].clientY - startY.current;
+
+      // First move decides direction — only decide once per gesture
+      if (!decided.current) {
+        decided.current = true;
+        if (diff <= 0) {
+          // Swiping UP — completely release this gesture to native scroll
+          canPull.current = false;
+          return;
+        }
+        // Swiping DOWN — activate pull-to-refresh
+        pulling.current = true;
+      }
+
+      if (!pulling.current) return;
 
       if (diff > 0) {
         const dampened = maxPull * (1 - Math.exp(-diff / 200));
@@ -64,8 +88,12 @@ export default function MobileEnhancements() {
     };
 
     const onTouchEnd = () => {
-      if (!pulling.current) return;
+      if (!pulling.current) {
+        canPull.current = false;
+        return;
+      }
       pulling.current = false;
+      canPull.current = false;
 
       if (pullRef.current >= threshold) {
         hapticTap();
@@ -97,7 +125,7 @@ export default function MobileEnhancements() {
       document.removeEventListener("touchend", onTouchEnd);
       document.removeEventListener("click", onClick, { capture: true });
     };
-  }, []); // Empty deps — register once, read from refs
+  }, []);
 
   // Apply transform to the entire page
   useEffect(() => {
