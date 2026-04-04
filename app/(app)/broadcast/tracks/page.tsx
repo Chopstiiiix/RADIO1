@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import TrashButton from "@/app/components/TrashButton";
 import BroadcastAgreement from "@/app/components/BroadcastAgreement";
@@ -617,21 +617,18 @@ export default function TracksPage() {
           </a>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {tracks.map((track) => (
-            <TrackCard
-              key={track.id}
-              track={track}
-              isSelected={selectedTracks.has(track.id)}
-              isNowPlaying={nowPlayingTitle !== null && normalize(nowPlayingTitle).includes(normalize(track.title))}
-              isBroadcasting={isTrackBroadcasting(track)}
-              onToggleSelection={() => toggleTrackSelection(track.id)}
-              onToggleActive={() => toggleActive(track.id, track.is_active)}
-              onDelete={() => deleteTrack(track.id)}
-              formatDuration={formatDuration}
-            />
-          ))}
-        </div>
+        <DraggableTrackList
+          tracks={tracks}
+          setTracks={setTracks}
+          selectedTracks={selectedTracks}
+          nowPlayingTitle={nowPlayingTitle}
+          normalize={normalize}
+          isTrackBroadcasting={isTrackBroadcasting}
+          toggleTrackSelection={toggleTrackSelection}
+          toggleActive={toggleActive}
+          deleteTrack={deleteTrack}
+          formatDuration={formatDuration}
+        />
       )}
 
       </div>{/* end scrollable zone */}
@@ -657,7 +654,183 @@ export default function TracksPage() {
   );
 }
 
-function TrackCard({ track, isSelected, isNowPlaying, isBroadcasting, onToggleSelection, onToggleActive, onDelete, formatDuration }: {
+function DraggableTrackList({
+  tracks, setTracks, selectedTracks, nowPlayingTitle, normalize,
+  isTrackBroadcasting, toggleTrackSelection, toggleActive, deleteTrack, formatDuration,
+}: {
+  tracks: Track[];
+  setTracks: (t: Track[]) => void;
+  selectedTracks: Set<string>;
+  nowPlayingTitle: string | null;
+  normalize: (s: string) => string;
+  isTrackBroadcasting: (t: Track) => boolean;
+  toggleTrackSelection: (id: string) => void;
+  toggleActive: (id: string, current: boolean) => void;
+  deleteTrack: (id: string) => void;
+  formatDuration: (s: number | null) => string;
+}) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const dragStartY = useRef(0);
+  const dragNodeRef = useRef<HTMLDivElement | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  function handleDragStart(index: number, clientY: number, node: HTMLDivElement) {
+    setDragIndex(index);
+    setOverIndex(index);
+    setIsDragging(true);
+    dragStartY.current = clientY;
+    dragNodeRef.current = node;
+    node.style.zIndex = "100";
+    node.style.opacity = "0.85";
+    node.style.boxShadow = "0 8px 32px rgba(245, 158, 11, 0.3)";
+    node.style.transform = "scale(1.02)";
+  }
+
+  function handleDragMove(clientY: number) {
+    if (dragIndex === null || !dragNodeRef.current) return;
+    const parent = dragNodeRef.current.parentElement;
+    if (!parent) return;
+
+    const children = Array.from(parent.children) as HTMLDivElement[];
+    const dragRect = dragNodeRef.current.getBoundingClientRect();
+
+    // Find which item we're hovering over
+    for (let i = 0; i < children.length; i++) {
+      if (i === dragIndex) continue;
+      const rect = children[i].getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      if (clientY > rect.top && clientY < rect.bottom) {
+        if (overIndex !== i) {
+          setOverIndex(i);
+        }
+        break;
+      }
+    }
+  }
+
+  function handleDragEnd() {
+    if (dragIndex !== null && overIndex !== null && dragIndex !== overIndex) {
+      const newTracks = [...tracks];
+      const [moved] = newTracks.splice(dragIndex, 1);
+      newTracks.splice(overIndex, 0, moved);
+      setTracks(newTracks);
+    }
+
+    // Reset styles
+    if (dragNodeRef.current) {
+      dragNodeRef.current.style.zIndex = "";
+      dragNodeRef.current.style.opacity = "";
+      dragNodeRef.current.style.boxShadow = "";
+      dragNodeRef.current.style.transform = "";
+    }
+
+    setDragIndex(null);
+    setOverIndex(null);
+    setIsDragging(false);
+    dragNodeRef.current = null;
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
+
+  // Touch handlers
+  function onTouchStart(e: React.TouchEvent, index: number) {
+    const node = e.currentTarget as HTMLDivElement;
+    const y = e.touches[0].clientY;
+    // Long press to start drag (300ms)
+    longPressTimer.current = setTimeout(() => {
+      handleDragStart(index, y, node);
+    }, 300);
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    if (longPressTimer.current && !isDragging) {
+      // Cancel long press if finger moves before drag starts
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+      return;
+    }
+    if (!isDragging) return;
+    e.preventDefault();
+    handleDragMove(e.touches[0].clientY);
+  }
+
+  function onTouchEnd() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    if (isDragging) handleDragEnd();
+  }
+
+  // Mouse handlers
+  function onMouseDown(e: React.MouseEvent, index: number) {
+    // Only drag from the grip handle area
+    const target = e.target as HTMLElement;
+    if (!target.closest("[data-drag-handle]")) return;
+    e.preventDefault();
+    handleDragStart(index, e.clientY, e.currentTarget as HTMLDivElement);
+
+    const onMove = (ev: MouseEvent) => handleDragMove(ev.clientY);
+    const onUp = () => {
+      handleDragEnd();
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      {tracks.map((track, index) => {
+        // Calculate offset for animation
+        let translateY = 0;
+        if (isDragging && dragIndex !== null && overIndex !== null && index !== dragIndex) {
+          if (dragIndex < overIndex) {
+            // Dragging down: items between drag and over shift up
+            if (index > dragIndex && index <= overIndex) translateY = -1;
+          } else {
+            // Dragging up: items between over and drag shift down
+            if (index >= overIndex && index < dragIndex) translateY = 1;
+          }
+        }
+
+        return (
+          <div
+            key={track.id}
+            style={{
+              transition: isDragging ? "transform 0.25s ease" : "none",
+              transform: translateY !== 0 ? `translateY(${translateY * 88}px)` : "translateY(0)",
+              position: "relative",
+            }}
+            onTouchStart={(e) => onTouchStart(e, index)}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            onMouseDown={(e) => onMouseDown(e, index)}
+          >
+            <TrackCard
+              track={track}
+              isSelected={selectedTracks.has(track.id)}
+              isNowPlaying={nowPlayingTitle !== null && normalize(nowPlayingTitle).includes(normalize(track.title))}
+              isBroadcasting={isTrackBroadcasting(track)}
+              onToggleSelection={() => toggleTrackSelection(track.id)}
+              onToggleActive={() => toggleActive(track.id, track.is_active)}
+              onDelete={() => deleteTrack(track.id)}
+              formatDuration={formatDuration}
+              showDragHandle
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TrackCard({ track, isSelected, isNowPlaying, isBroadcasting, onToggleSelection, onToggleActive, onDelete, formatDuration, showDragHandle }: {
   track: Track;
   isSelected: boolean;
   isNowPlaying: boolean;
@@ -666,6 +839,7 @@ function TrackCard({ track, isSelected, isNowPlaying, isBroadcasting, onToggleSe
   onToggleActive: () => void;
   onDelete: () => void;
   formatDuration: (s: number | null) => string;
+  showDragHandle?: boolean;
 }) {
   const isSelectable = track.is_active && !isBroadcasting;
   const dominantColor = useDominantColor(track.artwork_url);
@@ -733,6 +907,27 @@ function TrackCard({ track, isSelected, isNowPlaying, isBroadcasting, onToggleSe
             />
           </div>
         </>
+      )}
+
+      {/* Drag handle */}
+      {showDragHandle && (
+        <div
+          data-drag-handle
+          style={{
+            zIndex: 2,
+            cursor: "grab",
+            padding: "4px 2px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "2px",
+            flexShrink: 0,
+            touchAction: "none",
+          }}
+        >
+          <div style={{ width: "12px", height: "2px", backgroundColor: hasArt ? "rgba(255,255,255,0.4)" : "#52525b", borderRadius: "1px" }} />
+          <div style={{ width: "12px", height: "2px", backgroundColor: hasArt ? "rgba(255,255,255,0.4)" : "#52525b", borderRadius: "1px" }} />
+          <div style={{ width: "12px", height: "2px", backgroundColor: hasArt ? "rgba(255,255,255,0.4)" : "#52525b", borderRadius: "1px" }} />
+        </div>
       )}
 
       {/* Checkbox / On-Air indicator */}
