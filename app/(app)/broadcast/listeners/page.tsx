@@ -184,55 +184,73 @@ export default function ListenersPage() {
         </h1>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: "8px", marginBottom: "0" }}>
-        <button
-          onClick={() => setTab("active")}
-          style={{
-            flex: 1, padding: "10px",
-            backgroundColor: tab === "active" ? "rgba(245, 158, 11, 0.1)" : "transparent",
-            border: "1px solid",
-            borderColor: tab === "active" ? "#f59e0b" : "#27272a",
-            color: tab === "active" ? "#f59e0b" : "#52525b",
-            fontSize: "10px", fontWeight: 700, textTransform: "uppercase",
-            letterSpacing: "0.1em", cursor: "pointer",
-            fontFamily: "var(--font-mono)",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-          }}
-        >
-          <span style={{
-            width: "6px", height: "6px", borderRadius: "50%",
-            backgroundColor: tab === "active" ? "#4ADE80" : "#3f3f46",
-          }} />
-          Live Now
-          <span style={{
-            fontSize: "9px",
-            backgroundColor: tab === "active" ? "rgba(245, 158, 11, 0.2)" : "#27272a",
-            padding: "1px 5px",
-            color: tab === "active" ? "#f59e0b" : "#71717a",
-          }}>{activeListeners.length}</span>
-        </button>
-        <button
-          onClick={() => setTab("followers")}
-          style={{
-            flex: 1, padding: "10px",
-            backgroundColor: tab === "followers" ? "rgba(245, 158, 11, 0.1)" : "transparent",
-            border: "1px solid",
-            borderColor: tab === "followers" ? "#f59e0b" : "#27272a",
-            color: tab === "followers" ? "#f59e0b" : "#52525b",
-            fontSize: "10px", fontWeight: 700, textTransform: "uppercase",
-            letterSpacing: "0.1em", cursor: "pointer",
-            fontFamily: "var(--font-mono)",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-          }}
-        >
-          Followers
-          <span style={{
-            fontSize: "9px",
-            backgroundColor: tab === "followers" ? "rgba(245, 158, 11, 0.2)" : "#27272a",
-            padding: "1px 5px",
-            color: tab === "followers" ? "#f59e0b" : "#71717a",
-          }}>{followers.length}</span>
-        </button>
+        <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
+          <button
+            onClick={() => setTab("active")}
+            style={{
+              flex: 1,
+              padding: "10px",
+              backgroundColor: tab === "active" ? "rgba(245, 158, 11, 0.1)" : "transparent",
+              border: "1px solid",
+              borderColor: tab === "active" ? "#f59e0b" : "#27272a",
+              color: tab === "active" ? "#f59e0b" : "#52525b",
+              fontSize: "10px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              cursor: "pointer",
+              fontFamily: "'JetBrains Mono', monospace",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              transition: "all 0.15s",
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="3" fill={tab === "active" ? "#4ADE80" : "none"} />
+            </svg>
+            Live Now
+            <span style={{
+              fontSize: "9px",
+              backgroundColor: tab === "active" ? "rgba(245, 158, 11, 0.2)" : "#27272a",
+              padding: "1px 5px",
+              color: tab === "active" ? "#f59e0b" : "#71717a",
+            }}>{activeListeners.length}</span>
+          </button>
+          <button
+            onClick={() => setTab("followers")}
+            style={{
+              flex: 1,
+              padding: "10px",
+              backgroundColor: tab === "followers" ? "rgba(245, 158, 11, 0.1)" : "transparent",
+              border: "1px solid",
+              borderColor: tab === "followers" ? "#f59e0b" : "#27272a",
+              color: tab === "followers" ? "#f59e0b" : "#52525b",
+              fontSize: "10px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              cursor: "pointer",
+              fontFamily: "'JetBrains Mono', monospace",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              transition: "all 0.15s",
+            }}
+          >
+            Followers
+            {followers.length > 0 && (
+              <span style={{
+                fontSize: "9px",
+                backgroundColor: tab === "followers" ? "rgba(245, 158, 11, 0.2)" : "#27272a",
+                padding: "1px 5px",
+                color: tab === "followers" ? "#f59e0b" : "#71717a",
+              }}>{followers.length}</span>
+            )}
+          </button>
         </div>
       </div>{/* end fixed top zone */}
 
