@@ -138,7 +138,15 @@ export default function AdvertiserProfile() {
     .toUpperCase() || "?";
 
   return (
-    <div style={{ maxWidth: "500px" }}>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      width: "100vw",
+      height: "100%",
+      marginTop: "-24px",
+      marginLeft: "calc(-50vw + 50%)",
+      overflow: "hidden",
+    }}>
       <style>{`
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
@@ -148,42 +156,49 @@ export default function AdvertiserProfile() {
           animation: pulse-opacity 1s step-end infinite;
         }
       `}</style>
-      <div style={{
-        fontFamily: "var(--font-mono)",
-        fontSize: "12px",
-        color: "#f59e0b",
-        marginBottom: "8px",
-        letterSpacing: "0.05em",
-      }}>
-        {">"} edit_profile
-        <span className="cursor-blink" style={{
-          width: "8px",
-          height: "12px",
-          backgroundColor: "#f59e0b",
-          display: "inline-block",
-        }} />
-      </div>
 
-      <h1 style={{
-        fontSize: "24px",
-        fontWeight: 700,
-        marginBottom: "24px",
-        textTransform: "uppercase",
-        letterSpacing: "-0.05em",
-        color: "var(--text-primary)",
-      }}>
-        Edit Profile<span style={{ color: "#f59e0b" }}>_</span>
-      </h1>
-
-      {/* Avatar section */}
+      {/* ── Fixed top zone ── */}
       <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "16px",
-        marginBottom: "24px",
-        padding: "16px",
-        backgroundColor: "rgba(24, 24, 27, 0.3)",
-        borderLeft: "3px solid #f59e0b",
+        flexShrink: 0,
+        padding: "24px 20px 16px",
+        backgroundColor: "var(--bg-base)",
+        borderBottom: "1px solid #27272a",
+      }}>
+        <div style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: "12px",
+          color: "#f59e0b",
+          marginBottom: "8px",
+          letterSpacing: "0.05em",
+        }}>
+          {">"} edit_profile
+          <span className="cursor-blink" style={{
+            width: "8px",
+            height: "12px",
+            backgroundColor: "#f59e0b",
+            display: "inline-block",
+          }} />
+        </div>
+
+        <h1 style={{
+          fontSize: "24px",
+          fontWeight: 700,
+          marginBottom: "16px",
+          textTransform: "uppercase",
+          letterSpacing: "-0.05em",
+          color: "var(--text-primary)",
+        }}>
+          Edit Profile<span style={{ color: "#f59e0b" }}>_</span>
+        </h1>
+
+        {/* Avatar section */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "16px",
+          padding: "16px",
+          backgroundColor: "rgba(24, 24, 27, 0.3)",
+          borderLeft: "3px solid #f59e0b",
       }}>
         <div style={{
           width: "64px",
@@ -244,7 +259,15 @@ export default function AdvertiserProfile() {
           </div>
         </div>
       </div>
+      </div>{/* end fixed top zone */}
 
+      {/* ── Scrollable content zone ── */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "16px 20px",
+      }}>
       <form
         onSubmit={handleSave}
         style={{
@@ -328,6 +351,7 @@ export default function AdvertiserProfile() {
           {saving ? "Saving..." : "Save Changes"}
         </button>
       </form>
+      </div>{/* end scrollable zone */}
     </div>
   );
 }

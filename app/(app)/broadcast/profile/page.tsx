@@ -182,7 +182,15 @@ export default function BroadcasterProfile() {
     .toUpperCase() || "?";
 
   return (
-    <div style={{ maxWidth: "500px" }}>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      width: "100vw",
+      height: "100%",
+      marginTop: "-24px",
+      marginLeft: "calc(-50vw + 50%)",
+      overflow: "hidden",
+    }}>
       <style>{`
         @keyframes pulse-opacity {
           0%, 100% { opacity: 1; }
@@ -192,103 +200,118 @@ export default function BroadcasterProfile() {
           animation: pulse-opacity 1s step-end infinite;
         }
       `}</style>
-      <div style={{
-        fontFamily: "var(--font-mono)",
-        fontSize: "12px",
-        color: "#f59e0b",
-        marginBottom: "8px",
-        letterSpacing: "0.05em",
-      }}>
-        {">"} edit_profile
-        <span className="cursor-blink" style={{
-          width: "8px",
-          height: "12px",
-          backgroundColor: "#f59e0b",
-          display: "inline-block",
-        }} />
-      </div>
 
-      <h1 style={{
-        fontSize: "24px",
-        fontWeight: 700,
-        marginBottom: "24px",
-        textTransform: "uppercase",
-        letterSpacing: "-0.05em",
-        color: "var(--text-primary)",
-      }}>
-        Edit Profile<span style={{ color: "#f59e0b" }}>_</span>
-      </h1>
-
-      {/* Avatar section */}
+      {/* ── Fixed top zone ── */}
       <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "16px",
-        marginBottom: "24px",
-        padding: "16px",
-        backgroundColor: "rgba(24, 24, 27, 0.3)",
-        borderLeft: "3px solid #f59e0b",
+        flexShrink: 0,
+        padding: "24px 20px 16px",
+        backgroundColor: "var(--bg-base)",
+        borderBottom: "1px solid #27272a",
       }}>
         <div style={{
-          width: "64px",
-          height: "64px",
-          borderRadius: "50%",
-          border: "2px solid #3f3f46",
-          backgroundColor: avatarUrl ? "transparent" : "#27272a",
-          overflow: "hidden",
+          fontFamily: "var(--font-mono)",
+          fontSize: "12px",
+          color: "#f59e0b",
+          marginBottom: "8px",
+          letterSpacing: "0.05em",
+        }}>
+          {">"} edit_profile
+          <span className="cursor-blink" style={{
+            width: "8px",
+            height: "12px",
+            backgroundColor: "#f59e0b",
+            display: "inline-block",
+          }} />
+        </div>
+
+        <h1 style={{
+          fontSize: "24px",
+          fontWeight: 700,
+          marginBottom: "16px",
+          textTransform: "uppercase",
+          letterSpacing: "-0.05em",
+          color: "var(--text-primary)",
+        }}>
+          Edit Profile<span style={{ color: "#f59e0b" }}>_</span>
+        </h1>
+
+        {/* Avatar section */}
+        <div style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
+          gap: "16px",
+          padding: "16px",
+          backgroundColor: "rgba(24, 24, 27, 0.3)",
+          borderLeft: "3px solid #f59e0b",
         }}>
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <span style={{ fontSize: "20px", fontWeight: 700, color: "#a1a1aa", fontFamily: "var(--font-mono)" }}>
-              {initials}
-            </span>
-          )}
-        </div>
-        <div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            onChange={handleAvatarUpload}
-            style={{ display: "none" }}
-          />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={uploadingAvatar}
-            style={{
-              padding: "8px 14px",
-              backgroundColor: "transparent",
-              border: "1px solid #f59e0b",
-              color: "#f59e0b",
-              borderRadius: "0px",
-              cursor: uploadingAvatar ? "not-allowed" : "pointer",
-              fontSize: "11px",
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              fontFamily: "var(--font-mono)",
-              opacity: uploadingAvatar ? 0.6 : 1,
-            }}
-          >
-            {uploadingAvatar ? "Uploading..." : avatarUrl ? "Change Photo" : "Add Photo"}
-          </button>
           <div style={{
-            fontSize: "10px",
-            color: "#52525b",
-            marginTop: "6px",
-            fontFamily: "var(--font-mono)",
-            textTransform: "uppercase",
+            width: "64px",
+            height: "64px",
+            borderRadius: "50%",
+            border: "2px solid #3f3f46",
+            backgroundColor: avatarUrl ? "transparent" : "#27272a",
+            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
           }}>
-            JPG, PNG — max 2MB
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <span style={{ fontSize: "20px", fontWeight: 700, color: "#a1a1aa", fontFamily: "var(--font-mono)" }}>
+                {initials}
+              </span>
+            )}
+          </div>
+          <div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              style={{ display: "none" }}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploadingAvatar}
+              style={{
+                padding: "8px 14px",
+                backgroundColor: "transparent",
+                border: "1px solid #f59e0b",
+                color: "#f59e0b",
+                borderRadius: "0px",
+                cursor: uploadingAvatar ? "not-allowed" : "pointer",
+                fontSize: "11px",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                fontFamily: "var(--font-mono)",
+                opacity: uploadingAvatar ? 0.6 : 1,
+              }}
+            >
+              {uploadingAvatar ? "Uploading..." : avatarUrl ? "Change Photo" : "Add Photo"}
+            </button>
+            <div style={{
+              fontSize: "10px",
+              color: "#52525b",
+              marginTop: "6px",
+              fontFamily: "var(--font-mono)",
+              textTransform: "uppercase",
+            }}>
+              JPG, PNG — max 2MB
+            </div>
           </div>
         </div>
-      </div>
+      </div>{/* end fixed top zone */}
 
+      {/* ── Scrollable content zone ── */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        padding: "16px 20px",
+      }}>
       <form
         onSubmit={handleSave}
         style={{
@@ -428,6 +451,7 @@ export default function BroadcasterProfile() {
           {saving ? "Saving..." : "Save Changes"}
         </button>
       </form>
+      </div>{/* end scrollable zone */}
     </div>
   );
 }
