@@ -175,6 +175,25 @@ export default function AgentMarketplacePage() {
     setTogglingHost(false);
   }
 
+  const [unsubscribingId, setUnsubscribingId] = useState<string | null>(null);
+
+  async function handleUnsubscribe(agentId: string) {
+    if (!userId) return;
+    setUnsubscribingId(agentId);
+    try {
+      await supabase
+        .from("agent_subscriptions")
+        .delete()
+        .eq("broadcaster_id", userId)
+        .eq("agent_id", agentId);
+      setSuccessMessage("Agent removed.");
+      await loadData();
+    } catch {
+      alert("Error removing agent.");
+    }
+    setUnsubscribingId(null);
+  }
+
   async function handleBillingPortal() {
     setPortalLoading(true);
     try {
@@ -611,15 +630,37 @@ export default function AgentMarketplacePage() {
                   </button>
                 </div>
               ) : (
-                <div style={{
-                  fontSize: "11px",
-                  fontFamily: "var(--font-mono)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "#4ADE80",
-                  padding: "10px 0",
-                }}>
-                  Active as {sub.role === "primary" ? "Primary Host" : "Co-Host"}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 0" }}>
+                  <span style={{
+                    fontSize: "11px",
+                    fontFamily: "var(--font-mono)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: "#4ADE80",
+                    flex: 1,
+                  }}>
+                    Active as {sub.role === "primary" ? "Primary Host" : "Co-Host"}
+                  </span>
+                  <button
+                    onClick={() => handleUnsubscribe(agent.id)}
+                    disabled={unsubscribingId === agent.id}
+                    style={{
+                      padding: "6px 14px",
+                      backgroundColor: "transparent",
+                      border: "1px solid #E24A4A",
+                      color: "#E24A4A",
+                      borderRadius: "0px",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      fontFamily: "var(--font-mono)",
+                      cursor: unsubscribingId === agent.id ? "not-allowed" : "pointer",
+                      opacity: unsubscribingId === agent.id ? 0.6 : 1,
+                    }}
+                  >
+                    {unsubscribingId === agent.id ? "Removing..." : "Unsubscribe"}
+                  </button>
                 </div>
               )}
             </div>
