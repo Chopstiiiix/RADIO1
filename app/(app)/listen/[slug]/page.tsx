@@ -601,6 +601,7 @@ export default function ChannelPage() {
             textTransform: "uppercase",
             marginBottom: "8px",
             letterSpacing: "0.1em",
+            textShadow: "0 1px 4px rgba(0,0,0,0.8), 0 0 12px rgba(0,0,0,0.5)",
           }}>
             {metadata.track ? (metadata.type === "host_segment" ? "ON_AIR" : "NOW_PLAYING") : "AWAITING_SIGNAL"}
           </div>
@@ -613,6 +614,7 @@ export default function ChannelPage() {
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
+            textShadow: "0 1px 4px rgba(0,0,0,0.8), 0 0 12px rgba(0,0,0,0.5)",
           }}>
             {metadata.track ? (metadata.type === "host_segment" ? metadata.track.title : metadata.track.title.replace(/\s+/g, "_")) : "—"}
           </h2>
@@ -621,6 +623,7 @@ export default function ChannelPage() {
             fontWeight: 500,
             color: metadata.track ? "#d4d4d8" : "#71717a",
             marginTop: "4px",
+            textShadow: "0 1px 4px rgba(0,0,0,0.8), 0 0 12px rgba(0,0,0,0.5)",
           }}>
             {metadata.track?.artist || profile?.display_name || "—"}</h3>
         </div>

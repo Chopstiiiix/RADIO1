@@ -133,12 +133,6 @@ export default function Visualizer({ analyserNode, isPlaying, artworkUrl }: Visu
               objectPosition: "center",
             }}
           />
-          {/* Gradient overlay for readability */}
-          <div style={{
-            position: "absolute",
-            inset: 0,
-            background: "linear-gradient(to bottom, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.3) 100%)",
-          }} />
         </>
       )}
       {/* Wave canvas — always on top */}
