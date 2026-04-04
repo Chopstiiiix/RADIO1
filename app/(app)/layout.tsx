@@ -28,7 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     "/profile";
 
   return (
-    <div style={{
+    <div id="app-root" style={{
       height: "100dvh",
       display: "flex",
       flexDirection: "column",
