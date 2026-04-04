@@ -645,6 +645,7 @@ export default function ChannelPage() {
         backgroundColor: "#2B2B2B",
         borderTop: "2px solid #27272a",
         flexShrink: 0,
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}>
         {/* Timecode */}
         <div style={{
