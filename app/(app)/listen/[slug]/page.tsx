@@ -312,7 +312,7 @@ export default function ChannelPage() {
       display: "flex",
       flexDirection: "column",
       width: "100vw",
-      height: "100dvh",
+      height: "100%",
       marginTop: "-24px",
       marginLeft: "calc(-50vw + 50%)",
       backgroundColor: "var(--bg-base)",
