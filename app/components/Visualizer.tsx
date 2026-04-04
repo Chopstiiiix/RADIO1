@@ -137,7 +137,7 @@ export default function Visualizer({ analyserNode, isPlaying, artworkUrl }: Visu
           <div style={{
             position: "absolute",
             inset: 0,
-            background: "linear-gradient(to bottom, rgba(32,32,32,0.1) 0%, rgba(32,32,32,0.25) 50%, rgba(32,32,32,0.55) 100%)",
+            background: "linear-gradient(to bottom, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.3) 100%)",
           }} />
         </>
       )}
