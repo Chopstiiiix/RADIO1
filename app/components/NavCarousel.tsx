@@ -21,12 +21,21 @@ export default function NavCarousel({ items }: { items: NavItem[] }) {
   // On mount / API ready: scroll so active item is visible with context
   const onApiReady = useCallback(
     (api: CarouselApi) => {
-      if (!api || activeIndex <= 0) return;
-      // Scroll to one before active so user sees where they came from
-      const scrollTo = Math.max(0, activeIndex - 1);
-      api.scrollTo(scrollTo, true); // true = instant, no animation
+      if (!api || activeIndex < 0) return;
+      // At the start — no need to offset
+      if (activeIndex <= 1) {
+        api.scrollTo(0, true);
+        return;
+      }
+      // At the end — just scroll to the last possible position
+      if (activeIndex >= items.length - 2) {
+        api.scrollTo(items.length - 1, true);
+        return;
+      }
+      // Middle items — show one before for context
+      api.scrollTo(activeIndex - 1, true);
     },
-    [activeIndex],
+    [activeIndex, items.length],
   );
 
   return (
@@ -38,7 +47,7 @@ export default function NavCarousel({ items }: { items: NavItem[] }) {
         dragThreshold: 3,
         duration: 20,
         skipSnaps: true,
-        startIndex: Math.max(0, activeIndex - 1),
+        startIndex: activeIndex <= 1 ? 0 : activeIndex >= items.length - 2 ? items.length - 1 : activeIndex - 1,
       }}
       setApi={onApiReady}
       className="w-full"
