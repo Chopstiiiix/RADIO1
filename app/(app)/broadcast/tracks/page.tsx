@@ -830,7 +830,7 @@ export default function TracksPage() {
                   <button
                     key={ad.id}
                     type="button"
-                    onClick={() => insertAdAtPosition(ad, queue.length)}
+                    onClick={() => insertAdAtPosition(ad, 0)}
                     style={{
                       display: "flex", alignItems: "center", gap: "10px",
                       padding: "10px 12px",
