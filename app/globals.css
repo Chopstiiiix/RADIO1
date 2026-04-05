@@ -123,6 +123,12 @@ body::after {
   padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
 }
 
+/* Full-bleed player pages — kill parent scroll padding so footer isn't buried */
+.app-content:has(.player-fullbleed) {
+  padding-bottom: 0 !important;
+  overflow: hidden;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-well); }

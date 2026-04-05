@@ -308,7 +308,7 @@ export default function ChannelPage() {
   const nextTrack = metadata.upcoming[0];
 
   return (
-    <div style={{
+    <div className="player-fullbleed" style={{
       display: "flex",
       flexDirection: "column",
       width: "100vw",
