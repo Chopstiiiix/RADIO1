@@ -21,6 +21,23 @@ interface Track {
   artwork_url: string | null;
 }
 
+interface ApprovedAd {
+  id: string;         // ad_request id
+  advert_id: string;
+  title: string;
+  description: string | null;
+  file_url: string | null;
+  duration_seconds: number | null;
+  advertiser_name: string;
+}
+
+type QueueItem =
+  | { type: "track"; id: string; data: Track }
+  | { type: "advert"; id: string; data: ApprovedAd };
+
+const MAX_ADS_PER_WINDOW = 1;
+const AD_WINDOW_SIZE = 15;
+
 export default function TracksPage() {
   const supabase = createClient();
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -38,6 +55,8 @@ export default function TracksPage() {
   const [schedulingMessage, setSchedulingMessage] = useState("");
   const [broadcastStartedAt, setBroadcastStartedAt] = useState(0);
   const [broadcasterId, setBroadcasterId] = useState<string | null>(null);
+  const [approvedAds, setApprovedAds] = useState<ApprovedAd[]>([]);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
 
   async function handleSchedule(scheduledAt: string) {
     if (selectedTracks.size === 0) return;
@@ -67,13 +86,65 @@ export default function TracksPage() {
     if (!user) return;
     setBroadcasterId(user.id);
 
-    const { data } = await supabase
-      .from("tracks")
-      .select("id, title, primary_artist, featured_artists, producer, genre, duration_seconds, is_active, uploaded_at, artwork_url")
-      .eq("broadcaster_id", user.id)
-      .order("uploaded_at", { ascending: false });
+    const [trackRes, adRes] = await Promise.all([
+      supabase
+        .from("tracks")
+        .select("id, title, primary_artist, featured_artists, producer, genre, duration_seconds, is_active, uploaded_at, artwork_url")
+        .eq("broadcaster_id", user.id)
+        .order("uploaded_at", { ascending: false }),
+      supabase
+        .from("ad_requests")
+        .select(`
+          id, frequency,
+          advert:adverts(id, title, description, file_url, duration_seconds),
+          advertiser:profiles!ad_requests_advertiser_id_fkey(display_name)
+        `)
+        .eq("broadcaster_id", user.id)
+        .eq("status", "approved"),
+    ]);
 
-    setTracks(data || []);
+    const loadedTracks = trackRes.data || [];
+    setTracks(loadedTracks);
+
+    // Parse approved ads into flat structure
+    const ads: ApprovedAd[] = ((adRes.data as any) || []).map((r: any) => ({
+      id: r.id,
+      advert_id: r.advert?.id,
+      title: r.advert?.title || "Ad",
+      description: r.advert?.description,
+      file_url: r.advert?.file_url,
+      duration_seconds: r.advert?.duration_seconds,
+      advertiser_name: r.advertiser?.display_name || "Advertiser",
+    }));
+    setApprovedAds(ads);
+
+    // Build initial queue from tracks only (ads can be inserted by broadcaster)
+    // Preserve existing queue if tracks haven't changed
+    setQueue(prev => {
+      if (prev.length === 0) {
+        return loadedTracks.filter(t => t.is_active).map(t => ({ type: "track" as const, id: t.id, data: t }));
+      }
+      // Update existing queue items with fresh data, remove deleted, keep ad positions
+      const trackMap = new Map(loadedTracks.map(t => [t.id, t]));
+      const updated: QueueItem[] = [];
+      for (const item of prev) {
+        if (item.type === "track") {
+          const fresh = trackMap.get(item.id);
+          if (fresh && fresh.is_active) updated.push({ type: "track", id: fresh.id, data: fresh });
+        } else {
+          const freshAd = ads.find(a => a.id === item.id);
+          if (freshAd) updated.push({ type: "advert", id: freshAd.id, data: freshAd });
+        }
+      }
+      // Add any new active tracks not already in queue
+      for (const t of loadedTracks) {
+        if (t.is_active && !updated.some(q => q.type === "track" && q.id === t.id)) {
+          updated.push({ type: "track", id: t.id, data: t });
+        }
+      }
+      return updated;
+    });
+
     setLoading(false);
 
     // Always fetch channel slug and live status
@@ -231,6 +302,56 @@ export default function TracksPage() {
     return `${m}:${String(sec).padStart(2, "0")}`;
   }
 
+  // Check if an ad can be inserted at the given position (1 ad per 15 songs rule)
+  function canInsertAdAt(position: number, currentQueue: QueueItem[]): boolean {
+    // Count tracks in the surrounding window
+    let tracksBefore = 0;
+    let tracksAfter = 0;
+
+    // Look backward for the nearest ad (or start of queue)
+    for (let i = position - 1; i >= 0; i--) {
+      if (currentQueue[i].type === "advert") break;
+      if (currentQueue[i].type === "track") tracksBefore++;
+    }
+
+    // Look forward for the nearest ad (or end of queue)
+    for (let i = position; i < currentQueue.length; i++) {
+      if (currentQueue[i].type === "advert") break;
+      if (currentQueue[i].type === "track") tracksAfter++;
+    }
+
+    // The ad splits a window — both sides must have enough room
+    // Total tracks in this window must be >= AD_WINDOW_SIZE for the ad to be valid
+    // But we allow it as long as both neighbors aren't too close
+    return tracksBefore + tracksAfter >= AD_WINDOW_SIZE ||
+           (tracksBefore >= 1 && currentQueue.filter(q => q.type === "advert").length === 0);
+  }
+
+  function insertAdAtPosition(ad: ApprovedAd, position: number) {
+    setQueue(prev => {
+      // Check if this ad is already in the queue
+      if (prev.some(q => q.type === "advert" && q.id === ad.id)) {
+        setBroadcastMessage("This ad is already in the queue");
+        return prev;
+      }
+      if (!canInsertAdAt(position, prev)) {
+        setBroadcastMessage(`Max ${MAX_ADS_PER_WINDOW} ad per ${AD_WINDOW_SIZE} songs`);
+        return prev;
+      }
+      const next = [...prev];
+      next.splice(position, 0, { type: "advert", id: ad.id, data: ad });
+      setBroadcastMessage("");
+      return next;
+    });
+  }
+
+  function removeAdFromQueue(adId: string) {
+    setQueue(prev => prev.filter(q => !(q.type === "advert" && q.id === adId)));
+  }
+
+  // Get ads not yet placed in the queue
+  const unplacedAds = approvedAds.filter(ad => !queue.some(q => q.type === "advert" && q.id === ad.id));
+
   function toggleTrackSelection(id: string) {
     setSelectedTracks((prev) => {
       const next = new Set(prev);
@@ -277,11 +398,19 @@ export default function TracksPage() {
     setBroadcasting(true);
     setBroadcastMessage("");
 
+    // Build ordered queue for broadcast — only selected tracks + any ads in position
+    const broadcastQueue = queue.filter(q =>
+      q.type === "advert" || selectedTracks.has(q.id)
+    ).map(q => ({ type: q.type, id: q.type === "track" ? q.id : (q.data as ApprovedAd).advert_id }));
+
+    // Extract just track IDs for the server
+    const trackIdsInOrder = broadcastQueue.filter(q => q.type === "track").map(q => q.id);
+
     // Mark selected tracks as active (ensure they're in the broadcast rotation)
     const { error } = await supabase
       .from("tracks")
       .update({ is_active: true })
-      .in("id", Array.from(selectedTracks));
+      .in("id", trackIdsInOrder);
 
     if (error) {
       setBroadcastMessage(error.message);
@@ -295,7 +424,12 @@ export default function TracksPage() {
       const res = await fetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, track_ids: Array.from(selectedTracks), broadcaster_id: broadcasterId }),
+        body: JSON.stringify({
+          action,
+          track_ids: trackIdsInOrder,
+          broadcast_queue: broadcastQueue,
+          broadcaster_id: broadcasterId,
+        }),
       });
 
       const data = await res.json();
@@ -662,18 +796,70 @@ export default function TracksPage() {
           </a>
         </div>
       ) : (
-        <DraggableTrackList
-          tracks={tracks}
-          setTracks={setTracks}
-          selectedTracks={selectedTracks}
-          nowPlayingTitle={nowPlayingTitle}
-          normalize={normalize}
-          isTrackBroadcasting={isTrackBroadcasting}
-          toggleTrackSelection={toggleTrackSelection}
-          toggleActive={toggleActive}
-          deleteTrack={deleteTrack}
-          formatDuration={formatDuration}
-        />
+        <>
+          {/* Available ads to place */}
+          {unplacedAds.length > 0 && (
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{
+                fontSize: "11px", fontWeight: 700, color: "#4ADE80",
+                letterSpacing: "0.1em", textTransform: "uppercase",
+                marginBottom: "8px", fontFamily: "var(--font-mono)",
+              }}>
+                Available Ads — tap to place in queue
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {unplacedAds.map(ad => (
+                  <button
+                    key={ad.id}
+                    type="button"
+                    onClick={() => insertAdAtPosition(ad, queue.length)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "10px",
+                      padding: "10px 12px",
+                      backgroundColor: "rgba(74, 222, 128, 0.06)",
+                      borderLeft: "3px solid #4ADE80",
+                      border: "1px solid rgba(74, 222, 128, 0.2)",
+                      borderRadius: "0px",
+                      cursor: "pointer",
+                      fontFamily: "var(--font-mono)",
+                      textAlign: "left",
+                      width: "100%",
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="16" />
+                      <line x1="8" y1="12" x2="16" y2="12" />
+                    </svg>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#4ADE80", textTransform: "uppercase" }}>
+                        {ad.title}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "#71717a" }}>
+                        by {ad.advertiser_name} {ad.duration_seconds ? `· ${Math.round(ad.duration_seconds)}s` : ""}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "9px", color: "#4ADE80", letterSpacing: "0.1em" }}>+ ADD</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <DraggableQueueList
+            queue={queue}
+            setQueue={setQueue}
+            selectedTracks={selectedTracks}
+            nowPlayingTitle={nowPlayingTitle}
+            normalize={normalize}
+            isTrackBroadcasting={isTrackBroadcasting}
+            toggleTrackSelection={toggleTrackSelection}
+            toggleActive={toggleActive}
+            deleteTrack={deleteTrack}
+            removeAdFromQueue={removeAdFromQueue}
+            formatDuration={formatDuration}
+          />
+        </>
       )}
 
       </div>{/* end scrollable zone */}
@@ -699,12 +885,12 @@ export default function TracksPage() {
   );
 }
 
-function DraggableTrackList({
-  tracks, setTracks, selectedTracks, nowPlayingTitle, normalize,
-  isTrackBroadcasting, toggleTrackSelection, toggleActive, deleteTrack, formatDuration,
+function DraggableQueueList({
+  queue, setQueue, selectedTracks, nowPlayingTitle, normalize,
+  isTrackBroadcasting, toggleTrackSelection, toggleActive, deleteTrack, removeAdFromQueue, formatDuration,
 }: {
-  tracks: Track[];
-  setTracks: (t: Track[]) => void;
+  queue: QueueItem[];
+  setQueue: (q: QueueItem[] | ((prev: QueueItem[]) => QueueItem[])) => void;
   selectedTracks: Set<string>;
   nowPlayingTitle: string | null;
   normalize: (s: string) => string;
@@ -712,6 +898,7 @@ function DraggableTrackList({
   toggleTrackSelection: (id: string) => void;
   toggleActive: (id: string, current: boolean) => void;
   deleteTrack: (id: string) => void;
+  removeAdFromQueue: (id: string) => void;
   formatDuration: (s: number | null) => string;
 }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -728,7 +915,6 @@ function DraggableTrackList({
     if (!listRef.current) return;
     const items = Array.from(listRef.current.children) as HTMLElement[];
     itemRects.current = items.map((el) => el.getBoundingClientRect());
-    // Find scrollable parent
     let parent = listRef.current.parentElement;
     while (parent) {
       const style = getComputedStyle(parent);
@@ -756,8 +942,6 @@ function DraggableTrackList({
     setDragOffset(0);
     setIsDragging(true);
     startY.current = clientY;
-
-    // Prevent page scroll during drag
     document.body.style.overflow = "hidden";
     document.body.style.touchAction = "none";
   }
@@ -766,33 +950,26 @@ function DraggableTrackList({
     if (dragIndex === null) return;
     const offset = clientY - startY.current;
     setDragOffset(offset);
-
     const newOver = getOverIndex(clientY);
-    if (newOver !== overIndex) {
-      setOverIndex(newOver);
-    }
-
-    // Auto-scroll when near edges
+    if (newOver !== overIndex) setOverIndex(newOver);
     if (scrollParent.current) {
       const sp = scrollParent.current;
       const spRect = sp.getBoundingClientRect();
       const edgeZone = 60;
-      if (clientY < spRect.top + edgeZone) {
-        sp.scrollTop -= 8;
-      } else if (clientY > spRect.bottom - edgeZone) {
-        sp.scrollTop += 8;
-      }
+      if (clientY < spRect.top + edgeZone) sp.scrollTop -= 8;
+      else if (clientY > spRect.bottom - edgeZone) sp.scrollTop += 8;
     }
   }
 
   function endDrag() {
     if (dragIndex !== null && overIndex !== null && dragIndex !== overIndex) {
-      const newTracks = [...tracks];
-      const [moved] = newTracks.splice(dragIndex, 1);
-      newTracks.splice(overIndex, 0, moved);
-      setTracks(newTracks);
+      setQueue(prev => {
+        const next = [...prev];
+        const [moved] = next.splice(dragIndex, 1);
+        next.splice(overIndex, 0, moved);
+        return next;
+      });
     }
-
     setDragIndex(null);
     setOverIndex(null);
     setDragOffset(0);
@@ -800,21 +977,18 @@ function DraggableTrackList({
     draggingRef.current = false;
     document.body.style.overflow = "";
     document.body.style.touchAction = "";
-
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
   }
 
-  // Native non-passive touchmove to block scroll during drag
   const draggingRef = useRef(false);
   const longPressTimerRef2 = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-
     function handleTouchMove(e: TouchEvent) {
       if (longPressTimerRef2.current && !draggingRef.current) {
         clearTimeout(longPressTimerRef2.current);
@@ -826,12 +1000,10 @@ function DraggableTrackList({
       e.stopPropagation();
       moveDrag(e.touches[0].clientY);
     }
-
     el.addEventListener("touchmove", handleTouchMove, { passive: false });
     return () => el.removeEventListener("touchmove", handleTouchMove);
   });
 
-  // Touch handlers
   function onTouchStart(e: React.TouchEvent, index: number) {
     const y = e.touches[0].clientY;
     longPressTimerRef2.current = setTimeout(() => {
@@ -848,13 +1020,11 @@ function DraggableTrackList({
     if (isDragging) endDrag();
   }
 
-  // Mouse handlers
   function onMouseDown(e: React.MouseEvent, index: number) {
     const target = e.target as HTMLElement;
     if (!target.closest("[data-drag-handle]")) return;
     e.preventDefault();
     startDrag(index, e.clientY);
-
     const onMove = (ev: MouseEvent) => moveDrag(ev.clientY);
     const onUp = () => {
       endDrag();
@@ -865,17 +1035,14 @@ function DraggableTrackList({
     document.addEventListener("mouseup", onUp);
   }
 
-  // Calculate item height for animations
   const itemH = itemRects.current[0]?.height || 88;
   const gap = 8;
   const step = itemH + gap;
 
   return (
     <div ref={listRef} style={{ display: "flex", flexDirection: "column", gap: `${gap}px`, position: "relative" }}>
-      {tracks.map((track, index) => {
+      {queue.map((item, index) => {
         const isBeingDragged = isDragging && index === dragIndex;
-
-        // Calculate displacement for non-dragged items
         let slideY = 0;
         if (isDragging && dragIndex !== null && overIndex !== null && index !== dragIndex) {
           if (dragIndex < overIndex) {
@@ -887,7 +1054,7 @@ function DraggableTrackList({
 
         return (
           <div
-            key={track.id}
+            key={`${item.type}-${item.id}`}
             style={{
               position: "relative",
               zIndex: isBeingDragged ? 100 : 1,
@@ -898,24 +1065,37 @@ function DraggableTrackList({
                 ? "box-shadow 0.2s, scale 0.2s"
                 : "transform 0.25s cubic-bezier(0.25, 1, 0.5, 1)",
               opacity: isBeingDragged ? 0.9 : 1,
-              boxShadow: isBeingDragged ? "0 8px 32px rgba(245, 158, 11, 0.3)" : "none",
+              boxShadow: isBeingDragged
+                ? item.type === "advert"
+                  ? "0 8px 32px rgba(74, 222, 128, 0.3)"
+                  : "0 8px 32px rgba(245, 158, 11, 0.3)"
+                : "none",
               touchAction: isDragging ? "none" : "auto",
             }}
             onTouchStart={(e) => onTouchStart(e, index)}
             onTouchEnd={onTouchEnd}
             onMouseDown={(e) => onMouseDown(e, index)}
           >
-            <TrackCard
-              track={track}
-              isSelected={selectedTracks.has(track.id)}
-              isNowPlaying={nowPlayingTitle !== null && normalize(nowPlayingTitle).includes(normalize(track.title))}
-              isBroadcasting={isTrackBroadcasting(track)}
-              onToggleSelection={() => !isDragging && toggleTrackSelection(track.id)}
-              onToggleActive={() => toggleActive(track.id, track.is_active)}
-              onDelete={() => deleteTrack(track.id)}
-              formatDuration={formatDuration}
-              showDragHandle
-            />
+            {item.type === "track" ? (
+              <TrackCard
+                track={item.data as Track}
+                isSelected={selectedTracks.has(item.id)}
+                isNowPlaying={nowPlayingTitle !== null && normalize(nowPlayingTitle).includes(normalize((item.data as Track).title))}
+                isBroadcasting={isTrackBroadcasting(item.data as Track)}
+                onToggleSelection={() => !isDragging && toggleTrackSelection(item.id)}
+                onToggleActive={() => toggleActive(item.id, (item.data as Track).is_active)}
+                onDelete={() => deleteTrack(item.id)}
+                formatDuration={formatDuration}
+                showDragHandle
+              />
+            ) : (
+              <AdCard
+                ad={item.data as ApprovedAd}
+                onRemove={() => removeAdFromQueue(item.id)}
+                formatDuration={formatDuration}
+                showDragHandle
+              />
+            )}
           </div>
         );
       })}
@@ -1143,6 +1323,117 @@ function TrackCard({ track, isSelected, isNowPlaying, isBroadcasting, onToggleSe
         </button>
         <TrashButton onClick={() => { onDelete(); }} />
       </div>
+    </div>
+  );
+}
+
+function AdCard({ ad, onRemove, formatDuration, showDragHandle }: {
+  ad: ApprovedAd;
+  onRemove: () => void;
+  formatDuration: (s: number | null) => string;
+  showDragHandle?: boolean;
+}) {
+  return (
+    <div style={{
+      position: "relative",
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+      padding: "12px",
+      backgroundColor: "rgba(74, 222, 128, 0.06)",
+      borderLeft: "3px solid #4ADE80",
+      borderRadius: "0px",
+      cursor: "default",
+      transition: "background-color 0.15s",
+    }}>
+      {/* Drag handle */}
+      {showDragHandle && (
+        <div
+          data-drag-handle
+          style={{
+            cursor: "grab",
+            padding: "4px 2px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "2px",
+            flexShrink: 0,
+            touchAction: "none",
+          }}
+        >
+          <div style={{ width: "12px", height: "2px", backgroundColor: "rgba(74, 222, 128, 0.4)", borderRadius: "1px" }} />
+          <div style={{ width: "12px", height: "2px", backgroundColor: "rgba(74, 222, 128, 0.4)", borderRadius: "1px" }} />
+          <div style={{ width: "12px", height: "2px", backgroundColor: "rgba(74, 222, 128, 0.4)", borderRadius: "1px" }} />
+        </div>
+      )}
+
+      {/* Ad icon */}
+      <div style={{
+        width: "32px", height: "32px",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        backgroundColor: "rgba(74, 222, 128, 0.12)",
+        border: "1px solid rgba(74, 222, 128, 0.25)",
+        borderRadius: "4px",
+        flexShrink: 0,
+      }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+        </svg>
+      </div>
+
+      {/* Ad info */}
+      <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: "6px",
+        }}>
+          <span style={{
+            fontSize: "9px", fontWeight: 700,
+            color: "#0a0a0a", backgroundColor: "#4ADE80",
+            padding: "1px 6px", letterSpacing: "0.1em",
+            fontFamily: "var(--font-mono)",
+          }}>AD</span>
+          <span style={{
+            fontWeight: 600, fontSize: "14px",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            textTransform: "uppercase", color: "#4ADE80",
+          }}>
+            {ad.title}
+          </span>
+        </div>
+        <div style={{
+          display: "flex", alignItems: "center", gap: "8px", marginTop: "2px",
+        }}>
+          <span style={{ color: "#71717a", fontSize: "12px" }}>
+            {ad.advertiser_name}
+          </span>
+          <span style={{
+            fontFamily: "var(--font-mono)", fontSize: "11px",
+            color: "rgba(74, 222, 128, 0.5)", whiteSpace: "nowrap",
+          }}>
+            {formatDuration(ad.duration_seconds)}
+          </span>
+        </div>
+      </div>
+
+      {/* Remove button */}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onRemove(); }}
+        style={{
+          background: "none",
+          border: "1px solid rgba(74, 222, 128, 0.2)",
+          color: "#E24A4A",
+          padding: "3px 8px",
+          borderRadius: "0px",
+          fontSize: "10px",
+          cursor: "pointer",
+          fontFamily: "var(--font-mono)",
+          letterSpacing: "0.05em",
+          flexShrink: 0,
+        }}
+      >
+        REMOVE
+      </button>
     </div>
   );
 }

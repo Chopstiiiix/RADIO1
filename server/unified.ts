@@ -18,7 +18,7 @@ import { supabase } from "./supabase";
 import { syncTracksForChannel } from "./track-sync";
 import { dbMetadataCache, loadDbMetadata } from "./scheduler";
 import { isAiHostEnabled, getBroadcasterAgents, pregenerateHostSegments, generateHostAudio, type TrackContext } from "./react-agent";
-import { getNextAdForChannel, generateAdAudio, markAdPlayed } from "./ad-scheduler";
+import { generateAdAudio, markAdPlayed } from "./ad-scheduler";
 import { startMixer, connectMusicSource, writeMicAudio, stopMicInput, stopMixer, setMixerVolumes, hasMixer } from "./mic-mixer";
 import { AccessToken } from "livekit-server-sdk";
 import type { Response } from "express";
@@ -88,7 +88,7 @@ function buildUpcoming(tracks: TrackFile[], fromIndex: number, count = 3) {
   return upcoming;
 }
 
-async function startChannel(broadcasterId: string, slug: string, trackIds?: string[], mode: "tracks" | "live_mic" = "tracks"): Promise<boolean> {
+async function startChannel(broadcasterId: string, slug: string, trackIds?: string[], mode: "tracks" | "live_mic" = "tracks", broadcastQueue?: { type: string; id: string }[]): Promise<boolean> {
   // Clean up any stale state from a previous session
   stopChannelPipeline(slug);
   stopMixer(slug);
@@ -112,58 +112,207 @@ async function startChannel(broadcasterId: string, slug: string, trackIds?: stri
   const baseTracks = getChannelTracks(musicDir);
   if (baseTracks.length === 0) return false;
 
+  // ── Build ordered queue: respect broadcaster's ad placement ──
+  // If broadcastQueue is provided, reorder baseTracks to match and insert ad placeholders
+  const queueAdIds: { position: number; advertId: string }[] = [];
+  if (broadcastQueue && Array.isArray(broadcastQueue) && broadcastQueue.length > 0) {
+    // Build a map of local track files by DB metadata match
+    const trackFileMap = new Map<string, TrackFile>();
+    for (const tf of baseTracks) {
+      // Try matching by DB metadata cache (title lookup)
+      const name = tf.filename.replace(/\.[^.]+$/, "");
+      const dbMatch = dbMetadataCache.get(name.toUpperCase());
+      if (dbMatch) {
+        // We can't match by DB id directly, but tracks were synced by ID so filename should match
+        trackFileMap.set(tf.filename, tf);
+      } else {
+        trackFileMap.set(tf.filename, tf);
+      }
+    }
+
+    // Reorder baseTracks to match the queue order and note ad positions
+    const reordered: TrackFile[] = [];
+    let trackIndex = 0;
+    for (const qItem of broadcastQueue) {
+      if (qItem.type === "track") {
+        // Use tracks in the order they appear in broadcastQueue
+        // baseTracks are already synced by track_ids, so pick in order
+        if (trackIndex < baseTracks.length) {
+          reordered.push(baseTracks[trackIndex]);
+          trackIndex++;
+        }
+      } else if (qItem.type === "advert") {
+        // Record ad position (relative to reordered tracks so far)
+        queueAdIds.push({ position: reordered.length, advertId: qItem.id });
+      }
+    }
+    // Append any remaining tracks not in the queue
+    while (trackIndex < baseTracks.length) {
+      reordered.push(baseTracks[trackIndex]);
+      trackIndex++;
+    }
+    // Replace baseTracks reference
+    baseTracks.splice(0, baseTracks.length, ...reordered);
+  }
+
   // Check if broadcaster has AI host enabled (reads from DB — no frontend flag needed)
-  let finalTracks = baseTracks;
+  let finalTracks: TrackFile[] = baseTracks;
   const shouldUseAiHost = await isAiHostEnabled(broadcasterId);
-  if (shouldUseAiHost) {
+  const agents = shouldUseAiHost ? await getBroadcasterAgents(broadcasterId).catch(() => []) : [];
+
+  if (agents.length > 0) {
     try {
-      const agents = await getBroadcasterAgents(broadcasterId);
-      if (agents.length > 0) {
-        console.log(`🎙️ [${slug}] AI Host enabled — ${agents.map(a => `${a.name} (${a.role})`).join(", ")}`);
+      console.log(`🎙️ [${slug}] AI Host enabled — ${agents.map(a => `${a.name} (${a.role})`).join(", ")}`);
 
-        const segmentDir = path.join(musicDir, "_host_segments");
-        fs.mkdirSync(segmentDir, { recursive: true });
+      const segmentDir = path.join(musicDir, "_host_segments");
+      fs.mkdirSync(segmentDir, { recursive: true });
 
-        // Clean old host segments
-        if (fs.existsSync(segmentDir)) {
-          for (const f of fs.readdirSync(segmentDir)) {
-            fs.unlinkSync(path.join(segmentDir, f));
-          }
+      // Clean old host segments
+      if (fs.existsSync(segmentDir)) {
+        for (const f of fs.readdirSync(segmentDir)) {
+          fs.unlinkSync(path.join(segmentDir, f));
         }
+      }
 
-        const trackMeta = baseTracks.map(t => ({
-          filename: t.filename,
-          title: t.filename.replace(/\.[^.]+$/, "").split(" - ").slice(1).join(" - ") || t.filename.replace(/\.[^.]+$/, ""),
-          artist: t.filename.replace(/\.[^.]+$/, "").split(" - ")[0] || "Unknown",
-          duration: t.duration,
-        }));
+      const trackMeta = baseTracks.map(t => ({
+        filename: t.filename,
+        title: t.filename.replace(/\.[^.]+$/, "").split(" - ").slice(1).join(" - ") || t.filename.replace(/\.[^.]+$/, ""),
+        artist: t.filename.replace(/\.[^.]+$/, "").split(" - ")[0] || "Unknown",
+        duration: t.duration,
+      }));
 
-        const hostSegments = await pregenerateHostSegments(slug, broadcasterId, trackMeta, segmentDir);
+      const hostSegments = await pregenerateHostSegments(slug, broadcasterId, trackMeta, segmentDir);
 
-        if (hostSegments.size > 0) {
-          const interleaved: TrackFile[] = [];
-          for (let i = 0; i < baseTracks.length; i++) {
-            const segment = hostSegments.get(i);
-            if (segment) {
-              // Encode speaker names into filename so scheduler can display them
-              // Format: HOST__Adam__Eve__1234_track_intro.mp3
-              const speakerTag = segment.speakers.join("__");
-              const originalName = path.basename(segment.audioPath);
-              const taggedFilename = `HOST__${speakerTag}__${originalName}`;
-              interleaved.push({
-                path: segment.audioPath,
-                filename: taggedFilename,
-                duration: segment.duration,
-              });
-            }
-            interleaved.push(baseTracks[i]);
+      if (hostSegments.size > 0) {
+        const interleaved: TrackFile[] = [];
+        for (let i = 0; i < baseTracks.length; i++) {
+          const segment = hostSegments.get(i);
+          if (segment) {
+            const speakerTag = segment.speakers.join("__");
+            const originalName = path.basename(segment.audioPath);
+            const taggedFilename = `HOST__${speakerTag}__${originalName}`;
+            interleaved.push({
+              path: segment.audioPath,
+              filename: taggedFilename,
+              duration: segment.duration,
+            });
           }
-          finalTracks = interleaved;
-          console.log(`🎙️ [${slug}] Interleaved ${hostSegments.size} host segments into ${baseTracks.length} tracks`);
+          interleaved.push(baseTracks[i]);
         }
+        finalTracks = interleaved;
+        console.log(`🎙️ [${slug}] Interleaved ${hostSegments.size} host segments into ${baseTracks.length} tracks`);
       }
     } catch (err) {
       console.error(`🎙️ [${slug}] AI Host generation failed, continuing without:`, err);
+    }
+  }
+
+  // ── Insert ads at broadcaster-specified positions ──
+  if (queueAdIds.length > 0) {
+    const outputDir2 = path.join(BASE_OUTPUT_DIR, slug);
+    const segmentDir = path.join(musicDir, "_host_segments");
+    fs.mkdirSync(segmentDir, { recursive: true });
+
+    // We need to map queue positions (in baseTracks) to positions in finalTracks (which may have host segments interleaved)
+    // Build a mapping: baseTrackIndex -> finalTracksIndex
+    const baseToFinal = new Map<number, number>();
+    let baseIdx = 0;
+    for (let fi = 0; fi < finalTracks.length; fi++) {
+      if (!finalTracks[fi].filename.startsWith("HOST__")) {
+        baseToFinal.set(baseIdx, fi);
+        baseIdx++;
+      }
+    }
+
+    // Insert ads from end to start so positions don't shift
+    const sortedAds = [...queueAdIds].sort((a, b) => b.position - a.position);
+
+    for (const { position, advertId } of sortedAds) {
+      // Fetch the ad details
+      const { data: advert } = await supabase
+        .from("adverts")
+        .select("id, title, description, file_url, duration_seconds")
+        .eq("id", advertId)
+        .single();
+
+      if (!advert) {
+        console.log(`📢 [${slug}] Ad ${advertId} not found — skipping`);
+        continue;
+      }
+
+      console.log(`📢 [${slug}] Inserting ad "${advert.title}" at queue position ${position}`);
+
+      // Find the insertion point in finalTracks
+      const insertAt = (baseToFinal.get(position) ?? finalTracks.length);
+
+      const adBreakItems: TrackFile[] = [];
+
+      // Figure out the track before and after the ad for host context
+      const prevTrack = insertAt > 0 ? finalTracks[insertAt - 1] : null;
+      let nextTrack: TrackFile | null = null;
+      for (let ni = insertAt; ni < finalTracks.length; ni++) {
+        if (!finalTracks[ni].filename.startsWith("HOST__")) { nextTrack = finalTracks[ni]; break; }
+      }
+
+      const outgoing: TrackContext = prevTrack
+        ? { title: parseTrackMeta(prevTrack.filename).title, artist: parseTrackMeta(prevTrack.filename).artist }
+        : { title: "the last track", artist: "your favorite artist" };
+      const incoming: TrackContext = nextTrack
+        ? { title: parseTrackMeta(nextTrack.filename).title, artist: parseTrackMeta(nextTrack.filename).artist }
+        : { title: "the next track", artist: "your favorite artist" };
+
+      // 1. Host commercial break intro
+      if (agents.length > 0) {
+        const introSeg = await generateHostAudio(slug, agents, outgoing, incoming, {
+          isAdIntro: true,
+          adTitle: advert.title,
+          segmentDir,
+          maxDurationSeconds: 15,
+        });
+        if (introSeg) {
+          const speakerTag = introSeg.speakers.join("__");
+          adBreakItems.push({
+            path: introSeg.audioPath,
+            filename: `HOST__${speakerTag}__${path.basename(introSeg.audioPath)}`,
+            duration: introSeg.duration,
+          });
+        }
+      }
+
+      // 2. Generate ad audio (TTS ad read)
+      const ad: any = { advert: { id: advert.id, title: advert.title, description: advert.description, file_url: advert.file_url, duration_seconds: advert.duration_seconds } };
+      const adAudio = await generateAdAudio(ad, outputDir2);
+      if (adAudio) {
+        adBreakItems.push({
+          path: adAudio.path,
+          filename: path.basename(adAudio.path),
+          duration: adAudio.duration,
+        });
+        markAdPlayed(slug, advert.id);
+      }
+
+      // 3. Host welcome back
+      if (agents.length > 0 && adAudio) {
+        const outroSeg = await generateHostAudio(slug, agents, outgoing, incoming, {
+          isAdOutro: true,
+          adTitle: advert.title,
+          segmentDir,
+          maxDurationSeconds: 15,
+        });
+        if (outroSeg) {
+          const speakerTag = outroSeg.speakers.join("__");
+          adBreakItems.push({
+            path: outroSeg.audioPath,
+            filename: `HOST__${speakerTag}__${path.basename(outroSeg.audioPath)}`,
+            duration: outroSeg.duration,
+          });
+        }
+      }
+
+      if (adBreakItems.length > 0) {
+        finalTracks.splice(insertAt, 0, ...adBreakItems);
+        console.log(`📢 [${slug}] Spliced ${adBreakItems.length} ad break items at position ${insertAt}`);
+      }
     }
   }
 
@@ -225,99 +374,8 @@ function startTrackTimer(slug: string) {
     const current = activeChannels.get(slug);
     if (!current) return;
 
-    // ── Check if an ad break should be inserted ──
-    // Only check after a regular music track finishes (not host segments or ads)
-    const justFinished = current.tracks[current.currentIndex];
-    const isMusic = justFinished && !justFinished.filename.startsWith("HOST__") && !justFinished.filename.startsWith("AD__");
-
-    if (isMusic && !current.cuedTrack) {
-      try {
-        const ad = await getNextAdForChannel(current.broadcasterId, slug);
-        if (ad) {
-          console.log(`📢 [${slug}] Ad break triggered: "${ad.advert.title}"`);
-
-          // Figure out the next music track (the one after the ad break)
-          let nextMusicIndex = current.currentIndex + 1;
-          // Skip any existing host segments to find the actual next music track
-          while (nextMusicIndex < current.tracks.length && current.tracks[nextMusicIndex].filename.startsWith("HOST__")) {
-            nextMusicIndex++;
-          }
-          const nextMusicTrack = current.tracks[nextMusicIndex];
-
-          const outputDir = path.join(BASE_OUTPUT_DIR, slug);
-          const segmentDir = path.join(BASE_MUSIC_DIR, slug, "_host_segments");
-          fs.mkdirSync(segmentDir, { recursive: true });
-
-          // Build track context for the next song (for host dialogue)
-          const nextTrackContext: TrackContext = nextMusicTrack
-            ? { title: parseTrackMeta(nextMusicTrack.filename).title, artist: parseTrackMeta(nextMusicTrack.filename).artist }
-            : { title: "the next track", artist: "your favorite artist" };
-          const outgoingContext: TrackContext = { title: parseTrackMeta(justFinished.filename).title, artist: parseTrackMeta(justFinished.filename).artist };
-
-          // Get AI agents for host segments
-          const agents = await getBroadcasterAgents(current.broadcasterId);
-          const adBreakItems: TrackFile[] = [];
-
-          // 1. Generate ad_intro host segment ("taking a quick break")
-          if (agents.length > 0) {
-            const introSeg = await generateHostAudio(slug, agents, outgoingContext, nextTrackContext, {
-              isAdIntro: true,
-              adTitle: ad.advert.title,
-              segmentDir,
-              maxDurationSeconds: 15,
-            });
-            if (introSeg) {
-              const speakerTag = introSeg.speakers.join("__");
-              adBreakItems.push({
-                path: introSeg.audioPath,
-                filename: `HOST__${speakerTag}__${path.basename(introSeg.audioPath)}`,
-                duration: introSeg.duration,
-              });
-            }
-          }
-
-          // 2. Generate the ad audio itself
-          const adAudio = await generateAdAudio(ad, outputDir);
-          if (adAudio) {
-            adBreakItems.push({
-              path: adAudio.path,
-              filename: path.basename(adAudio.path),
-              duration: adAudio.duration,
-            });
-            markAdPlayed(slug, ad.advert.id);
-          }
-
-          // 3. Generate ad_outro host segment ("welcome back")
-          if (agents.length > 0 && adAudio) {
-            const outroSeg = await generateHostAudio(slug, agents, outgoingContext, nextTrackContext, {
-              isAdOutro: true,
-              adTitle: ad.advert.title,
-              segmentDir,
-              maxDurationSeconds: 15,
-            });
-            if (outroSeg) {
-              const speakerTag = outroSeg.speakers.join("__");
-              adBreakItems.push({
-                path: outroSeg.audioPath,
-                filename: `HOST__${speakerTag}__${path.basename(outroSeg.audioPath)}`,
-                duration: outroSeg.duration,
-              });
-            }
-          }
-
-          // Splice ad break items into the track list right after the current track
-          if (adBreakItems.length > 0) {
-            const insertAt = current.currentIndex + 1;
-            current.tracks.splice(insertAt, 0, ...adBreakItems);
-            console.log(`📢 [${slug}] Spliced ${adBreakItems.length} ad break items at index ${insertAt}`);
-          }
-        }
-      } catch (err) {
-        console.error(`📢 [${slug}] Ad break insertion failed:`, err);
-      }
-    }
-
     // ── Advance to next track ──
+    // Ad breaks are pre-inserted at build time based on broadcaster's queue order
     if (current.cuedTrack) {
       const cuedIndex = current.tracks.findIndex(t => t.filename === current.cuedTrack);
       if (cuedIndex !== -1) {
@@ -585,7 +643,7 @@ async function main() {
 
   app.post("/api/channels/:slug/start", async (req, res) => {
     const { slug } = req.params;
-    const { broadcaster_id, track_ids, mode } = req.body;
+    const { broadcaster_id, track_ids, broadcast_queue, mode } = req.body;
     if (!broadcaster_id) return res.status(400).json({ error: "broadcaster_id required" });
 
     // If channel is already live in tracks mode with an active mixer, don't restart
@@ -607,7 +665,6 @@ async function main() {
     const requestedMode = mode || "tracks";
 
     if (requestedMode === "live_mic") {
-      // Live mic mode: start synchronously — mixer must be ready before frontend sends audio
       const success = await startChannel(broadcaster_id, slug, track_ids, "live_mic");
       if (success) {
         res.json({ ok: true, message: `Channel ${slug} is now live` });
@@ -615,11 +672,10 @@ async function main() {
         res.status(400).json({ error: "Failed to start live mic broadcast" });
       }
     } else {
-      // Tracks mode: start async — AI host gen can take minutes, return immediately
       await supabase.from("broadcaster_profiles").update({ is_live: true }).eq("channel_slug", slug);
       res.json({ ok: true, message: `Channel ${slug} is starting...` });
 
-      startChannel(broadcaster_id, slug, track_ids, "tracks").then((success) => {
+      startChannel(broadcaster_id, slug, track_ids, "tracks", broadcast_queue).then((success) => {
         if (!success) {
           supabase.from("broadcaster_profiles").update({ is_live: false }).eq("channel_slug", slug);
           console.error(`❌ [${slug}] Broadcast failed to start`);
