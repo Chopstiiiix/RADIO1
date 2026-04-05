@@ -29,7 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div id="app-root" style={{
-      height: "100dvh",
+      height: "calc(100dvh - env(safe-area-inset-top, 0px))",
       display: "flex",
       flexDirection: "column",
       backgroundColor: "var(--bg-base)",
