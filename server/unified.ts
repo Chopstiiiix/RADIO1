@@ -17,7 +17,8 @@ import { startChannelPipeline, startChannelPipelineFromTracks, stopChannelPipeli
 import { supabase } from "./supabase";
 import { syncTracksForChannel } from "./track-sync";
 import { dbMetadataCache, loadDbMetadata } from "./scheduler";
-import { isAiHostEnabled, getBroadcasterAgents, pregenerateHostSegments } from "./react-agent";
+import { isAiHostEnabled, getBroadcasterAgents, pregenerateHostSegments, generateHostAudio, type TrackContext } from "./react-agent";
+import { getNextAdForChannel, generateAdAudio, markAdPlayed } from "./ad-scheduler";
 import { startMixer, connectMusicSource, writeMicAudio, stopMicInput, stopMixer, setMixerVolumes, hasMixer } from "./mic-mixer";
 import { AccessToken } from "livekit-server-sdk";
 import type { Response } from "express";
@@ -220,10 +221,103 @@ function startTrackTimer(slug: string) {
   // Add 0.5s buffer to account for FFmpeg -re timing drift
   const delay = (track.duration + 0.5) * 1000;
 
-  const timer = setTimeout(() => {
+  const timer = setTimeout(async () => {
     const current = activeChannels.get(slug);
     if (!current) return;
 
+    // ── Check if an ad break should be inserted ──
+    // Only check after a regular music track finishes (not host segments or ads)
+    const justFinished = current.tracks[current.currentIndex];
+    const isMusic = justFinished && !justFinished.filename.startsWith("HOST__") && !justFinished.filename.startsWith("AD__");
+
+    if (isMusic && !current.cuedTrack) {
+      try {
+        const ad = await getNextAdForChannel(current.broadcasterId, slug);
+        if (ad) {
+          console.log(`📢 [${slug}] Ad break triggered: "${ad.advert.title}"`);
+
+          // Figure out the next music track (the one after the ad break)
+          let nextMusicIndex = current.currentIndex + 1;
+          // Skip any existing host segments to find the actual next music track
+          while (nextMusicIndex < current.tracks.length && current.tracks[nextMusicIndex].filename.startsWith("HOST__")) {
+            nextMusicIndex++;
+          }
+          const nextMusicTrack = current.tracks[nextMusicIndex];
+
+          const outputDir = path.join(BASE_OUTPUT_DIR, slug);
+          const segmentDir = path.join(BASE_MUSIC_DIR, slug, "_host_segments");
+          fs.mkdirSync(segmentDir, { recursive: true });
+
+          // Build track context for the next song (for host dialogue)
+          const nextTrackContext: TrackContext = nextMusicTrack
+            ? { title: parseTrackMeta(nextMusicTrack.filename).title, artist: parseTrackMeta(nextMusicTrack.filename).artist }
+            : { title: "the next track", artist: "your favorite artist" };
+          const outgoingContext: TrackContext = { title: parseTrackMeta(justFinished.filename).title, artist: parseTrackMeta(justFinished.filename).artist };
+
+          // Get AI agents for host segments
+          const agents = await getBroadcasterAgents(current.broadcasterId);
+          const adBreakItems: TrackFile[] = [];
+
+          // 1. Generate ad_intro host segment ("taking a quick break")
+          if (agents.length > 0) {
+            const introSeg = await generateHostAudio(slug, agents, outgoingContext, nextTrackContext, {
+              isAdIntro: true,
+              adTitle: ad.advert.title,
+              segmentDir,
+              maxDurationSeconds: 15,
+            });
+            if (introSeg) {
+              const speakerTag = introSeg.speakers.join("__");
+              adBreakItems.push({
+                path: introSeg.audioPath,
+                filename: `HOST__${speakerTag}__${path.basename(introSeg.audioPath)}`,
+                duration: introSeg.duration,
+              });
+            }
+          }
+
+          // 2. Generate the ad audio itself
+          const adAudio = await generateAdAudio(ad, outputDir);
+          if (adAudio) {
+            adBreakItems.push({
+              path: adAudio.path,
+              filename: path.basename(adAudio.path),
+              duration: adAudio.duration,
+            });
+            markAdPlayed(slug, ad.advert.id);
+          }
+
+          // 3. Generate ad_outro host segment ("welcome back")
+          if (agents.length > 0 && adAudio) {
+            const outroSeg = await generateHostAudio(slug, agents, outgoingContext, nextTrackContext, {
+              isAdOutro: true,
+              adTitle: ad.advert.title,
+              segmentDir,
+              maxDurationSeconds: 15,
+            });
+            if (outroSeg) {
+              const speakerTag = outroSeg.speakers.join("__");
+              adBreakItems.push({
+                path: outroSeg.audioPath,
+                filename: `HOST__${speakerTag}__${path.basename(outroSeg.audioPath)}`,
+                duration: outroSeg.duration,
+              });
+            }
+          }
+
+          // Splice ad break items into the track list right after the current track
+          if (adBreakItems.length > 0) {
+            const insertAt = current.currentIndex + 1;
+            current.tracks.splice(insertAt, 0, ...adBreakItems);
+            console.log(`📢 [${slug}] Spliced ${adBreakItems.length} ad break items at index ${insertAt}`);
+          }
+        }
+      } catch (err) {
+        console.error(`📢 [${slug}] Ad break insertion failed:`, err);
+      }
+    }
+
+    // ── Advance to next track ──
     if (current.cuedTrack) {
       const cuedIndex = current.tracks.findIndex(t => t.filename === current.cuedTrack);
       if (cuedIndex !== -1) {
@@ -251,13 +345,14 @@ function startTrackTimer(slug: string) {
     }
 
     const isHostSeg = next.filename.includes("_host_segments") || next.filename.startsWith("HOST__");
+    const isAdvert = next.filename.startsWith("AD__");
     updateNowPlaying(slug, {
       track: parseTrackMeta(next.filename),
       upcoming: buildUpcoming(current.tracks, current.currentIndex),
       duration: next.duration,
       trackStartOffset: cumulativeOffset,
       ended: false,
-      type: isHostSeg ? "host_segment" : "track",
+      type: isAdvert ? "advert" : isHostSeg ? "host_segment" : "track",
     });
 
     startTrackTimer(slug);

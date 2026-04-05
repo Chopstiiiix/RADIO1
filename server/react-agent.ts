@@ -40,7 +40,7 @@ export interface GeneratedSegment {
   audioPath: string;
   duration: number;
   speakers: string[];
-  type: "track_intro" | "track_outro" | "ad_intro" | "ad_outro" | "show_open" | "show_close" | "recap";
+  type: "track_intro" | "track_outro" | "ad_intro" | "ad_outro" | "ad_welcome_back" | "show_open" | "show_close" | "recap";
 }
 
 // ---------------------------------------------------------------------------
@@ -228,6 +228,7 @@ export async function generateHostAudio(
   incoming: TrackContext,
   options?: {
     isAdIntro?: boolean;
+    isAdOutro?: boolean;
     adTitle?: string;
     segmentDir?: string;
     maxDurationSeconds?: number;
@@ -250,12 +251,15 @@ export async function generateHostAudio(
   const segmentDir =
     options?.segmentDir ?? path.join(process.cwd(), "music", slug, "_host_segments");
   const isAdIntro = options?.isAdIntro ?? false;
+  const isAdOutro = options?.isAdOutro ?? false;
   const adTitle = options?.adTitle;
 
   // Determine segment type from the style hint
   const segmentStyle = options?.segmentStyle as string | undefined;
   let segmentType: GeneratedSegment["type"];
-  if (isAdIntro) {
+  if (isAdOutro) {
+    segmentType = "ad_welcome_back";
+  } else if (isAdIntro) {
     segmentType = "ad_intro";
   } else if (segmentStyle === "show_open") {
     segmentType = "show_open";
@@ -314,7 +318,18 @@ export async function generateHostAudio(
 
   let prompt: string;
 
-  if (isAdIntro) {
+  if (isAdOutro) {
+    prompt = `You are writing a short radio host ${isSolo ? "monologue" : "conversation"} for an AI radio station.
+
+${agentDescriptions}
+
+They are coming back from a commercial break. The ad was for: "${adTitle}"
+The next song is "${incoming.title}" by ${incoming.artist}${buildTrackDetails(incoming)}
+
+Write a ${isSolo ? "monologue (2-3 sentences)" : "natural, short 3-5 line conversation"} that welcomes listeners back from the break and transitions into the next track. Keep it upbeat — "welcome back", "we're back", "alright we're back in the mix" energy. Don't dwell on the ad, pivot straight to the music.
+${formatInstruction}
+${toneInstruction}`;
+  } else if (isAdIntro) {
     prompt = `You are writing a short radio host ${isSolo ? "monologue" : "conversation"} for an AI radio station.
 
 ${agentDescriptions}
@@ -322,7 +337,7 @@ ${agentDescriptions}
 They are about to introduce a short ad break. The ad is for: "${adTitle}"
 After the ad, the next song will be "${incoming.title}" by ${incoming.artist}.
 
-Write a ${isSolo ? "monologue (2-3 sentences)" : "natural, short 3-5 line conversation"} that smoothly transitions to the ad break.
+Write a ${isSolo ? "monologue (2-3 sentences)" : "natural, short 3-5 line conversation"} that smoothly transitions to the ad break. Use phrases like "quick break", "don't go anywhere", "we'll be right back" — classic radio commercial break energy.
 ${formatInstruction}
 ${toneInstruction}`;
   } else if (segmentStyle === "show_open") {
