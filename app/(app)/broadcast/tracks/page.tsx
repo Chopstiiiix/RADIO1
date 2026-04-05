@@ -19,6 +19,7 @@ interface Track {
   is_active: boolean;
   uploaded_at: string;
   artwork_url: string | null;
+  position: number | null;
 }
 
 interface ApprovedAd {
@@ -89,8 +90,9 @@ export default function TracksPage() {
     const [trackRes, adRes] = await Promise.all([
       supabase
         .from("tracks")
-        .select("id, title, primary_artist, featured_artists, producer, genre, duration_seconds, is_active, uploaded_at, artwork_url")
+        .select("id, title, primary_artist, featured_artists, producer, genre, duration_seconds, is_active, uploaded_at, artwork_url, position")
         .eq("broadcaster_id", user.id)
+        .order("position", { ascending: true, nullsFirst: false })
         .order("uploaded_at", { ascending: false }),
       supabase
         .from("ad_requests")
@@ -351,6 +353,22 @@ export default function TracksPage() {
 
   // Get ads not yet placed in the queue
   const unplacedAds = approvedAds.filter(ad => !queue.some(q => q.type === "advert" && q.id === ad.id));
+
+  // Persist track positions to Supabase after reorder
+  async function saveTrackPositions(updatedQueue: QueueItem[]) {
+    let pos = 0;
+    const updates: { id: string; position: number }[] = [];
+    for (const item of updatedQueue) {
+      if (item.type === "track") {
+        updates.push({ id: item.id, position: pos });
+        pos++;
+      }
+    }
+    // Batch update positions
+    for (const u of updates) {
+      await supabase.from("tracks").update({ position: u.position }).eq("id", u.id);
+    }
+  }
 
   function toggleTrackSelection(id: string) {
     setSelectedTracks((prev) => {
@@ -858,6 +876,7 @@ export default function TracksPage() {
             deleteTrack={deleteTrack}
             removeAdFromQueue={removeAdFromQueue}
             formatDuration={formatDuration}
+            onReorder={saveTrackPositions}
           />
         </>
       )}
@@ -887,7 +906,7 @@ export default function TracksPage() {
 
 function DraggableQueueList({
   queue, setQueue, selectedTracks, nowPlayingTitle, normalize,
-  isTrackBroadcasting, toggleTrackSelection, toggleActive, deleteTrack, removeAdFromQueue, formatDuration,
+  isTrackBroadcasting, toggleTrackSelection, toggleActive, deleteTrack, removeAdFromQueue, formatDuration, onReorder,
 }: {
   queue: QueueItem[];
   setQueue: (q: QueueItem[] | ((prev: QueueItem[]) => QueueItem[])) => void;
@@ -900,6 +919,7 @@ function DraggableQueueList({
   deleteTrack: (id: string) => void;
   removeAdFromQueue: (id: string) => void;
   formatDuration: (s: number | null) => string;
+  onReorder: (q: QueueItem[]) => void;
 }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
@@ -967,6 +987,8 @@ function DraggableQueueList({
         const next = [...prev];
         const [moved] = next.splice(dragIndex, 1);
         next.splice(overIndex, 0, moved);
+        // Persist new positions to DB
+        onReorder(next);
         return next;
       });
     }
@@ -991,8 +1013,13 @@ function DraggableQueueList({
     if (!el) return;
     function handleTouchMove(e: TouchEvent) {
       if (longPressTimerRef2.current && !draggingRef.current) {
-        clearTimeout(longPressTimerRef2.current);
-        longPressTimerRef2.current = null;
+        // Cancel long press if finger moved beyond threshold (user is scrolling, not dragging)
+        const dx = e.touches[0].clientX - touchStartPos.current.x;
+        const dy = e.touches[0].clientY - touchStartPos.current.y;
+        if (Math.abs(dx) > MOVE_THRESHOLD || Math.abs(dy) > MOVE_THRESHOLD) {
+          clearTimeout(longPressTimerRef2.current);
+          longPressTimerRef2.current = null;
+        }
         return;
       }
       if (!draggingRef.current) return;
@@ -1004,11 +1031,15 @@ function DraggableQueueList({
     return () => el.removeEventListener("touchmove", handleTouchMove);
   });
 
+  const touchStartPos = useRef({ x: 0, y: 0 });
+  const MOVE_THRESHOLD = 10; // px — cancel long press if finger moves more than this
+
   function onTouchStart(e: React.TouchEvent, index: number) {
-    const y = e.touches[0].clientY;
+    const touch = e.touches[0];
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
     longPressTimerRef2.current = setTimeout(() => {
       draggingRef.current = true;
-      startDrag(index, y);
+      startDrag(index, touch.clientY);
     }, 400);
   }
 
