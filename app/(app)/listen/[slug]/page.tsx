@@ -547,6 +547,22 @@ export default function ChannelPage() {
         position: "relative",
         overflow: "hidden",
       }}>
+        {/* Full-bleed artwork background */}
+        {metadata.track?.artwork && (
+          <img
+            src={metadata.track.artwork}
+            alt=""
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center",
+              zIndex: 0,
+            }}
+          />
+        )}
         {/* Tap to join live — shown when browser blocks autoplay in live_mic mode */}
         {autoplayBlocked && isLiveMic && !stream.isPlaying && (
           <button
@@ -629,18 +645,13 @@ export default function ChannelPage() {
             {metadata.track?.artist || profile?.display_name || "—"}</h3>
         </div>
 
-        {/* Visualizer (positioned absolute at bottom) */}
+        {/* Visualizer — transparent canvas waves floating over artwork */}
         <div style={{
           position: "absolute",
-          bottom: 0,
-          left: 0,
-          width: "100%",
-          height: "60%",
-          opacity: 0.8,
-          maskImage: "linear-gradient(to bottom, transparent 0%, black 40%)",
-          WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 40%)",
+          inset: 0,
+          zIndex: 1,
         }}>
-          <Visualizer analyserNode={isLiveMic ? liveMic.analyserNode : stream.analyserNode} isPlaying={isLiveMic ? liveMic.connected : stream.isPlaying} artworkUrl={metadata.track?.artwork} />
+          <Visualizer analyserNode={isLiveMic ? liveMic.analyserNode : stream.analyserNode} isPlaying={isLiveMic ? liveMic.connected : stream.isPlaying} />
         </div>
       </main>
 

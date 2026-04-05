@@ -6,10 +6,9 @@ import { isNative } from "../../lib/capacitor-bridge";
 interface VisualizerProps {
   analyserNode: AnalyserNode | null;
   isPlaying: boolean;
-  artworkUrl?: string | null;
 }
 
-export default function Visualizer({ analyserNode, isPlaying, artworkUrl }: VisualizerProps) {
+export default function Visualizer({ analyserNode, isPlaying }: VisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timeRef = useRef(0);
   const animFrameRef = useRef<number>(0);
@@ -93,14 +92,14 @@ export default function Visualizer({ analyserNode, isPlaying, artworkUrl }: Visu
       ctx.beginPath();
       ctx.moveTo(0, h / 2);
       ctx.lineTo(w, h / 2);
-      ctx.strokeStyle = artworkUrl ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.05)";
+      ctx.strokeStyle = "rgba(255,255,255,0.05)";
       ctx.lineWidth = 1;
       ctx.stroke();
 
       // Three layered waves — brighter when over artwork
       const fd = hasRealData ? freqData : undefined;
       const br = hasRealData ? undefined : breathe;
-      const opMul = artworkUrl ? 1.3 : 1;
+      const opMul = 1;
       drawWave(w, h, h * 0.3, 0.005, 0, 0.3 * opMul, 2, timeRef.current, fd, br);
       drawWave(w, h, h * 0.2, 0.01, Math.PI / 4, 0.8 * opMul, 1.5, timeRef.current, fd, br);
       drawWave(w, h, h * 0.1, 0.02, Math.PI, 0.5 * opMul, 1, timeRef.current, fd, br);
@@ -114,28 +113,10 @@ export default function Visualizer({ analyserNode, isPlaying, artworkUrl }: Visu
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(animFrameRef.current);
     };
-  }, [analyserNode, isPlaying, artworkUrl]);
+  }, [analyserNode, isPlaying]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      {/* Artwork background layer */}
-      {artworkUrl && (
-        <>
-          <img
-            src={artworkUrl}
-            alt="Track artwork"
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              objectPosition: "center",
-            }}
-          />
-        </>
-      )}
-      {/* Wave canvas — always on top */}
       <canvas
         ref={canvasRef}
         style={{
