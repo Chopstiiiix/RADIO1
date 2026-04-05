@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import InlineLoader from "@/app/components/InlineLoader";
+import ManageBilling from "@/app/components/ManageBilling";
 import { useRouter } from "next/navigation";
 
 export default function BroadcasterProfile() {
@@ -451,6 +452,9 @@ export default function BroadcasterProfile() {
           {saving ? "Saving..." : "Save Changes"}
         </button>
       </form>
+
+      <ManageBilling />
+
       </div>{/* end scrollable zone */}
     </div>
   );

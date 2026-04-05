@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import NotificationButton from "@/app/components/NotificationButton";
 import AvatarMenu from "@/app/components/AvatarMenu";
 import NavCarousel from "@/app/components/NavCarousel";
+import Paywall from "@/app/components/Paywall";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient();
@@ -14,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, display_name, avatar_url")
+    .select("role, display_name, avatar_url, subscription_status")
     .eq("id", user.id)
     .single();
 
@@ -117,6 +118,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <main className="app-content" style={{ padding: "24px 20px 1px", width: "100%", flex: 1, overflow: "hidden", minHeight: 0 }}>
         {children}
       </main>
+
+      {/* Paywall — shown when user has no active subscription */}
+      {profile.subscription_status !== "active" && profile.subscription_status !== "trialing" && (
+        <Paywall role={profile.role as "listener" | "broadcaster" | "advertiser"} />
+      )}
     </div>
   );
 }

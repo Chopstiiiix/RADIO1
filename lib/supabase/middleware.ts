@@ -73,5 +73,27 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  // Check subscription status for protected role routes
+  // The paywall is rendered client-side via the layout, but we set a header
+  // so the layout can read it without an extra DB call
+  if (user && !isPublicRoute) {
+    const isRoleRoute = pathname.startsWith("/listen") || pathname.startsWith("/broadcast") || pathname.startsWith("/advertise") || pathname === "/profile" || pathname === "/search";
+    if (isRoleRoute) {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("subscription_status")
+          .eq("id", user.id)
+          .single();
+
+        if (profile) {
+          supabaseResponse.headers.set("x-subscription-status", profile.subscription_status || "incomplete");
+        }
+      } catch {
+        // Can't read profile — let them through, paywall will check client-side
+      }
+    }
+  }
+
   return supabaseResponse;
 }
